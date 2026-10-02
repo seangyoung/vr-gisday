@@ -42,7 +42,7 @@ Prepared workflow: `.github/workflows/deploy.yml` tests and builds on pushes to 
 4. Run/re-run the Deploy GIS Day to Pages workflow if necessary.
 5. Open the HTTPS URL from its successful deployment in Quest Browser.
 
-Requested remote: `seangyoung/vr-gisday`. The existing Git credential authenticates as `seangyoung`, but repository creation returned HTTP 403 (token permission). Awaiting creation of the empty public repository by its owner; push and Pages permissions are not yet verified.
+Repository: https://github.com/seangyoung/vr-gisday. GitHub Pages is configured to deploy using GitHub Actions. Site: https://seangyoung.github.io/vr-gisday/.
 
 ## Validation and headset acceptance
 
