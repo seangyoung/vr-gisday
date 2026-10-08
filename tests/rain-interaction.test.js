@@ -172,3 +172,34 @@ test("high-resolution erosion sculpting rebases the experiment and preserves the
   assert.equal(r.originalBed.visible, false);
   r.dispose();
 });
+
+for (const kind of ["drainage", "erosion"])
+  test(`${kind}: sculpt and rain together without clearing water`, () => {
+    const r = new RainExperience(new THREE.Scene(), () => {}, kind);
+    r.explore();
+    const id = r.cellAt(-0.3, -0.4);
+    r.water.add(id, 0.002);
+    const water = r.water,
+      volume = water.stored;
+    const before = r.heights.slice();
+    r.beginStroke(
+      0,
+      new THREE.Vector3(-0.3, before[id], -0.4),
+      new THREE.Vector3(-0.3, 1, -0.4),
+    );
+    r.moveStroke(0, new THREE.Vector3(-0.3, 1.07, -0.4));
+    assert.ok(r.heights[id] > before[id]);
+    assert.equal(r.water, water);
+    assert.equal(r.water.stored, volume);
+    r.setSource(id);
+    for (let i = 0; i < 100; i++) r.update(0.02, true);
+    assert.ok(r.water.added > 0.002);
+    assert.equal(r.stroke.id, 0);
+    r.endStroke(0);
+    assert.equal(r.stroke, null);
+    assert.equal(r.moveHandles.length, 2);
+    r.grab.begin(1, new THREE.Matrix4());
+    r.beginStroke(0, new THREE.Vector3(), new THREE.Vector3());
+    assert.equal(r.stroke, null);
+    r.dispose();
+  });

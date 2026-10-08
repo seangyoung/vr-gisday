@@ -451,16 +451,6 @@ function drawRainUI() {
       "A watershed is land that drains to a common outlet.\nNearby drops can end up in different places.\nRidges divide the land into different drainage areas.",
     ],
   ];
-  if (r.stage === 1 && r.mode === "sculpt")
-    copy[1] = [
-      "Sandbox · shape the land",
-      "Point at the land and HOLD a SIDE GRIP.\nLift to raise earth; lower to dig. Move sideways to sculpt.\nRelease, then choose Rain mode to test your changes.",
-    ];
-  else if (r.stage === 1 && r.edited)
-    copy[1] = [
-      "Rain mode · test your terrain",
-      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nKeep raining to fill / spill. GRIP: move; BOTH grips: resize.",
-    ];
   if (r.stage === 4 && r.edited)
     copy[4] = [
       "Change the land. Change the flow.",
@@ -471,19 +461,17 @@ function drawRainUI() {
       "Make It Rain · erosion tray",
       "Water can move the land as well as flow over it.\nPour onto this tilted bed and watch channels develop.\nGRIP: move / turn. BOTH grips: resize.",
     ];
-    copy[1] = [
-      "Pour. Cut channels. Carry sediment.",
-      "Start the pour, or point and HOLD TRIGGER to add water.\nWatch grooves deepen and join as loose earth moves.\nStop pour; use Original bed to compare. GRIP: move / turn.",
-    ];
     copy[4] = [
       "Water shapes its own path.",
       "Flow removes loose material and carries it downhill.\nChannels can join; slower water can leave sediment behind.\nThis accelerated experiment is not a real erosion forecast.",
     ];
   }
-  if (r.kind === "erosion" && r.stage === 1 && r.mode === "sculpt")
-    copy[1] = [
-      "Shape your erosion experiment",
-      "Point at the bed and HOLD a SIDE GRIP.\nLift to build a ridge; lower to dig a hollow or channel.\nChoose Pour mode, then Start pour to test the new landscape.",
+  if (r.stage === 0 || r.stage === 1)
+    copy[r.stage] = [
+      r.kind === "erosion"
+        ? "Shape the land. Watch water reshape it."
+        : "Shape the land. Follow the water.",
+      "HOLD TRIGGER on land: add water. HOLD SIDE GRIP: sculpt.\nLift to raise earth; lower to dig. Both work together.\nGRIP blue handles: move / turn. BOTH grips: resize.",
     ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
@@ -504,98 +492,53 @@ function drawRainUI() {
       1.02,
     );
   }
-  if (r.stage === 1 && r.kind === "erosion") {
+  if (r.stage === 1) {
     button(
-      r.pouring ? "Stop pour" : "Start pour",
-      -0.92,
-      -0.77,
-      () => {
-        stopRainInput();
-        if (r.mode === "sculpt") r.setMode("rain");
-        r.pouring = !r.pouring;
-        draw();
-      },
-      0.44,
-    );
-    button(
-      "Reset tray",
-      -0.46,
+      r.kind === "erosion" ? "Reset tray" : "Reset terrain",
+      -0.84,
       -0.77,
       () => {
         stopRainInput();
         r.restore();
       },
-      0.44,
-    );
-    button(
-      r.originalBed.visible ? "Hide original" : "Original bed",
-      0,
-      -0.77,
-      () => {
-        r.originalBed.visible = !r.originalBed.visible;
-        draw();
-      },
-      0.44,
-    );
-    button(
-      r.mode === "sculpt" ? "Pour mode" : "Shape terrain",
-      0.46,
-      -0.77,
-      () => {
-        stopRainInput();
-        r.setMode(r.mode === "sculpt" ? "rain" : "sculpt");
-      },
-      0.44,
-    );
-    button(
-      "Takeaways",
-      0.92,
-      -0.77,
-      () => {
-        stopRainInput();
-        r.finish();
-      },
-      0.44,
-    );
-  }
-  if (r.stage === 1 && r.kind !== "erosion") {
-    button(
-      r.mode === "sculpt" ? "Rain mode" : "Shape terrain",
-      -0.84,
-      -0.77,
-      () => {
-        stopRainInput();
-        r.setMode(r.mode === "sculpt" ? "rain" : "sculpt");
-      },
       0.52,
     );
     button(
-      r.mode === "sculpt"
-        ? "Restore terrain"
+      r.kind === "erosion"
+        ? r.originalBed.visible
+          ? "Hide original"
+          : "Original bed"
         : r.overlay
           ? "Hide basins"
           : "Show basins",
       -0.28,
       -0.77,
       () => {
-        stopRainInput();
-        if (r.mode === "sculpt") r.restore();
-        else r.toggleOverlay();
+        if (r.kind === "erosion") {
+          r.originalBed.visible = !r.originalBed.visible;
+          draw();
+        } else r.toggleOverlay();
       },
       0.52,
     );
     button(
-      r.edited || r.mode === "sculpt" ? "Takeaways" : "Prediction",
+      r.kind === "erosion" || r.edited ? "Takeaways" : "Prediction",
       0.28,
       -0.77,
       () => {
         stopRainInput();
-        if (r.edited || r.mode === "sculpt") r.finish();
+        if (r.kind === "erosion" || r.edited) r.finish();
         else r.challenge();
       },
       0.52,
     );
-    button("Erosion tray", 0.84, -0.77, () => startRain("erosion", true), 0.52);
+    button(
+      r.kind === "erosion" ? "Drainage" : "Erosion tray",
+      0.84,
+      -0.77,
+      () => startRain(r.kind === "erosion" ? "drainage" : "erosion", true),
+      0.52,
+    );
   }
   if (r.stage === 2) {
     button("Outlet A · left", -0.54, -0.77, () => r.choose("A"), 1.02);
@@ -631,13 +574,11 @@ function drawRainUI() {
     label(
       r.kind === "erosion"
         ? "Dark: erosion · Pale: deposits · White grid: original bed · Accelerated"
-        : r.mode === "sculpt"
-          ? "Editing drains water · Edges anchored · Height limited"
-          : r.overlay && r.edited
-            ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
-            : r.overlay
-              ? "A: blue / round outlet    ·    B: gold / square outlet"
-              : "Surface-flow model · Synthetic terrain · No flood prediction",
+        : r.overlay && r.edited
+          ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
+          : r.overlay
+            ? "A: blue / round outlet    ·    B: gold / square outlet"
+            : "Surface-flow model · Synthetic terrain · No flood prediction",
       0,
       -0.55,
       2.3,
@@ -884,6 +825,18 @@ function draw() {
       panel.append(b);
     }
     if (rain?.stage === 1) {
+      for (const [name, x, delta] of [
+        ["Dig hollow", -0.3, -0.3],
+        ["Raise ridge", 0.3, 0.3],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => {
+          rain.applyBrush(x, -0.4, delta);
+          rain.endStroke();
+        };
+        panel.append(b);
+      }
       for (const [name, x] of [
         ["Rain on left slope", -0.3],
         ["Rain on right slope", 0.3],
@@ -891,18 +844,7 @@ function draw() {
         const b = document.createElement("button");
         b.textContent = name;
         b.style.cssText = "font-size:11px;padding:5px;margin:3px";
-        b.textContent =
-          rain.mode === "sculpt"
-            ? x < 0
-              ? "Dig hollow"
-              : "Raise ridge"
-            : name;
-        b.onclick = () => {
-          if (rain.mode === "sculpt") {
-            rain.applyBrush(x, -0.4, x < 0 ? -0.3 : 0.3);
-            rain.endStroke();
-          } else rain.burst(rain.cellAt(x, -0.4));
-        };
+        b.onclick = () => rain.burst(rain.cellAt(x, -0.4));
         panel.append(b);
       }
     }
@@ -1117,31 +1059,23 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
-    if (rain?.mode === "sculpt" && grip.visible && !intersect(c)) {
-      const land = rainHit(c);
-      if (land)
-        rain.beginStroke(
-          i,
-          land.point,
-          grip.getWorldPosition(new THREE.Vector3()),
-        );
-      return;
-    }
-    if (rain && rain.mode === "rain" && grip.visible) {
+    if (rain && grip.visible && !intersect(c)) {
       grip.updateWorldMatrix(true, false);
-      rain.group.updateWorldMatrix(true, false);
-      const local = rain.group.worldToLocal(
-        grip.getWorldPosition(new THREE.Vector3()),
-      );
-      const near =
-        Math.abs(local.x) < 1.1 &&
-        Math.abs(local.z) < 1.1 &&
-        local.y > -0.15 &&
-        local.y < 1.1;
-      if (rain.grab.hands.size || (!intersect(c) && (near || rainHit(c)))) {
+      rain.group.updateWorldMatrix(true, true);
+      const handle = raycaster.intersectObjects(rain.moveHandles, false)[0];
+      if (rain.grab.hands.size || handle) {
+        rain.endStroke();
         for (const { c: controller } of controllers)
           controller.userData.raining = false;
         rain.grab.begin(i, grip.matrixWorld);
+      } else {
+        const land = rainHit(c);
+        if (land)
+          rain.beginStroke(
+            i,
+            land.point,
+            grip.getWorldPosition(new THREE.Vector3()),
+          );
       }
       return;
     }
@@ -1391,14 +1325,7 @@ renderer.setAnimationLoop((time, frame) => {
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan();
   if (audible && rain && rain.water.added > previousWater)
     waterSoundUntil = time + 1500;
-  sound.setWater(
-    !!(
-      audible &&
-      rain?.stage === 1 &&
-      rain.mode === "rain" &&
-      time < waterSoundUntil
-    ),
-  );
+  sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {

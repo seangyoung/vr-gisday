@@ -50,6 +50,15 @@ export class RainExperience {
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
     scene.add(this.group);
+    this.moveHandles = [-1.15, 1.15].map((x) => {
+      const handle = new THREE.Mesh(
+        new THREE.SphereGeometry(0.09, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0x60e3f0 }),
+      );
+      handle.position.set(x, 0.22, 0.8);
+      this.group.add(handle);
+      return handle;
+    });
     this.group.add(new THREE.HemisphereLight(0xd4f5ff, 0x39513a, 2.3));
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);
     sun.position.set(-2, 4, 1);
@@ -343,16 +352,16 @@ export class RainExperience {
     }
     this.setSource(this.source);
   }
-  refreshOriginalBed() {
+  refreshOriginalBed(heights = this.heights, hide = true) {
     const positions = this.originalBed.geometry.attributes.position;
     for (let i = 0; i < positions.count; i++)
       positions.setY(
         i,
-        this.heights[this.cellAt(positions.getX(i), positions.getZ(i))] + 0.003,
+        heights[this.cellAt(positions.getX(i), positions.getZ(i))] + 0.003,
       );
     positions.needsUpdate = true;
     this.originalBed.geometry.computeBoundingSphere();
-    this.originalBed.visible = false;
+    if (hide) this.originalBed.visible = false;
   }
   setMode(mode) {
     this.grab.cancel();
@@ -433,7 +442,7 @@ export class RainExperience {
     if (this.ponds.instanceColor) this.ponds.instanceColor.needsUpdate = true;
   }
   beginStroke(id, worldHit, worldHand) {
-    if (this.stage !== 1 || this.mode !== "sculpt" || this.stroke) return;
+    if (this.stage !== 1 || this.grab.hands.size || this.stroke) return;
     const hit = this.group.worldToLocal(worldHit.clone());
     const hand = this.group.worldToLocal(worldHand.clone());
     this.stroke = { id, last: hand, offset: hit.clone().sub(hand) };
@@ -447,13 +456,22 @@ export class RainExperience {
     this.applyBrush(center.x, center.z, delta);
   }
   applyBrush(x, z, delta) {
-    if (this.mode !== "sculpt" || this.stage !== 1) return;
+    if (this.stage !== 1 || this.grab.hands.size) return;
     if (x < -1 || x > 1 || z < -1 || z > 1) {
       this.brush.visible = false;
       return;
     }
+    const before = this.kind === "erosion" ? this.heights.slice() : null;
     sculpt(this.heights, x, z, delta);
+    if (before) {
+      // Manual earth movement shifts the erosion reference by exactly that edit.
+      // Water and suspended sediment remain in the ongoing experiment.
+      for (let i = 0; i < before.length; i++)
+        this.water.initial[i] += this.heights[i] - before[i];
+      this.refreshOriginalBed(this.water.initial, false);
+    }
     this.edited = true;
+    if (delta !== 0) this.strokeDirty = true;
     this.brush.visible = true;
     this.brush.position.set(
       x,
@@ -477,7 +495,12 @@ export class RainExperience {
   endStroke(id) {
     if (id !== undefined && this.stroke?.id !== id) return;
     this.stroke = null;
-    if (this.edited) this.rebuildRoutes();
+    if (this.strokeDirty) {
+      this.strokeDirty = false;
+      this.rebuildRoutes();
+      this.paint();
+      this.onChange();
+    }
   }
   rebuildRoutes() {
     this.routes = Array.from({ length: this.size * this.size }, (_, i) =>
@@ -666,7 +689,7 @@ export class RainExperience {
   }
   emit(id = this.source) {
     if (this.drops.length >= 128) return;
-    const ids = this.kind === "erosion" ? [id] : this.routes[id];
+    const ids = this.kind === "erosion" ? [id] : routeFrom(id, this.heights);
     const points = ids.map((n) => {
       const p = cellPoint(n, this.heights);
       return new THREE.Vector3(p.x, p.y + 0.025, p.z);
@@ -700,7 +723,6 @@ export class RainExperience {
     }
   }
   burst(id) {
-    if (this.mode !== "rain") return;
     this.setSource(id);
     for (let i = 0; i < 12; i++) this.emit(id);
   }
@@ -715,7 +737,6 @@ export class RainExperience {
     }
     const active =
       (this.stage === 1 &&
-        this.mode === "rain" &&
         !this.grab.hands.size &&
         (raining || this.pouring)) ||
       (this.stage === 3 && this.playback > 0);
@@ -749,7 +770,7 @@ export class RainExperience {
       this.particles.setMatrixAt(count++, dummy.matrix);
       return true;
     });
-    if (this.mode === "rain") this.updateWater(dt);
+    this.updateWater(dt);
     this.particles.count = count;
     this.particles.instanceMatrix.needsUpdate = true;
     this.marker.scale.setScalar(1 + 0.12 * Math.sin(this.time * 3));
