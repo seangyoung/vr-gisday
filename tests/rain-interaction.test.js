@@ -118,3 +118,57 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   assert.equal(r.pouring, false);
   r.dispose();
 });
+
+test("high-resolution erosion sculpting rebases the experiment and preserves the edited bed", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  r.explore();
+  assert.equal(r.size, 65);
+  assert.equal(r.heights.length, 65 * 65);
+  assert.equal(r.water.size, r.size);
+  assert.equal(
+    r.waterSurface.mesh.geometry.attributes.position.count,
+    r.heights.length,
+  );
+  r.pouring = true;
+  for (let i = 0; i < 100; i++) r.update(0.05);
+  r.setMode("sculpt");
+  assert.equal(r.pouring, false);
+  assert.equal(r.water.stored, 0);
+  assert.equal(r.water.suspended, 0);
+  const center = r.cellAt(0, -0.4),
+    before = r.heights[center];
+  r.beginStroke(
+    0,
+    new THREE.Vector3(0, before, -0.4),
+    new THREE.Vector3(0, 1, -0.4),
+  );
+  r.moveStroke(0, new THREE.Vector3(0, 1.08, -0.4));
+  r.endStroke();
+  assert.ok(r.heights[center] > before);
+  const edited = r.heights.slice();
+  r.setMode("rain");
+  assert.deepEqual(r.heights, edited);
+  assert.deepEqual(r.water.initial, edited);
+  const reference = r.originalBed.geometry.attributes.position;
+  for (let i = 0; i < reference.count; i++)
+    assert.ok(
+      Math.abs(
+        reference.getY(i) -
+          edited[r.cellAt(reference.getX(i), reference.getZ(i))] -
+          0.003,
+      ) < 1e-6,
+    );
+  assert.equal(r.water.eroded, 0);
+  r.pouring = true;
+  for (let i = 0; i < 240; i++) r.update(0.05);
+  assert.ok(r.water.eroded > 0);
+  assert.notDeepEqual(r.heights, edited);
+  assert.ok(r.waterSurface.mesh.geometry.drawRange.count > 0);
+  r.clearWater();
+  r.waterSurface.update(r.heights, r.water);
+  assert.equal(r.waterSurface.mesh.geometry.drawRange.count, 0);
+  r.restore();
+  assert.equal(r.waterSurface.mesh.visible, false);
+  assert.equal(r.originalBed.visible, false);
+  r.dispose();
+});

@@ -93,3 +93,10 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 
 - Added original synthesized UI tones, scan-return pings, and water noise, plus persistent mute in shared navigation. Master gain fades when the document/session is hidden or XR ends; scan pings are capped to one per 140 ms; water fades after the last delivery. No audio asset downloads.
 - All 37 tests pass, including audio lazy initialization, cue throttling, mute, and visibility behavior with a mocked audio graph. Production build passes (existing chunk warning). Browser preview verifies mute persistence across reload, navigation, and pouring without console errors. Audibility, volume balance, and headset session interruption remain Quest listening checks; mock tests do not validate sound quality.
+
+## 2026-10-08 — Sculptable, finer erosion tray
+
+- Erosion uses a 65×65 bed and water grid (drainage remains 41×41). Shared-vertex water triangles replace erosion water tiles. Geometry updates at 10 Hz; simulation remains fixed at 50 Hz. Wet over-steep banks redistribute earth conservatively to reduce sharp cuts; dry land stays stable.
+- Shape terrain uses the existing grip sculpt interaction. Editing stops pouring and clears water/suspended sediment. Returning to pour mode rebases sediment limits and the reference grid to the edited bed. Reset restores the original factory tray. Erosion avoids computing unused drainage routes on every edit.
+- All 39 tests pass, including higher-resolution water/earth conservation, bounded erosion, sculpt-to-pour continuity, reference-grid rebase, dry water-surface removal, and reset. Production build passes with the existing chunk warning.
+- Browser preview reviewed sculpting a hollow/ridge, pouring over the edited terrain, smoother channels, and reference controls without console errors. A 600-step local Node sample measured ~2.3 ms median / ~2.6 ms p95 per 65-grid simulation step on this computer; this excludes rendering and is not a Quest frame-rate measurement. Quest controller feel, stereo water visibility, and sustained frame rate remain device checks.

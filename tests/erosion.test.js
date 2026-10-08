@@ -76,3 +76,33 @@ test("fast runoff erodes a cell even when it empties during the step", () => {
   assert.equal(water.depth[id], 0);
   assert.ok(h[id] < water.initial[id]);
 });
+
+test("65-grid bed conserves water and earth during channel and bank changes", () => {
+  const size = 65,
+    h = createTray(size),
+    water = new ErosionWater(h);
+  for (let i = 0; i < 1500; i++) {
+    if (i % 5 === 0)
+      water.add(
+        cellAt([-0.65, -0.32, 0, 0.32, 0.65][(i / 5) % 5], -0.8, size),
+        0.00035,
+      );
+    water.update(0.02);
+  }
+  assert.ok(Math.abs(water.stored + water.drained - water.added) < 1e-8);
+  const removed =
+    h.reduce((sum, v, i) => sum + water.initial[i] - v, 0) * water.area;
+  assert.ok(Math.abs(removed - water.exported - water.suspended) < 1e-8);
+  assert.ok(
+    Math.abs(
+      water.eroded - water.deposited - water.exported - water.suspended,
+    ) < 1e-8,
+  );
+  assert.ok(
+    [...h].every(
+      (v, i) =>
+        Number.isFinite(v) &&
+        v >= Math.max(0.015, water.initial[i] - 0.24) - 1e-9,
+    ),
+  );
+});

@@ -16,7 +16,6 @@ import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
-import { cellAt } from "./rain/terrain.js";
 import { ModelGrab } from "./manipulation.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
@@ -481,6 +480,11 @@ function drawRainUI() {
       "Flow removes loose material and carries it downhill.\nChannels can join; slower water can leave sediment behind.\nThis accelerated experiment is not a real erosion forecast.",
     ];
   }
+  if (r.kind === "erosion" && r.stage === 1 && r.mode === "sculpt")
+    copy[1] = [
+      "Shape your erosion experiment",
+      "Point at the bed and HOLD a SIDE GRIP.\nLift to build a ridge; lower to dig a hollow or channel.\nChoose Pour mode, then Start pour to test the new landscape.",
+    ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
   label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
@@ -507,6 +511,7 @@ function drawRainUI() {
       -0.77,
       () => {
         stopRainInput();
+        if (r.mode === "sculpt") r.setMode("rain");
         r.pouring = !r.pouring;
         draw();
       },
@@ -532,7 +537,16 @@ function drawRainUI() {
       },
       0.44,
     );
-    button("Drainage", 0.46, -0.77, () => startRain("drainage", true), 0.44);
+    button(
+      r.mode === "sculpt" ? "Pour mode" : "Shape terrain",
+      0.46,
+      -0.77,
+      () => {
+        stopRainInput();
+        r.setMode(r.mode === "sculpt" ? "rain" : "sculpt");
+      },
+      0.44,
+    );
     button(
       "Takeaways",
       0.92,
@@ -854,7 +868,7 @@ function draw() {
         panel.append(b);
       }
     }
-    if (rain?.stage === 1 && rain.kind === "erosion") {
+    if (rain?.stage === 1 && rain.kind === "erosion" && rain.mode === "rain") {
       const b = document.createElement("button");
       b.textContent = "Preview 30 seconds of pour";
       b.onclick = async () => {
@@ -887,7 +901,7 @@ function draw() {
           if (rain.mode === "sculpt") {
             rain.applyBrush(x, -0.4, x < 0 ? -0.3 : 0.3);
             rain.endStroke();
-          } else rain.burst(cellAt(x, -0.4));
+          } else rain.burst(rain.cellAt(x, -0.4));
         };
         panel.append(b);
       }

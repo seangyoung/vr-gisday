@@ -10,20 +10,28 @@ export function elevation(x, z) {
     0.2 * (Math.abs(x) - 0.65) ** 2
   );
 }
-export function cellAt(x, z) {
-  const col = Math.max(0, Math.min(SIZE - 1, Math.round((x + 1) / SPACING)));
-  const row = Math.max(0, Math.min(SIZE - 1, Math.round((z + 1) / SPACING)));
-  return row * SIZE + col;
+export function cellAt(x, z, size = SIZE) {
+  const spacing = 2 / (size - 1);
+  const col = Math.max(0, Math.min(size - 1, Math.round((x + 1) / spacing)));
+  const row = Math.max(0, Math.min(size - 1, Math.round((z + 1) / spacing)));
+  return row * size + col;
 }
-export function cellPoint(id, heights) {
-  const x = (id % SIZE) * SPACING - 1,
-    z = Math.floor(id / SIZE) * SPACING - 1;
+export function cellPoint(
+  id,
+  heights,
+  size = heights ? Math.sqrt(heights.length) : SIZE,
+) {
+  const spacing = 2 / (size - 1);
+  const x = (id % size) * spacing - 1,
+    z = Math.floor(id / size) * spacing - 1;
   return { x, y: heights ? heights[id] : elevation(x, z), z };
 }
 export function downstream(id, heights) {
+  const size = heights ? Math.sqrt(heights.length) : SIZE,
+    spacing = 2 / (size - 1);
   const p = cellPoint(id, heights),
-    row = Math.floor(id / SIZE),
-    col = id % SIZE;
+    row = Math.floor(id / size),
+    col = id % size;
   let best = id,
     bestSlope = 1e-9;
   for (let dr = -1; dr <= 1; dr++)
@@ -31,14 +39,14 @@ export function downstream(id, heights) {
       if (
         (!dr && !dc) ||
         row + dr < 0 ||
-        row + dr >= SIZE ||
+        row + dr >= size ||
         col + dc < 0 ||
-        col + dc >= SIZE
+        col + dc >= size
       )
         continue;
-      const n = (row + dr) * SIZE + col + dc;
+      const n = (row + dr) * size + col + dc;
       const slope =
-        (p.y - cellPoint(n, heights).y) / (SPACING * Math.hypot(dr, dc));
+        (p.y - cellPoint(n, heights).y) / (spacing * Math.hypot(dr, dc));
       if (slope > bestSlope) {
         best = n;
         bestSlope = slope;
@@ -50,7 +58,7 @@ export const OUTLET_A = cellAt(-0.65, 1),
   OUTLET_B = cellAt(0.65, 1);
 export function routeFrom(id, heights) {
   const ids = [id];
-  for (let i = 0; i < SIZE * SIZE; i++) {
+  for (let i = 0; i < (heights?.length ?? SIZE * SIZE); i++) {
     const next = downstream(ids.at(-1), heights);
     if (next === ids.at(-1)) return ids;
     ids.push(next);
@@ -70,10 +78,11 @@ export function createHeights() {
   return Float64Array.from({ length: SIZE * SIZE }, (_, id) => cellPoint(id).y);
 }
 export function sculpt(heights, x, z, delta, radius = 0.24) {
+  const size = Math.sqrt(heights.length);
   if (![x, z, delta, radius].every(Number.isFinite) || radius <= 0) return;
-  for (let row = 1; row < SIZE - 1; row++) {
-    for (let col = 1; col < SIZE - 1; col++) {
-      const id = row * SIZE + col;
+  for (let row = 1; row < size - 1; row++) {
+    for (let col = 1; col < size - 1; col++) {
+      const id = row * size + col;
       const p = cellPoint(id, heights);
       const distance = Math.hypot(p.x - x, p.z - z) / radius;
       if (distance >= 1) continue;
