@@ -57,3 +57,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Twenty-one tests pass, including dry stability, repeatable initial terrain, bed lowering, deposition/export, water and sediment mass balance, bedrock limits, live geometry changes, reset preserving viewing pose, and timed pour shutdown. Existing pond/drainage/positioning tests remain passing.
 - Browser inspection checked initial and evolved terrain, mode controls, reset, and return to drainage. Corrected the side-wall elevations for the alternate surface. No browser console errors observed. Production build passes.
 - The flow and sediment rules are deliberately simplified and accelerated, not calibrated hydraulics or soil erosion. Headset rendering, channel readability, controller targeting, and performance still require Quest testing.
+
+## 2026-10-08 — Scan the Hidden World
+
+- Third menu experience: a controller ray-cone scanner, bounded point cloud, alternate viewpoints via shared grip transforms, comparison scene, reversible vegetation filtering, clear/restart, and four-minute takeaways. First-hit occlusion applies even while solid objects are visually hidden.
+- Twenty-four tests pass, including first-surface hits, deduplication, reversible filtering with no invented points, opposite-view samples, coordinate stability after transforms, point cap, intro gate, clear/reset, and timed grip release. Production build passes.
+- Browser walkthrough reviewed front/back sampling, vegetation filtering, reveal/cloud comparison, clear, takeaways, reset, and shared-menu transitions. Actual Quest trigger/squeeze input, scan speed, stereo readability, passthrough, tracking recovery, and performance remain device acceptance checks.

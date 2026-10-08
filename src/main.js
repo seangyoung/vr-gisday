@@ -10,13 +10,14 @@ import {
   target3D,
 } from "./model.js";
 import "./style.css";
+import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
 import { cellAt } from "./rain/terrain.js";
 import { ModelGrab } from "./manipulation.js";
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Two short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Coming later: Scan the Hidden World</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Three short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Three hands-on experiences</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -47,6 +48,7 @@ let buttons = [],
   pendingPlacement = false,
   noisy = false,
   prediction = "";
+let scan = null;
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
@@ -173,6 +175,8 @@ function navigation(y = -0.98) {
     -0.72,
     y,
     () => {
+      scan?.dispose();
+      scan = null;
       rain?.dispose();
       rain = null;
       stopRainInput();
@@ -183,7 +187,7 @@ function navigation(y = -0.98) {
   );
   button("Restart", -0.23, y, () => start(), 0.46);
   button(
-    rain || isSpatial() ? "Reset View" : "Recenter",
+    rain || scan || isSpatial() ? "Reset View" : "Recenter",
     0.3,
     y,
     () => {
@@ -195,6 +199,10 @@ function navigation(y = -0.98) {
   button("Exit XR", 0.84, y, () => renderer.xr.getSession()?.end(), 0.46);
 }
 function start() {
+  if (scan) {
+    startScan();
+    return;
+  }
   if (rain) {
     startRain(rain.kind);
     return;
@@ -207,6 +215,8 @@ function start() {
   draw();
 }
 function stopRainInput() {
+  scan?.grab.cancel();
+  for (const { c } of controllers) c.userData.scanning = false;
   previewRaining = false;
   rain?.endStroke();
   rain?.grab.cancel();
@@ -214,12 +224,105 @@ function stopRainInput() {
 }
 function startRain(kind = "drainage", explore = false) {
   if (kind !== "erosion") kind = "drainage";
+  scan?.dispose();
+  scan = null;
   stopRainInput();
   rain?.dispose();
   rain = new RainExperience(scene, draw, kind);
   rain.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   if (explore) rain.stage = 1;
   draw();
+}
+function startScan() {
+  stopRainInput();
+  rain?.dispose();
+  rain = null;
+  scan?.dispose();
+  scan = new ScanExperience(scene, draw);
+  scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function drawScanUI() {
+  const s = scan;
+  const copy = [
+    [
+      "Scan the Hidden World",
+      "A scanner measures distance along a known direction.\nEach return becomes one 3D point, building a point cloud.\nThis is a synthetic scene, not a scan of your room.",
+    ],
+    [
+      "Sweep. Change your viewpoint. Discover.",
+      "Point into the box and HOLD TRIGGER to collect points.\nGRIP to turn / move; BOTH grips to resize. Scan another side.\nGaps can be blocked views. Filtering cannot fill them in.",
+    ],
+    [
+      "A point cloud is a set of observations.",
+      "New viewpoints reveal surfaces that were blocked.\nFiltering removes selected points; it cannot see through objects.\nReal lidar needs careful positioning and classification.",
+    ],
+  ];
+  const [title, body] = copy[s.stage];
+  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
+  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  label(
+    s.hideVegetation
+      ? "Vegetation hidden · Missing ground stays missing"
+      : "Cyan: ground · Gold: structure · Green: vegetation",
+    0,
+    -0.52,
+    2.3,
+    0.12,
+    28,
+    "#e6f4f5",
+    "#0b2430",
+  );
+  if (s.stage === 0)
+    button("Start scanning", 0, -0.77, () => s.explore(), 1.65);
+  else {
+    button(
+      s.reveal ? "Cloud only" : "Reveal scene",
+      -0.84,
+      -0.77,
+      () => s.toggleReveal(),
+      0.52,
+    );
+    button(
+      s.hideVegetation ? "All points" : "Hide plants",
+      -0.28,
+      -0.77,
+      () => s.toggleVegetation(),
+      0.52,
+    );
+    button(
+      "Clear scan",
+      0.28,
+      -0.77,
+      () => {
+        stopRainInput();
+        s.clearScan();
+      },
+      0.52,
+    );
+    button(
+      s.stage === 2 ? "Scan again" : "Takeaways",
+      0.84,
+      -0.77,
+      () => {
+        stopRainInput();
+        if (s.stage === 2) startScan();
+        else s.finish();
+      },
+      0.52,
+    );
+    label(
+      `${s.records.length.toLocaleString()} / 18,000 samples · First surface only · Synthetic class labels`,
+      0,
+      -0.64,
+      2.3,
+      0.09,
+      24,
+      "#b6d1d9",
+      "#0b2430",
+    );
+  }
+  navigation();
 }
 function drawRainUI() {
   const r = rain;
@@ -618,6 +721,27 @@ function draw() {
       document.body.append(panel);
     }
     panel.replaceChildren();
+    if (scan?.stage === 1) {
+      for (const [name, z] of [
+        ["Scan front", 3],
+        ["Scan back", -3],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => {
+          scan.group.updateWorldMatrix(true, true);
+          const origin = scan.group.localToWorld(new THREE.Vector3(0, 1.4, z));
+          for (let x = -1; x <= 1; x += 0.025)
+            for (let y = 0; y <= 1; y += 0.025) {
+              const aim = scan.group.localToWorld(new THREE.Vector3(x, y, 0));
+              scan.record(origin, aim.sub(origin).normalize());
+            }
+          scan.refreshPoints();
+          draw();
+        };
+        panel.append(b);
+      }
+    }
     if (rain?.stage === 1 && rain.kind === "erosion") {
       const b = document.createElement("button");
       b.textContent = "Preview 30 seconds of pour";
@@ -667,6 +791,10 @@ function draw() {
 }
 function drawScene() {
   clear();
+  if (scan) {
+    drawScanUI();
+    return;
+  }
   if (rain) {
     drawRainUI();
     return;
@@ -720,20 +848,12 @@ function drawScene() {
     label(
       "About 4 minutes each · Point and press the trigger",
       0,
-      -0.32,
+      -0.62,
       2,
       0.12,
       32,
     );
-    label(
-      "COMING LATER: Scan the Hidden World",
-      0,
-      -0.54,
-      2,
-      0.14,
-      32,
-      "#99b8c2",
-    );
+    button("Scan the Hidden World", 0, -0.4, startScan, 1.75);
     navigation();
     return;
   }
@@ -810,6 +930,7 @@ function place() {
   pendingPlacement = false;
   if (floatingModel) resetModelView();
   if (rain) rain.place(cam);
+  scan?.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -832,10 +953,15 @@ for (let i = 0; i < 2; i++) {
   beam.scale.z = 4;
   c.add(beam);
   c.addEventListener("selectstart", () => {
-    if (grab?.hands.size || rain?.grab.hands.size) return;
+    if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
+      return;
     const hit = intersect(c);
     if (hit) {
       hit.object.userData.action?.();
+      return;
+    }
+    if (scan?.stage === 1) {
+      c.userData.scanning = true;
       return;
     }
     if (rain?.stage === 1) {
@@ -849,8 +975,18 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("selectend", () => {
     c.userData.raining = false;
+    c.userData.scanning = false;
   });
   c.addEventListener("squeezestart", () => {
+    if (scan && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      if (scan.grab.hands.size || (!intersect(c) && scanHit(c))) {
+        for (const { c: controller } of controllers)
+          controller.userData.scanning = false;
+        scan.grab.begin(i, grip.matrixWorld);
+      }
+      return;
+    }
     if (rain?.mode === "sculpt" && grip.visible && !intersect(c)) {
       const land = rainHit(c);
       if (land)
@@ -891,16 +1027,24 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezeend", () => {
     grab?.release(i);
+    scan?.grab.release(i);
     rain?.grab.release(i);
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
     grab?.release(i);
+    scan?.grab.release(i);
     rain?.grab.release(i);
     rain?.endStroke(i);
     c.userData.raining = false;
+    c.userData.scanning = false;
   });
   controllers.push({ c, grip, beam, handle, id: i });
+}
+function scanHit(c) {
+  if (!scan) return null;
+  intersect(c);
+  return scan.hit(raycaster);
 }
 function rainHit(c) {
   if (!rain) return null;
@@ -929,6 +1073,8 @@ async function enter(mode) {
       mode === "immersive-ar" ? null : new THREE.Color(0x071820);
     await renderer.xr.setSession(session);
     document.body.classList.add("xr-active");
+    scan?.dispose();
+    scan = null;
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -986,6 +1132,7 @@ renderer.setAnimationLoop((time, frame) => {
     if (pendingPlacement) place();
     if (
       !rain &&
+      !scan &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
@@ -1022,6 +1169,14 @@ renderer.setAnimationLoop((time, frame) => {
       }
       rain.update(dt, falling);
     }
+    if (scan && renderer.xr.getSession().visibilityState === "visible") {
+      for (const { c } of controllers) {
+        if (!c.visible) c.userData.scanning = false;
+        if (c.visible && c.userData.scanning && !intersect(c))
+          scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
+      }
+      scan.update(dt);
+    }
     const poses = new Map();
     for (const { grip, id } of controllers)
       if (grip.visible) {
@@ -1031,18 +1186,24 @@ renderer.setAnimationLoop((time, frame) => {
     if (renderer.xr.getSession().visibilityState === "visible") {
       grab?.update(poses);
       rain?.grab.update(poses);
+      scan?.grab.update(poses);
     } else {
       grab?.cancel();
       rain?.grab.cancel();
+      scan?.grab.cancel();
     }
     for (const b of buttons) b.material.color.set(0xffffff);
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
-      const model = modelHit(c) || rainHit(c);
-      beam.visible = !grab?.hands.has(id) && !rain?.grab.hands.has(id);
+      const model = modelHit(c) || rainHit(c) || scanHit(c);
+      beam.visible =
+        !grab?.hands.has(id) &&
+        !rain?.grab.hands.has(id) &&
+        !scan?.grab.hands.has(id);
       beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
       handle.material.color.set(
         grab?.hands.has(id) ||
+          scan?.grab.hands.has(id) ||
           rain?.grab.hands.has(id) ||
           rain?.stroke?.id === id
           ? 0xffca83
@@ -1055,6 +1216,7 @@ renderer.setAnimationLoop((time, frame) => {
   }
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
+  if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
   renderer.render(scene, camera);
 });
 window.addEventListener("resize", () => {
@@ -1079,6 +1241,8 @@ if (
   document.body.classList.add("xr-active");
   scene.background = new THREE.Color(0x071820);
   if (new URLSearchParams(location.search).get("demo") === "rain") startRain();
+  else if (new URLSearchParams(location.search).get("demo") === "scan")
+    startScan();
   else draw();
   place();
   renderer.domElement.addEventListener("pointerdown", (e) => {
