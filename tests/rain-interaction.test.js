@@ -55,3 +55,34 @@ test("controller stroke edits mesh, survives mode switch, cancels safely, and re
   assert.equal(r.stroke, null);
   r.dispose();
 });
+
+test("terrain transforms preserve water and geometry; reset restores full pose and mode changes release grips", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  r.place(camera);
+  const original = r.group.position.clone();
+  r.water.add(cellAt(-0.3, -0.4), 0.001);
+  const heights = r.heights.slice();
+  const volume = r.water.stored;
+  const hand = new THREE.Matrix4().makeTranslation(0, 1, -1);
+  r.grab.begin(0, hand);
+  const moved = new THREE.Matrix4()
+    .makeRotationX(0.6)
+    .setPosition(0.5, 1.2, -1.3);
+  r.grab.update(new Map([[0, moved]]));
+  assert.ok(r.group.position.distanceTo(original) > 0.1);
+  assert.ok(Math.abs(r.group.rotation.x) > 0.1);
+  assert.deepEqual(r.heights, heights);
+  assert.equal(r.water.stored, volume);
+  r.place(camera);
+  assert.equal(r.grab.hands.size, 0);
+  assert.ok(r.group.position.distanceTo(original) < 1e-9);
+  assert.ok(Math.abs(r.group.rotation.x) < 1e-9);
+  assert.equal(r.group.scale.x, 0.43);
+  assert.equal(r.water.stored, volume);
+  r.grab.begin(0, hand);
+  r.setMode("sculpt");
+  assert.equal(r.grab.hands.size, 0);
+  r.dispose();
+});

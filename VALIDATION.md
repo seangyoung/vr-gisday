@@ -44,3 +44,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added conservative surface-water storage on the terrain grid. Rain particles contribute arbitrary water volumes at path endpoints; fixed 20 ms steps exchange water according to surface-height differences. Excess can cross spill edges, feed downstream hollows, and leave the open rim. Cyan cell surfaces show stored water. Editing drains the water; Restore/Restart clears it too.
 - Seventeen tests pass: below-spill retention, level rise, overflow, downstream hollow filling, volume conservation, nonnegative storage, equivalent frame partitions, clearing, and experience integration, alongside prior tests. Production build passes.
 - Browser preview checked a sculpted pond, rainfall, and updated instructions; no console errors observed. This is an educational surface-level relaxation model, not a calibrated flood or hydraulic model. Grid shoreline appearance, stereo water visibility, and performance remain Quest acceptance checks.
+
+## 2026-10-08 — Movable terrain
+
+- Reused the tested ModelGrab controller transform for the complete rain scene: one grip translates/rotates; two grips uniformly resize within 0.22–0.75. UI stays separate. Shape mode retains grip sculpting. Reset View restores all rotation axes and scale while preserving terrain and water.
+- Eighteen tests and production build pass. New integration coverage verifies terrain transforms leave elevations/water unchanged, full pose reset, and grip cancellation at mode changes. Shared manipulation tests cover two-hand limits, grip transitions, and tracking loss.
+- Quest check remains: grabbing with either controller, text clearance after moving/resizing, transitions into sculpting, tilt comfort, tracking-loss release, and reset. No new headset validation is claimed.

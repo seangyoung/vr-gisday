@@ -43,7 +43,9 @@ Choose **Make It Rain** inside the headset. This second experience is a floating
 4. Choose **Prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
 5. Read the takeaways or restart. The experience transitions to takeaways after four minutes of visible XR frame time.
 
-**Reset View** places the landscape and controls in front of the current view. **Menu** switches experiences. The landscape stays upright for runoff exploration. Use the trigger to position rain on the land.
+**Reset View** places the landscape and controls in front of the current view. **Menu** switches experiences. In Rain mode (including the introduction and takeaways), point at the terrain or reach near it and hold a **side grip** to move/rotate the whole model. Add the other grip and spread/squeeze to resize (scale 0.22–0.75; default 0.43). Release to leave it in place. Text and buttons stay separate, so you can move the landscape out of their way. **Reset View** restores position, full orientation, and size without changing terrain edits or water. Rainfall aiming pauses while holding the model. Mode changes, hidden sessions, disconnects, and lost tracking release the model.
+
+Grips sculpt in **Shape terrain** mode; switch back to Rain mode to reposition it. Rotating the model changes the viewing angle, not the simulated gravity direction: runoff and ponds remain in terrain coordinates. Use the trigger to position rain on the land.
 
 Choose **Shape terrain** during exploration for the sandbox. Point at the land, hold either controller side grip, and lift/lower the controller to raise/dig a soft patch of earth. Move sideways while lifting/lowering to shape adjacent ground. Release to end the stroke; one controller edits at a time. **Rain mode** retains the edited terrain and recalculates drainage; **Shape terrain → Restore terrain** restores the original landscape. Heights are bounded and the outer rim is anchored. Edits are temporary and cleared by Restart/Menu. Bare-hand tracking is not implemented.
 

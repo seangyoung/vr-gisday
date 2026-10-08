@@ -209,6 +209,7 @@ function start() {
 function stopRainInput() {
   previewRaining = false;
   rain?.endStroke();
+  rain?.grab.cancel();
   for (const { c } of controllers) c.userData.raining = false;
 }
 function startRain() {
@@ -223,11 +224,11 @@ function drawRainUI() {
   const copy = [
     [
       "Make It Rain",
-      "Water on the surface flows downhill.\nA ridge can send nearby drops toward different outlets.\nMake rain on this landscape and follow where it goes.",
+      "Water on the surface flows downhill.\nA ridge can send nearby drops toward different outlets.\nGRIP: move / turn the model. BOTH grips: resize.",
     ],
     [
       "Where will your rain go?",
-      "Point at the land and HOLD the TRIGGER to rain.\nThe cloud follows your aim. Try both sides of the ridge.\nA and B mark the two outlets.",
+      "Point at the land and HOLD the TRIGGER to rain.\nThe cloud follows your aim. Try both sides of the ridge.\nSIDE GRIP: move / turn. BOTH grips: resize.",
     ],
     [
       "Predict the path",
@@ -252,7 +253,7 @@ function drawRainUI() {
   else if (r.stage === 1 && r.edited)
     copy[1] = [
       "Rain mode · test your terrain",
-      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nKeep raining: ponds rise, then spill over their lowest edge.",
+      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nKeep raining to fill / spill. GRIP: move; BOTH grips: resize.",
     ];
   if (r.stage === 4 && r.edited)
     copy[4] = [
@@ -746,7 +747,7 @@ for (let i = 0; i < 2; i++) {
   beam.scale.z = 4;
   c.add(beam);
   c.addEventListener("selectstart", () => {
-    if (grab?.hands.size) return;
+    if (grab?.hands.size || rain?.grab.hands.size) return;
     const hit = intersect(c);
     if (hit) {
       hit.object.userData.action?.();
@@ -775,6 +776,24 @@ for (let i = 0; i < 2; i++) {
         );
       return;
     }
+    if (rain && rain.mode === "rain" && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      rain.group.updateWorldMatrix(true, false);
+      const local = rain.group.worldToLocal(
+        grip.getWorldPosition(new THREE.Vector3()),
+      );
+      const near =
+        Math.abs(local.x) < 1.1 &&
+        Math.abs(local.z) < 1.1 &&
+        local.y > -0.15 &&
+        local.y < 1.1;
+      if (rain.grab.hands.size || (!intersect(c) && (near || rainHit(c)))) {
+        for (const { c: controller } of controllers)
+          controller.userData.raining = false;
+        rain.grab.begin(i, grip.matrixWorld);
+      }
+      return;
+    }
     if (!floatingModel || !grip.visible) return;
     grip.updateWorldMatrix(true, false);
     const near =
@@ -787,10 +806,12 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezeend", () => {
     grab?.release(i);
+    rain?.grab.release(i);
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
     grab?.release(i);
+    rain?.grab.release(i);
     rain?.endStroke(i);
     c.userData.raining = false;
   });
@@ -893,7 +914,12 @@ renderer.setAnimationLoop((time, frame) => {
     if (rain && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
       let falling = false;
-      if (active?.c.visible && rain.stage === 1 && !intersect(active.c)) {
+      if (
+        active?.c.visible &&
+        rain.stage === 1 &&
+        !rain.grab.hands.size &&
+        !intersect(active.c)
+      ) {
         const land = rainHit(active.c);
         if (land) {
           rain.aim(land.point);
@@ -917,17 +943,23 @@ renderer.setAnimationLoop((time, frame) => {
         grip.updateWorldMatrix(true, false);
         poses.set(id, grip.matrixWorld);
       }
-    if (renderer.xr.getSession().visibilityState === "visible")
+    if (renderer.xr.getSession().visibilityState === "visible") {
       grab?.update(poses);
-    else grab?.cancel();
+      rain?.grab.update(poses);
+    } else {
+      grab?.cancel();
+      rain?.grab.cancel();
+    }
     for (const b of buttons) b.material.color.set(0xffffff);
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
       const model = modelHit(c) || rainHit(c);
-      beam.visible = !grab?.hands.has(id);
+      beam.visible = !grab?.hands.has(id) && !rain?.grab.hands.has(id);
       beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
       handle.material.color.set(
-        grab?.hands.has(id) || rain?.stroke?.id === id
+        grab?.hands.has(id) ||
+          rain?.grab.hands.has(id) ||
+          rain?.stroke?.id === id
           ? 0xffca83
           : model
             ? 0xffffff

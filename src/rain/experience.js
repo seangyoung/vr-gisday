@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { ModelGrab } from "../manipulation.js";
 import { SurfaceWater } from "./water.js";
 import {
   SIZE,
@@ -35,6 +36,7 @@ export class RainExperience {
     this.time = 0;
     this.playback = 0;
     this.group = new THREE.Group();
+    this.grab = new ModelGrab(this.group, 0.22, 0.75);
     scene.add(this.group);
     this.group.add(new THREE.HemisphereLight(0xd4f5ff, 0x39513a, 2.3));
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);
@@ -268,6 +270,7 @@ export class RainExperience {
     this.setSource(this.source);
   }
   setMode(mode) {
+    this.grab.cancel();
     this.endStroke();
     this.mode = mode;
     if (mode === "sculpt") this.clearWater();
@@ -358,6 +361,7 @@ export class RainExperience {
     this.setSource(this.source);
   }
   restore(notify = true) {
+    this.grab.cancel();
     this.stroke = null;
     this.heights = createHeights();
     this.water = new SurfaceWater(this.heights);
@@ -450,6 +454,7 @@ export class RainExperience {
     }
   }
   place(camera) {
+    this.grab.cancel();
     this.endStroke();
     const pos = new THREE.Vector3(),
       dir = new THREE.Vector3();
@@ -460,7 +465,7 @@ export class RainExperience {
     dir.normalize();
     this.group.position.copy(pos).addScaledVector(dir, 1.4);
     this.group.position.y -= 0.28;
-    this.group.rotation.y = Math.atan2(-dir.x, -dir.z);
+    this.group.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
     this.group.scale.setScalar(0.43);
   }
   explore() {
@@ -492,6 +497,7 @@ export class RainExperience {
     this.onChange();
   }
   finish() {
+    this.grab.cancel();
     this.endStroke();
     this.mode = "rain";
     this.brush.visible = false;
@@ -592,6 +598,7 @@ export class RainExperience {
     this.marker.scale.setScalar(1 + 0.12 * Math.sin(this.time * 3));
   }
   dispose() {
+    this.grab.cancel();
     this.group.removeFromParent();
     const materials = new Set(),
       geometries = new Set();
