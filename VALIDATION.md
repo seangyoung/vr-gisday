@@ -82,3 +82,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added a toggleable original-bed reference grid that follows the tray pose but retains initial heights, plus stronger erosion/deposition colors. Reset hides the grid and restores terrain and water.
 - All 36 tests pass, including conservation, bounded bed removal, a fast-emptying-cell regression, more than 100 downstream cells cut over 0.02 units after 10 seconds, and actual rendered terrain change via the experience update loop. Production build passes with the existing bundle-size warning.
 - Browser preview checked the initial tray, 30 seconds of simulated pour, original-bed comparison, and reset; no console errors. Channels visibly cut the mesh in preview. Quest stereo readability and revised controller-button sizing remain headset checks.
+
+## 2026-10-08 — Web app manifest and icons
+
+- Added and linked `public/manifest.json`, standalone display preference, relative app ID/start URL/scope, regular 192/512 PNG icons, a maskable 512 PNG, favicon, and Apple touch icon. Original globe artwork and regeneration script are included.
+- Production build passes with the existing chunk warning. Parsed the built manifest and verified URL resolution under `/vr-gisday/`, PNG formats/dimensions, and the built HTML manifest link. Visually inspected the 512 icon; foreground fits the maskable central safe area.
+- Quest Add to Library and installed relaunch remain device acceptance checks. No offline capability or store package is claimed.

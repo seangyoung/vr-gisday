@@ -114,3 +114,9 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 ## Assets
 
 All diagrams and scene assets are generated in code. No Blender models or third-party educational illustrations are included. Three.js is MIT licensed; its license is included in THIRD_PARTY_NOTICES.md. Licensing of original project content has not yet been selected by the owner.
+
+## Web app installation metadata
+
+The linked `public/manifest.json` supplies the app name, standalone display preference, theme, and 192/512-pixel PNG icons, including a maskable icon. Its ID, start URL, and scope resolve relative to the manifest, keeping this installation inside `/vr-gisday/` on GitHub Pages. The landing page also links a favicon and Apple touch icon. Original icon artwork can be regenerated with `python3 scripts/generate-icons.py` (Pillow required).
+
+In Quest Browser, open the published site and use its web-app installation / Add to Library option if offered. Launching the saved app opens the existing VR/mixed-reality entry screen. Library installation and relaunch must be verified on the headset; providing a manifest does not itself confirm successful installation. This change adds no offline cache or service worker, so loading the app requires connectivity. Store packaging is a separate workflow. References: [Meta WebXR PWA manifest guidance](https://developers.meta.com/vr/documentation/web/pwa-webxr-gs/) and [MDN installability](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Guides/Making_PWAs_installable).
