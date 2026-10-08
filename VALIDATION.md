@@ -38,3 +38,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added side-grip terrain sculpting and Rain/Shape modes, with bounded smooth brush edits, fixed outer rim, persistent edits between modes, recalculated drainage, and exact terrain restore. Closed sinks have a separate purple destination category; they do not simulate storage or overflow.
 - Fourteen tests pass, including brush falloff and limits, fixed boundaries, exhaustive edited-grid routing, controller motion through real Three.js transforms, mode switching, sink paths, restore, and timed stroke cancellation. Production build passes.
 - Browser preview reviewed sculpted terrain, rain/basin display after editing, and restore. Preview uses development buttons; actual Quest squeeze events, drag comfort, tracking loss, and stereo performance still require headset testing.
+
+## 2026-10-08 — Pond filling and overflow
+
+- Added conservative surface-water storage on the terrain grid. Rain particles contribute arbitrary water volumes at path endpoints; fixed 20 ms steps exchange water according to surface-height differences. Excess can cross spill edges, feed downstream hollows, and leave the open rim. Cyan cell surfaces show stored water. Editing drains the water; Restore/Restart clears it too.
+- Seventeen tests pass: below-spill retention, level rise, overflow, downstream hollow filling, volume conservation, nonnegative storage, equivalent frame partitions, clearing, and experience integration, alongside prior tests. Production build passes.
+- Browser preview checked a sculpted pond, rainfall, and updated instructions; no console errors observed. This is an educational surface-level relaxation model, not a calibrated flood or hydraulic model. Grid shoreline appearance, stereo water visibility, and performance remain Quest acceptance checks.

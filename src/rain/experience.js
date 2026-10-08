@@ -1,6 +1,8 @@
 import * as THREE from "three";
+import { SurfaceWater } from "./water.js";
 import {
   SIZE,
+  SPACING,
   createHeights,
   sculpt,
   cellPoint,
@@ -17,6 +19,7 @@ export class RainExperience {
     this.onChange = onChange;
     this.stage = 0;
     this.heights = createHeights();
+    this.water = new SurfaceWater(this.heights);
     this.mode = "rain";
     this.edited = false;
     this.stroke = null;
@@ -234,6 +237,21 @@ export class RainExperience {
     this.particles.count = 0;
     this.particles.frustumCulled = false;
     this.group.add(this.particles);
+    this.ponds = new THREE.InstancedMesh(
+      new THREE.PlaneGeometry(SPACING, SPACING),
+      new THREE.MeshStandardMaterial({
+        color: 0x48c7fa,
+        roughness: 0.2,
+        metalness: 0.15,
+        transparent: true,
+        opacity: 0.8,
+        side: THREE.DoubleSide,
+      }),
+      SIZE * SIZE,
+    );
+    this.ponds.count = 0;
+    this.ponds.frustumCulled = false;
+    this.group.add(this.ponds);
     this.brush = new THREE.Mesh(
       new THREE.SphereGeometry(0.24, 24, 12),
       new THREE.MeshBasicMaterial({
@@ -252,6 +270,7 @@ export class RainExperience {
   setMode(mode) {
     this.endStroke();
     this.mode = mode;
+    if (mode === "sculpt") this.clearWater();
     this.drops = [];
     this.particles.count = 0;
     this.emission = 0;
@@ -262,6 +281,25 @@ export class RainExperience {
     this.brush.visible = false;
     this.paint();
     this.onChange();
+  }
+  clearWater() {
+    this.water.clear();
+    this.ponds.count = 0;
+  }
+  updateWater(dt) {
+    this.water.update(dt);
+    const tile = new THREE.Object3D();
+    tile.rotation.x = -Math.PI / 2;
+    let count = 0;
+    for (let id = 0; id < this.heights.length; id++) {
+      if (this.water.depth[id] < 0.001) continue;
+      const p = cellPoint(id, this.heights);
+      tile.position.set(p.x, p.y + this.water.depth[id] + 0.002, p.z);
+      tile.updateMatrix();
+      this.ponds.setMatrixAt(count++, tile.matrix);
+    }
+    this.ponds.count = count;
+    this.ponds.instanceMatrix.needsUpdate = true;
   }
   beginStroke(id, worldHit, worldHand) {
     if (this.stage !== 1 || this.mode !== "sculpt" || this.stroke) return;
@@ -322,6 +360,8 @@ export class RainExperience {
   restore(notify = true) {
     this.stroke = null;
     this.heights = createHeights();
+    this.water = new SurfaceWater(this.heights);
+    this.ponds.count = 0;
     // Refresh mesh and tree heights through the same edit path.
     this.mode = "sculpt";
     const oldStage = this.stage;
@@ -484,7 +524,13 @@ export class RainExperience {
     const lengths = [0];
     for (let i = 1; i < points.length; i++)
       lengths.push(lengths[i - 1] + points[i].distanceTo(points[i - 1]));
-    this.drops.push({ points, lengths, progress: 0, outlet: this.basins[id] });
+    this.drops.push({
+      points,
+      lengths,
+      progress: 0,
+      outlet: this.basins[id],
+      end: ids.at(-1),
+    });
     if (!this.trails.some((t) => t.userData.cell === id)) {
       const trail = this.line(points.slice(1), COLORS[this.basins[id]], 0.9);
       trail.userData.cell = id;
@@ -528,6 +574,7 @@ export class RainExperience {
       d.progress += dt * 0.75;
       if (d.progress >= d.lengths.at(-1)) {
         this.counts[d.outlet]++;
+        this.water.add(d.end, 0.0003);
         return false;
       }
       let i = 1;
@@ -539,6 +586,7 @@ export class RainExperience {
       this.particles.setMatrixAt(count++, dummy.matrix);
       return true;
     });
+    if (this.mode === "rain") this.updateWater(dt);
     this.particles.count = count;
     this.particles.instanceMatrix.needsUpdate = true;
     this.marker.scale.setScalar(1 + 0.12 * Math.sin(this.time * 3));

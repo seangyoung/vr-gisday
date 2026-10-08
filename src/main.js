@@ -252,12 +252,12 @@ function drawRainUI() {
   else if (r.stage === 1 && r.edited)
     copy[1] = [
       "Rain mode · test your terrain",
-      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nPurple paths end in low spots, with no filling or overflow.",
+      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nKeep raining: ponds rise, then spill over their lowest edge.",
     ];
   if (r.stage === 4 && r.edited)
     copy[4] = [
       "Change the land. Change the flow.",
-      "A watershed is land that drains to a common outlet.\nNew ridges can redirect runoff; closed hollows trap it.\nThis model traces paths, not water depth or flood risk.",
+      "A watershed is land that drains to a common outlet.\nRidges redirect runoff; hollows fill before spilling.\nThis model traces paths, not water depth or flood risk.",
     ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
@@ -320,7 +320,7 @@ function drawRainUI() {
   }
   if (r.stage === 4) {
     label(
-      "This model shows surface paths only. Real rain can\nalso soak into soil, evaporate, or collect in low spots.",
+      "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
       0,
       -0.62,
       2.3,
@@ -333,9 +333,9 @@ function drawRainUI() {
   } else
     label(
       r.mode === "sculpt"
-        ? "One grip at a time · Edges anchored · Height limited"
+        ? "Editing drains water · Edges anchored · Height limited"
         : r.overlay && r.edited
-          ? "Blue: A · Gold: B · Purple: closed low spots (grouped)"
+          ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
           : r.overlay
             ? "A: blue / round outlet    ·    B: gold / square outlet"
             : "Surface-flow model · Synthetic terrain · No flood prediction",

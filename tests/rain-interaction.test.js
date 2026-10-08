@@ -36,6 +36,12 @@ test("controller stroke edits mesh, survives mode switch, cancels safely, and re
   assert.deepEqual(r.heights, edited);
   r.burst(id);
   assert.equal(r.drops[0].outlet, "sink");
+  for (let i = 0; i < 100; i++) r.update(0.05);
+  assert.ok(r.water.added > 0);
+  assert.ok(r.ponds.count > 0);
+  r.setMode("sculpt");
+  assert.equal(r.water.stored, 0);
+  assert.equal(r.ponds.count, 0);
   r.restore();
   assert.deepEqual(r.heights, createHeights());
   assert.equal(r.basins[id], "A");
