@@ -50,3 +50,10 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Reused the tested ModelGrab controller transform for the complete rain scene: one grip translates/rotates; two grips uniformly resize within 0.22–0.75. UI stays separate. Shape mode retains grip sculpting. Reset View restores all rotation axes and scale while preserving terrain and water.
 - Eighteen tests and production build pass. New integration coverage verifies terrain transforms leave elevations/water unchanged, full pose reset, and grip cancellation at mode changes. Shared manipulation tests cover two-hand limits, grip transitions, and tracking loss.
 - Quest check remains: grabbing with either controller, text clearance after moving/resizing, transitions into sculpting, tilt comfort, tracking-loss release, and reset. No new headset validation is claimed.
+
+## 2026-10-08 — Erosion tray within Make It Rain
+
+- Added an alternate tilted, rough sediment bed with automatic headwater pouring, trigger-directed pouring, sediment transport/deposition, live mesh updates, reset, takeaways, and switches to/from drainage. Reuses grip transforms; does not change physical slope when rotated. Fixed rim and bounded loose layer.
+- Twenty-one tests pass, including dry stability, repeatable initial terrain, bed lowering, deposition/export, water and sediment mass balance, bedrock limits, live geometry changes, reset preserving viewing pose, and timed pour shutdown. Existing pond/drainage/positioning tests remain passing.
+- Browser inspection checked initial and evolved terrain, mode controls, reset, and return to drainage. Corrected the side-wall elevations for the alternate surface. No browser console errors observed. Production build passes.
+- The flow and sediment rules are deliberately simplified and accelerated, not calibrated hydraulics or soil erosion. Headset rendering, channel readability, controller targeting, and performance still require Quest testing.

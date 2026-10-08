@@ -86,3 +86,29 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   assert.equal(r.grab.hands.size, 0);
   r.dispose();
 });
+
+test("erosion tray updates rendered heights and reset restores the experiment without moving the model", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  r.explore();
+  r.pouring = true;
+  const original = r.heights.slice();
+  r.group.position.set(0.3, 1, -1.5);
+  for (let i = 0; i < 100; i++) r.update(0.05);
+  assert.ok(r.water.eroded > 0);
+  assert.notDeepEqual(r.heights, original);
+  const geometry = r.terrain.geometry.attributes.position;
+  for (let i = 0; i < original.length; i++)
+    assert.ok(Math.abs(geometry.getY(i) - r.heights[i]) < 0.005);
+  r.pouring = false;
+  r.restore();
+  assert.deepEqual(r.heights, original);
+  assert.equal(r.water.eroded, 0);
+  assert.equal(r.water.stored, 0);
+  assert.equal(r.group.position.x, 0.3);
+  r.elapsed = 239.99;
+  r.pouring = true;
+  r.update(0.02);
+  assert.equal(r.stage, 4);
+  assert.equal(r.pouring, false);
+  r.dispose();
+});

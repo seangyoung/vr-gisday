@@ -37,7 +37,7 @@ This is a scaled positioning model, **not a measurement of the visitor's real lo
 
 Choose **Make It Rain** inside the headset. This second experience is a floating synthetic landscape with two outlets, a drainage divide, contour lines, and a movable rain cloud.
 
-1. Read the short explanation of surface runoff and choose **Make some rain**.
+1. Read the short explanation of surface runoff and choose **Drainage sandbox**.
 2. Point at the terrain and **hold the trigger**. The cloud follows the aiming point and rain travels downhill. Releasing the trigger stops new rain; existing drops finish their paths. Try both sides of the ridge.
 3. Toggle **Show basins** to color cells by their calculated outlet. Outlet A is blue and round; B is gold and square. Labels provide a cue independent of color.
 4. Choose **Prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
@@ -54,6 +54,13 @@ After editing, blue/gold basin colors still indicate A/B; purple groups areas dr
 The 41×41 elevation grid and steepest-descent paths are computed locally. The illustration uses arbitrary water volumes and a fixed-step surface-level relaxation model, not calibrated hydraulics. It does not simulate infiltration, evaporation, erosion, real rainfall intensity, momentum, or flood risk. Trees are decoration and do not change runoff. Pond surfaces use grid cells and may look stepped along shorelines. Particle speed is illustrative; synthetic model units have no geographic scale. This is not a real watershed dataset.
 
 For browser development review only, `?preview&demo=rain` opens the rain experience. Test buttons emit rain on either slope; pointer/trigger ray selection still needs Quest verification. Production has no desktop experience.
+
+
+### Erosion tray (inside Make It Rain)
+
+Choose **Erosion tray** from the Make It Rain introduction or drainage controls. A tilted, slightly rough, loose-sediment bed replaces the drainage landscape. **Start pour** supplies water across five points near the top; **Stop pour** stops new input while existing water and sediment continue downstream. You can also point and hold the trigger to pour at a chosen spot. Flow cuts darker grooves, carries sediment, and can deposit lighter material downstream. Brown-tinted water indicates suspended sediment. **Reset tray** restores the original bed and clears water; it preserves the viewing pose. **Drainage** returns to the other experiment. Switching experiments starts a fresh run, and each retains the four-minute wrap-up.
+
+Side grips move/rotate the tray; both grips resize. Rotation changes the viewing pose, not the fixed physical slope. This first erosion experiment does not include terrain sculpting, soil selection, roots, rainfall calibration, bank collapse, or realistic time/length units. The erosion experiment routes each cell toward its steepest neighboring water-surface drop to emphasize rivulets; the pond experiment retains its multi-neighbor spreading rule. Sediment capacity is a heuristic based on local flux and slope; erosion is accelerated, limited to a 0.16-model-unit loose layer, and the rim stays fixed. Sediment transfers use the water transfers and can leave the open rim. Channels are computed from evolving heights, not prerecorded lines. Water and sediment conservation are tested; this is not a predictive erosion model.
 
 ## GitHub Pages
 

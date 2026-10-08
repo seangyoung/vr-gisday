@@ -196,7 +196,7 @@ function navigation(y = -0.98) {
 }
 function start() {
   if (rain) {
-    startRain();
+    startRain(rain.kind);
     return;
   }
   preservePose = null;
@@ -212,11 +212,13 @@ function stopRainInput() {
   rain?.grab.cancel();
   for (const { c } of controllers) c.userData.raining = false;
 }
-function startRain() {
+function startRain(kind = "drainage", explore = false) {
+  if (kind !== "erosion") kind = "drainage";
   stopRainInput();
   rain?.dispose();
-  rain = new RainExperience(scene, draw);
+  rain = new RainExperience(scene, draw, kind);
   rain.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  if (explore) rain.stage = 1;
   draw();
 }
 function drawRainUI() {
@@ -260,21 +262,84 @@ function drawRainUI() {
       "Change the land. Change the flow.",
       "A watershed is land that drains to a common outlet.\nRidges redirect runoff; hollows fill before spilling.\nThis model traces paths, not water depth or flood risk.",
     ];
+  if (r.kind === "erosion") {
+    copy[0] = [
+      "Make It Rain · erosion tray",
+      "Water can move the land as well as flow over it.\nPour onto this tilted bed and watch channels develop.\nGRIP: move / turn. BOTH grips: resize.",
+    ];
+    copy[1] = [
+      "Pour. Cut channels. Carry sediment.",
+      "Start the pour, or point and HOLD TRIGGER to add water.\nDarker grooves show erosion; pale patches show deposits.\nStop the pour to inspect. GRIP: move; BOTH grips: resize.",
+    ];
+    copy[4] = [
+      "Water shapes its own path.",
+      "Flow removes loose material and carries it downhill.\nChannels can join; slower water can leave sediment behind.\nThis accelerated experiment is not a real erosion forecast.",
+    ];
+  }
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
   label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
-  if (r.stage === 0)
-    button("Make some rain", 0, -0.77, () => r.explore(), 1.65);
-  if (r.stage === 1) {
+  if (r.stage === 0) {
+    button(
+      r.kind === "erosion" ? "Explore tray" : "Drainage sandbox",
+      -0.55,
+      -0.77,
+      () => r.explore(),
+      1.02,
+    );
+    button(
+      r.kind === "erosion" ? "Drainage sandbox" : "Erosion tray",
+      0.55,
+      -0.77,
+      () => startRain(r.kind === "erosion" ? "drainage" : "erosion", true),
+      1.02,
+    );
+  }
+  if (r.stage === 1 && r.kind === "erosion") {
+    button(
+      r.pouring ? "Stop pour" : "Start pour",
+      -0.84,
+      -0.77,
+      () => {
+        stopRainInput();
+        r.pouring = !r.pouring;
+        draw();
+      },
+      0.52,
+    );
+    button(
+      "Reset tray",
+      -0.28,
+      -0.77,
+      () => {
+        stopRainInput();
+        r.pouring = false;
+        r.restore();
+      },
+      0.52,
+    );
+    button("Drainage", 0.28, -0.77, () => startRain("drainage", true), 0.52);
+    button(
+      "Takeaways",
+      0.84,
+      -0.77,
+      () => {
+        stopRainInput();
+        r.finish();
+      },
+      0.52,
+    );
+  }
+  if (r.stage === 1 && r.kind !== "erosion") {
     button(
       r.mode === "sculpt" ? "Rain mode" : "Shape terrain",
-      -0.76,
+      -0.84,
       -0.77,
       () => {
         stopRainInput();
         r.setMode(r.mode === "sculpt" ? "rain" : "sculpt");
       },
-      0.7,
+      0.52,
     );
     button(
       r.mode === "sculpt"
@@ -282,26 +347,27 @@ function drawRainUI() {
         : r.overlay
           ? "Hide basins"
           : "Show basins",
-      0,
+      -0.28,
       -0.77,
       () => {
         stopRainInput();
         if (r.mode === "sculpt") r.restore();
         else r.toggleOverlay();
       },
-      0.7,
+      0.52,
     );
     button(
       r.edited || r.mode === "sculpt" ? "Takeaways" : "Prediction",
-      0.76,
+      0.28,
       -0.77,
       () => {
         stopRainInput();
         if (r.edited || r.mode === "sculpt") r.finish();
         else r.challenge();
       },
-      0.7,
+      0.52,
     );
+    button("Erosion tray", 0.84, -0.77, () => startRain("erosion", true), 0.52);
   }
   if (r.stage === 2) {
     button("Outlet A · left", -0.54, -0.77, () => r.choose("A"), 1.02);
@@ -321,7 +387,9 @@ function drawRainUI() {
   }
   if (r.stage === 4) {
     label(
-      "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
+      r.kind === "erosion"
+        ? "Simplified water + loose sediment. No soil types, roots,\nreal-world erosion rates, or changing tray tilt."
+        : "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
       0,
       -0.62,
       2.3,
@@ -330,16 +398,18 @@ function drawRainUI() {
       "#e6f4f5",
       "#0b2430",
     );
-    button("Make rain again", 0, -0.77, startRain, 1.65);
+    button("Make rain again", 0, -0.77, () => startRain(r.kind), 1.65);
   } else
     label(
-      r.mode === "sculpt"
-        ? "Editing drains water · Edges anchored · Height limited"
-        : r.overlay && r.edited
-          ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
-          : r.overlay
-            ? "A: blue / round outlet    ·    B: gold / square outlet"
-            : "Surface-flow model · Synthetic terrain · No flood prediction",
+      r.kind === "erosion"
+        ? "Illustrative loose sediment · Fixed tray slope · Accelerated time"
+        : r.mode === "sculpt"
+          ? "Editing drains water · Edges anchored · Height limited"
+          : r.overlay && r.edited
+            ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
+            : r.overlay
+              ? "A: blue / round outlet    ·    B: gold / square outlet"
+              : "Surface-flow model · Synthetic terrain · No flood prediction",
       0,
       -0.55,
       2.3,
@@ -548,6 +618,21 @@ function draw() {
       document.body.append(panel);
     }
     panel.replaceChildren();
+    if (rain?.stage === 1 && rain.kind === "erosion") {
+      const b = document.createElement("button");
+      b.textContent = "Preview 30 seconds of pour";
+      b.onclick = async () => {
+        const experiment = rain;
+        experiment.pouring = true;
+        for (let chunk = 0; chunk < 30 && rain === experiment; chunk++) {
+          for (let i = 0; i < 20; i++) experiment.update(0.05);
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        experiment.pouring = false;
+        if (rain === experiment) draw();
+      };
+      panel.append(b);
+    }
     if (rain?.stage === 1) {
       for (const [name, x] of [
         ["Rain on left slope", -0.3],

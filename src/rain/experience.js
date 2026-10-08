@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
+import { createTray, ErosionWater } from "./erosion.js";
 import { SurfaceWater } from "./water.js";
 import {
   SIZE,
@@ -16,11 +17,18 @@ import {
 } from "./terrain.js";
 const COLORS = { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff };
 export class RainExperience {
-  constructor(scene, onChange) {
+  constructor(scene, onChange, kind = "drainage") {
+    this.kind = kind;
+    this.pouring = false;
+    this.pourIndex = 0;
+    this.meshTime = 0;
     this.onChange = onChange;
     this.stage = 0;
-    this.heights = createHeights();
-    this.water = new SurfaceWater(this.heights);
+    this.heights = this.kind === "erosion" ? createTray() : createHeights();
+    this.water =
+      this.kind === "erosion"
+        ? new ErosionWater(this.heights)
+        : new SurfaceWater(this.heights);
     this.mode = "rain";
     this.edited = false;
     this.stroke = null;
@@ -110,6 +118,7 @@ export class RainExperience {
       }),
     );
     this.group.add(this.contours);
+    this.contours.visible = this.kind !== "erosion";
     // Visible rock sides close the terrain slab, rather than a floating paper surface.
     const rim = [];
     for (let c = 0; c < SIZE; c++) rim.push(c);
@@ -119,7 +128,7 @@ export class RainExperience {
     const walls = [];
     for (let i = 0; i < rim.length; i++) {
       const a = cellPoint(rim[i], this.heights),
-        b = cellPoint(rim[(i + 1) % rim.length]);
+        b = cellPoint(rim[(i + 1) % rim.length], this.heights);
       walls.push(
         a.x,
         a.y,
@@ -172,10 +181,12 @@ export class RainExperience {
       0.85,
     );
     this.divide.visible = false;
-    for (const [id, name] of [
-      [OUTLET_A, "A"],
-      [OUTLET_B, "B"],
-    ]) {
+    for (const [id, name] of this.kind === "erosion"
+      ? []
+      : [
+          [OUTLET_A, "A"],
+          [OUTLET_B, "B"],
+        ]) {
       const p = cellPoint(id, this.heights);
       const basin = new THREE.Mesh(
         name === "A"
@@ -190,15 +201,17 @@ export class RainExperience {
       this.group.add(caption);
     }
     // A few trees communicate scale; they do not alter the routing model.
-    for (const [x, z] of [
-      [-0.85, -0.7],
-      [-0.72, -0.6],
-      [-0.86, -0.47],
-      [0.78, -0.66],
-      [0.87, -0.38],
-      [0.75, 0.13],
-      [-0.82, 0.3],
-    ]) {
+    for (const [x, z] of this.kind === "erosion"
+      ? []
+      : [
+          [-0.85, -0.7],
+          [-0.72, -0.6],
+          [-0.86, -0.47],
+          [0.78, -0.66],
+          [0.87, -0.38],
+          [0.75, 0.13],
+          [-0.82, 0.3],
+        ]) {
       const p = cellPoint(cellAt(x, z));
       const tree = new THREE.Mesh(
         new THREE.ConeGeometry(0.045, 0.16, 7),
@@ -224,6 +237,16 @@ export class RainExperience {
       this.cloud.add(m);
     }
     this.group.add(this.cloud);
+    if (this.kind === "erosion") {
+      this.cloud.visible = false;
+      const pipe = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.025, 0.025, 1.5, 12),
+        new THREE.MeshStandardMaterial({ color: 0x70b9c9 }),
+      );
+      pipe.rotation.z = Math.PI / 2;
+      pipe.position.set(0, 1.14, -0.8);
+      this.group.add(pipe);
+    }
     this.marker = new THREE.Mesh(
       new THREE.TorusGeometry(0.055, 0.014, 8, 28),
       new THREE.MeshBasicMaterial({ color: 0xffe28a }),
@@ -242,7 +265,7 @@ export class RainExperience {
     this.ponds = new THREE.InstancedMesh(
       new THREE.PlaneGeometry(SPACING, SPACING),
       new THREE.MeshStandardMaterial({
-        color: 0x48c7fa,
+        color: this.kind === "erosion" ? 0xffffff : 0x48c7fa,
         roughness: 0.2,
         metalness: 0.15,
         transparent: true,
@@ -267,6 +290,12 @@ export class RainExperience {
     this.brush.scale.y = 0.22;
     this.brush.visible = false;
     this.group.add(this.brush);
+    if (this.kind === "erosion") {
+      const caption = this.text("EROSION TRAY", 0xf5d7a3);
+      caption.position.set(0, 0.12, 1.24);
+      this.group.add(caption);
+      this.source = cellAt(0, -0.8);
+    }
     this.setSource(this.source);
   }
   setMode(mode) {
@@ -280,7 +309,7 @@ export class RainExperience {
     this.clearTrails();
     this.overlay = false;
     this.divide.visible = false;
-    this.cloud.visible = mode === "rain";
+    this.cloud.visible = mode === "rain" && this.kind !== "erosion";
     this.brush.visible = false;
     this.paint();
     this.onChange();
@@ -291,6 +320,20 @@ export class RainExperience {
   }
   updateWater(dt) {
     this.water.update(dt);
+    if (this.kind === "erosion") {
+      this.meshTime += dt;
+      if (this.meshTime >= 0.1) {
+        this.meshTime = 0;
+        const geo = this.terrain.geometry;
+        for (let i = 0; i < this.heights.length; i++)
+          geo.attributes.position.setY(i, this.heights[i]);
+        geo.attributes.position.needsUpdate = true;
+        geo.computeVertexNormals();
+        geo.computeBoundingSphere();
+        geo.computeBoundingBox();
+        this.paint();
+      }
+    }
     const tile = new THREE.Object3D();
     tile.rotation.x = -Math.PI / 2;
     let count = 0;
@@ -299,10 +342,24 @@ export class RainExperience {
       const p = cellPoint(id, this.heights);
       tile.position.set(p.x, p.y + this.water.depth[id] + 0.002, p.z);
       tile.updateMatrix();
+      if (this.kind === "erosion")
+        this.ponds.setColorAt(
+          count,
+          new THREE.Color(0x64cff5).lerp(
+            new THREE.Color(0xb88845),
+            Math.min(
+              0.9,
+              (this.water.sediment[id] /
+                Math.max(0.001, this.water.depth[id])) *
+                2,
+            ),
+          ),
+        );
       this.ponds.setMatrixAt(count++, tile.matrix);
     }
     this.ponds.count = count;
     this.ponds.instanceMatrix.needsUpdate = true;
+    if (this.ponds.instanceColor) this.ponds.instanceColor.needsUpdate = true;
   }
   beginStroke(id, worldHit, worldHand) {
     if (this.stage !== 1 || this.mode !== "sculpt" || this.stroke) return;
@@ -361,10 +418,14 @@ export class RainExperience {
     this.setSource(this.source);
   }
   restore(notify = true) {
+    this.pouring = false;
     this.grab.cancel();
     this.stroke = null;
-    this.heights = createHeights();
-    this.water = new SurfaceWater(this.heights);
+    this.heights = this.kind === "erosion" ? createTray() : createHeights();
+    this.water =
+      this.kind === "erosion"
+        ? new ErosionWater(this.heights)
+        : new SurfaceWater(this.heights);
     this.ponds.count = 0;
     // Refresh mesh and tree heights through the same edit path.
     this.mode = "sculpt";
@@ -373,7 +434,7 @@ export class RainExperience {
     this.applyBrush(0, 0, 0);
     this.stage = oldStage;
     this.edited = false;
-    this.contours.visible = true;
+    this.contours.visible = this.kind !== "erosion";
     this.rebuildRoutes();
     this.drops = [];
     this.particles.count = 0;
@@ -381,7 +442,7 @@ export class RainExperience {
     this.mode = "rain";
     this.overlay = false;
     this.brush.visible = false;
-    this.cloud.visible = true;
+    this.cloud.visible = this.kind !== "erosion";
     this.paint();
     if (notify) this.onChange();
   }
@@ -420,14 +481,21 @@ export class RainExperience {
   }
   paint() {
     const attr = this.terrain.geometry.getAttribute("color");
-    const low = new THREE.Color(0x396d4b),
-      high = new THREE.Color(0xb8bd75);
+    const low = new THREE.Color(this.kind === "erosion" ? 0x805331 : 0x396d4b),
+      high = new THREE.Color(this.kind === "erosion" ? 0xe8c78b : 0xb8bd75);
     for (let id = 0; id < SIZE * SIZE; id++) {
       const c = this.overlay
         ? new THREE.Color(COLORS[this.basins[id]]).multiplyScalar(0.65)
         : low
             .clone()
             .lerp(high, Math.min(1, cellPoint(id, this.heights).y / 0.8));
+      if (this.kind === "erosion") {
+        const change = this.heights[id] - this.water.initial[id];
+        c.lerp(
+          new THREE.Color(change < 0 ? 0x694024 : 0xf9dd9b),
+          Math.min(0.85, Math.abs(change) * 6),
+        );
+      }
       attr.setXYZ(id, c.r, c.g, c.b);
     }
     attr.needsUpdate = true;
@@ -498,10 +566,11 @@ export class RainExperience {
   }
   finish() {
     this.grab.cancel();
+    this.pouring = false;
     this.endStroke();
     this.mode = "rain";
     this.brush.visible = false;
-    this.cloud.visible = true;
+    this.cloud.visible = this.kind !== "erosion";
     this.stage = 4;
     this.playback = 0;
     this.onChange();
@@ -519,7 +588,7 @@ export class RainExperience {
   }
   emit(id = this.source) {
     if (this.drops.length >= 128) return;
-    const ids = this.routes[id];
+    const ids = this.kind === "erosion" ? [id] : this.routes[id];
     const points = ids.map((n) => {
       const p = cellPoint(n, this.heights);
       return new THREE.Vector3(p.x, p.y + 0.025, p.z);
@@ -537,7 +606,10 @@ export class RainExperience {
       outlet: this.basins[id],
       end: ids.at(-1),
     });
-    if (!this.trails.some((t) => t.userData.cell === id)) {
+    if (
+      this.kind !== "erosion" &&
+      !this.trails.some((t) => t.userData.cell === id)
+    ) {
       const trail = this.line(points.slice(1), COLORS[this.basins[id]], 0.9);
       trail.userData.cell = id;
       this.trails.push(trail);
@@ -564,12 +636,19 @@ export class RainExperience {
       }
     }
     const active =
-      (this.stage === 1 && this.mode === "rain" && raining) ||
+      (this.stage === 1 &&
+        this.mode === "rain" &&
+        !this.grab.hands.size &&
+        (raining || this.pouring)) ||
       (this.stage === 3 && this.playback > 0);
     this.playback = Math.max(0, this.playback - dt);
     if (active) {
       this.emission += dt;
       while (this.emission >= 0.1) {
+        if (this.kind === "erosion" && this.pouring) {
+          const x = [-0.65, -0.32, 0, 0.32, 0.65][this.pourIndex++ % 5];
+          this.setSource(cellAt(x, -0.8));
+        }
         this.emit();
         this.emission -= 0.1;
       }
@@ -580,7 +659,7 @@ export class RainExperience {
       d.progress += dt * 0.75;
       if (d.progress >= d.lengths.at(-1)) {
         this.counts[d.outlet]++;
-        this.water.add(d.end, 0.0003);
+        this.water.add(d.end, this.kind === "erosion" ? 0.00035 : 0.0003);
         return false;
       }
       let i = 1;

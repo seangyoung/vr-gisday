@@ -25,6 +25,8 @@ export class SurfaceWater {
         }
       }
     this.flux = new Float64Array(this.edges.length);
+    this.bestSlope = new Float64Array(heights.length);
+    this.bestEdge = new Int32Array(heights.length);
     this.clear();
   }
   clear() {
@@ -58,24 +60,44 @@ export class SurfaceWater {
   step() {
     const d = this.depth,
       h = this.heights;
+    this.bestSlope.fill(0);
+    this.bestEdge.fill(-1);
     this.outgoing.fill(0);
     this.change.fill(0);
     this.edges.forEach(([a, b, distance], i) => {
       const difference = h[a] + d[a] - h[b] - d[b];
       const from = difference > 0 ? a : b;
+      if (
+        this.preferSteep &&
+        Math.abs(difference) / distance > this.bestSlope[from]
+      ) {
+        this.bestSlope[from] = Math.abs(difference) / distance;
+        this.bestEdge[from] = i;
+      }
       // Never move dry ground, or extract more water than a source contains.
       const amount = Math.min(
         d[from],
-        (Math.abs(difference) * 0.18) / distance,
+        this.preferSteep
+          ? 0.45 * Math.abs(difference)
+          : (Math.abs(difference) * 0.18) / distance,
       );
       this.flux[i] = difference > 0 ? amount : -amount;
       this.outgoing[from] += amount;
     });
+    if (this.preferSteep) {
+      this.outgoing.fill(0);
+      this.edges.forEach(([a, b], i) => {
+        const from = this.flux[i] > 0 ? a : b;
+        if (this.bestEdge[from] !== i) this.flux[i] = 0;
+        this.outgoing[from] += Math.abs(this.flux[i]);
+      });
+    }
     this.edges.forEach(([a, b], i) => {
       const from = this.flux[i] > 0 ? a : b;
       const scale =
         this.outgoing[from] > d[from] ? d[from] / this.outgoing[from] : 1;
       const transfer = this.flux[i] * scale;
+      this.flux[i] = transfer; // Retain actual limited flux for sediment transport.
       this.change[a] -= transfer;
       this.change[b] += transfer;
     });
