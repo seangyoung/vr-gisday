@@ -9,7 +9,7 @@ export function createTray() {
       0.24 +
       0.28 * (1 - z) +
       0.16 * x * x +
-      0.024 * ((Math.sin(id * 12.9898) * 43758.5453) % 1)
+      0.006 * ((Math.sin(id * 12.9898) * 43758.5453) % 1)
     );
   });
 }
@@ -75,13 +75,15 @@ export class ErosionWater extends SurfaceWater {
         this.sediment[id] = 0;
         continue;
       }
-      const capacity = this.flow[id] * Math.min(2, this.slope[id]) * 2.5;
+      // Accelerated loose-sand response for a short exhibit. Use flow during
+      // this step: fast runoff may already have emptied the cell.
+      const capacity = this.flow[id] * Math.min(2, this.slope[id]) * 10;
       const difference = capacity - this.sediment[id];
-      if (difference > 0 && this.depth[id] > 0.00001) {
+      if (difference > 0 && this.flow[id] > 0.00001) {
         const removed = Math.min(
-          difference * 0.025,
-          0.0003,
-          Math.max(0, this.heights[id] - (this.initial[id] - 0.16)),
+          difference * 0.18,
+          0.0015,
+          Math.max(0, this.heights[id] - (this.initial[id] - 0.24)),
         );
         this.heights[id] -= removed;
         this.sediment[id] += removed;

@@ -85,6 +85,34 @@ export class RainExperience {
       }),
     );
     this.group.add(this.terrain);
+    if (this.kind === "erosion") {
+      const lines = [];
+      for (let a = 0; a < SIZE; a += 4)
+        for (let b = 0; b < SIZE - 1; b++)
+          for (const pair of [
+            [a * SIZE + b, a * SIZE + b + 1],
+            [b * SIZE + a, (b + 1) * SIZE + a],
+          ])
+            for (const id of pair) {
+              const p = cellPoint(id, this.heights);
+              lines.push(p.x, p.y + 0.003, p.z);
+            }
+      const original = new THREE.BufferGeometry();
+      original.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(lines, 3),
+      );
+      this.originalBed = new THREE.LineSegments(
+        original,
+        new THREE.LineBasicMaterial({
+          color: 0xf2f5e9,
+          transparent: true,
+          opacity: 0.55,
+        }),
+      );
+      this.originalBed.visible = false;
+      this.group.add(this.originalBed);
+    }
     this.paint();
     // Contours are derived from the same triangles used by routing and ray selection.
     const contourPoints = [];
@@ -418,6 +446,7 @@ export class RainExperience {
     this.setSource(this.source);
   }
   restore(notify = true) {
+    if (this.originalBed) this.originalBed.visible = false;
     this.pouring = false;
     this.grab.cancel();
     this.stroke = null;
@@ -492,8 +521,8 @@ export class RainExperience {
       if (this.kind === "erosion") {
         const change = this.heights[id] - this.water.initial[id];
         c.lerp(
-          new THREE.Color(change < 0 ? 0x694024 : 0xf9dd9b),
-          Math.min(0.85, Math.abs(change) * 6),
+          new THREE.Color(change < 0 ? 0x452819 : 0xffe6aa),
+          Math.min(0.85, Math.abs(change) * 14),
         );
       }
       attr.setXYZ(id, c.r, c.g, c.b);

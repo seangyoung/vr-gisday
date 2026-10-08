@@ -36,7 +36,7 @@ test("controller stroke edits mesh, survives mode switch, cancels safely, and re
   assert.deepEqual(r.heights, edited);
   r.burst(id);
   assert.equal(r.drops[0].outlet, "sink");
-  for (let i = 0; i < 100; i++) r.update(0.05);
+  for (let i = 0; i < 240; i++) r.update(0.05);
   assert.ok(r.water.added > 0);
   assert.ok(r.ponds.count > 0);
   r.setMode("sculpt");
@@ -93,7 +93,12 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   r.pouring = true;
   const original = r.heights.slice();
   r.group.position.set(0.3, 1, -1.5);
-  for (let i = 0; i < 100; i++) r.update(0.05);
+  for (let i = 0; i < 240; i++) r.update(0.05);
+  assert.ok(Math.max(...r.heights.map((v, i) => original[i] - v)) > 0.1);
+  const reference = r.originalBed.geometry.attributes.position.array.slice();
+  r.originalBed.visible = true;
+  r.update(0.1);
+  assert.deepEqual(r.originalBed.geometry.attributes.position.array, reference);
   assert.ok(r.water.eroded > 0);
   assert.notDeepEqual(r.heights, original);
   const geometry = r.terrain.geometry.attributes.position;
@@ -103,6 +108,7 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   r.restore();
   assert.deepEqual(r.heights, original);
   assert.equal(r.water.eroded, 0);
+  assert.equal(r.originalBed.visible, false);
   assert.equal(r.water.stored, 0);
   assert.equal(r.group.position.x, 0.3);
   r.elapsed = 239.99;

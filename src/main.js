@@ -456,7 +456,7 @@ function drawRainUI() {
     ];
     copy[1] = [
       "Pour. Cut channels. Carry sediment.",
-      "Start the pour, or point and HOLD TRIGGER to add water.\nDarker grooves show erosion; pale patches show deposits.\nStop the pour to inspect. GRIP: move; BOTH grips: resize.",
+      "Start the pour, or point and HOLD TRIGGER to add water.\nWatch grooves deepen and join as loose earth moves.\nStop pour; use Original bed to compare. GRIP: move / turn.",
     ];
     copy[4] = [
       "Water shapes its own path.",
@@ -485,36 +485,45 @@ function drawRainUI() {
   if (r.stage === 1 && r.kind === "erosion") {
     button(
       r.pouring ? "Stop pour" : "Start pour",
-      -0.84,
+      -0.92,
       -0.77,
       () => {
         stopRainInput();
         r.pouring = !r.pouring;
         draw();
       },
-      0.52,
+      0.44,
     );
     button(
       "Reset tray",
-      -0.28,
+      -0.46,
       -0.77,
       () => {
         stopRainInput();
-        r.pouring = false;
         r.restore();
       },
-      0.52,
+      0.44,
     );
-    button("Drainage", 0.28, -0.77, () => startRain("drainage", true), 0.52);
+    button(
+      r.originalBed.visible ? "Hide original" : "Original bed",
+      0,
+      -0.77,
+      () => {
+        r.originalBed.visible = !r.originalBed.visible;
+        draw();
+      },
+      0.44,
+    );
+    button("Drainage", 0.46, -0.77, () => startRain("drainage", true), 0.44);
     button(
       "Takeaways",
-      0.84,
+      0.92,
       -0.77,
       () => {
         stopRainInput();
         r.finish();
       },
-      0.52,
+      0.44,
     );
   }
   if (r.stage === 1 && r.kind !== "erosion") {
@@ -589,7 +598,7 @@ function drawRainUI() {
   } else
     label(
       r.kind === "erosion"
-        ? "Illustrative loose sediment · Fixed tray slope · Accelerated time"
+        ? "Dark: erosion · Pale: deposits · White grid: original bed · Accelerated"
         : r.mode === "sculpt"
           ? "Editing drains water · Edges anchored · Height limited"
           : r.overlay && r.edited

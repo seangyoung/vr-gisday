@@ -75,3 +75,10 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added original procedural woodland ruins, ravine bridge, hillside village, and terraced lookout models. New runs consume a shuffled bag, visiting each scene once before reshuffling and preventing immediate repeats across cycles. Active scans never switch automatically; clearing points preserves the scene.
 - `npm test`: all 34 tests pass. Added rotation-cycle checks and sampling/class/bounds/clear checks for each model; existing occlusion, filtering, transform, room-scan, and other demo tests still pass.
 - `npm run build`: passes (existing large-bundle warning). Browser preview inspected all four point clouds and the Takeaways → Next scene transition. Desktop screenshots show layout only; Quest stereo, controller scanning, and performance of the new scenes remain headset checks.
+
+## 2026-10-08 — Visible erosion within the exhibit time window
+
+- User reported runoff without perceptible terrain change. Fixed erosion eligibility to use actual outgoing water flux rather than leftover depth (fast runoff can empty a cell). Increased the illustrative sediment response and loose layer to 0.24 model units; reduced initial roughness so evolving channels stand out. This remains an accelerated teaching model, not calibrated erosion.
+- Added a toggleable original-bed reference grid that follows the tray pose but retains initial heights, plus stronger erosion/deposition colors. Reset hides the grid and restores terrain and water.
+- All 36 tests pass, including conservation, bounded bed removal, a fast-emptying-cell regression, more than 100 downstream cells cut over 0.02 units after 10 seconds, and actual rendered terrain change via the experience update loop. Production build passes with the existing bundle-size warning.
+- Browser preview checked the initial tray, 30 seconds of simulated pour, original-bed comparison, and reset; no console errors. Channels visibly cut the mesh in preview. Quest stereo readability and revised controller-button sizing remain headset checks.
