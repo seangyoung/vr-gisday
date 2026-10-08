@@ -24,17 +24,17 @@ export function candidates(count, tolerance = 0.025, step = 0.025) {
 export const stages = [
   {
     title: "One distance. Many possibilities.",
-    body: "Beacon A knows your distance, but not your direction.\nEvery point on this circle could be your location.",
+    body: "We know where A is and how far away we are.\nEvery point on the circle is that same distance from A.\nWithout direction, any of these points could be us.",
     action: "Add a second beacon",
   },
   {
     title: "Two distances. Two possibilities.",
-    body: "Both intersections satisfy the same two distances.\nChoose either glowing point to make a prediction.",
+    body: "A second known beacon gives us another distance.\nOnly the two white points fit BOTH measurements.\nChoose one: which will match a third beacon?",
     action: null,
   },
   {
     title: "A third beacon resolves the choice.",
-    body: "Only one point matches all three distances.\nThis is positioning by distance: trilateration.",
+    body: "The third circle passes through only one candidate.\nThat point fits all three measured distances.\nFinding position from distances is trilateration.",
     action: "Make measurements uncertain",
   },
   {
@@ -44,12 +44,12 @@ export const stages = [
   },
   {
     title: "In 3D, circles become shells.",
-    body: "A known distance defines a sphere. Three ranges can\nleave two positions; a fourth can resolve the ambiguity.",
+    body: "In space, every point on a shell is equally far from its beacon.\nThe two white points fit all three distances.\nGrab and turn the model to see both possibilities.",
     action: "Add the fourth beacon",
   },
   {
     title: "Four ranges. One common position.",
-    body: "This example assumes exact ranges and known beacons.\nGPS also solves clock error using satellite signals.",
+    body: "The fourth beacon rules out the other white point.\nOne position now matches all four exact distances.\nGPS also needs to solve receiver clock error.",
     action: "Finish",
   },
 ];

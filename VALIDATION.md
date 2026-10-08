@@ -16,3 +16,12 @@ The in-app browser later stopped responding to test clicks without console error
 Actual immersive session entry/exit, stereo rendering, left/right controller targeting, passthrough composition, recentering, seated comfort, frame rate, four-minute wrap-up, and headset sleep/resume. Automated tests and desktop scene review do not establish these results.
 
 No hand tracking, room mesh, persistent anchoring, networked visitors, or desktop product experience is implemented.
+
+## 2026-10-08 revision — floating model and controller manipulation
+
+- Replaced the 3D backdrop/rotate buttons with an independent world-space assembly and side-grip movement/rotation. Two grips provide bounded, uniform scaling and rotation based on the line between controllers. A single grip also supports full wrist rotation.
+- Stable shared bounds center across the three/four-beacon transition; added radius spokes as orientation cues.
+- Added Reset View and a mandatory short distance-versus-direction introduction; clarified the circle and beacon explanations.
+- Eight tests pass: prior geometry tests plus rigid child transforms, scale limits, grip transitions, coincident grips, and tracking-loss cancellation. Production build passes.
+- Browser preview: reviewed intro and 3D layout; checked stage transition, reset, and restart.
+- Still requires Quest validation: squeeze-event wiring and controller poses, real one/two-grip feel, stereo/AR layout, scale comfort, and recovery from real tracking loss. Unit tests do not simulate an actual Quest session.

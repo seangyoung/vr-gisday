@@ -10,6 +10,7 @@ import {
   target3D,
 } from "./model.js";
 import "./style.css";
+import { ModelGrab } from "./manipulation.js";
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
@@ -35,6 +36,7 @@ scene.add(root);
 const content = new THREE.Group();
 root.add(content);
 const raycaster = new THREE.Raycaster();
+raycaster.params.Line.threshold = 0.025;
 const rotation = new THREE.Matrix4();
 let buttons = [],
   step = -1,
@@ -43,8 +45,22 @@ let buttons = [],
   pendingPlacement = false,
   noisy = false,
   prediction = "";
+let floatingModel = null,
+  grab = null,
+  preservePose = null;
+const isSpatial = () => step === 4 || step === 5;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
+  grab?.cancel();
+  if (floatingModel) {
+    floatingModel.traverse((n) => {
+      n.geometry?.dispose();
+      n.material?.dispose();
+    });
+    scene.remove(floatingModel);
+    floatingModel = null;
+    grab = null;
+  }
   buttons = [];
   while (content.children.length) {
     const obj = content.children[0];
@@ -146,37 +162,47 @@ function point(p, color, r = 0.026, z = 0.045) {
   content.add(m);
   return m;
 }
-function navigation() {
+function navigation(y = -0.98) {
   button(
     "Menu",
     -0.72,
-    -0.98,
+    y,
     () => {
       step = -1;
       draw();
     },
     0.42,
   );
-  button("Restart", -0.23, -0.98, () => start(), 0.46);
+  button("Restart", -0.23, y, () => start(), 0.46);
   button(
-    "Recenter",
+    isSpatial() ? "Reset View" : "Recenter",
     0.3,
-    -0.98,
+    y,
     () => {
-      pendingPlacement = true;
+      if (devPreview) place();
+      else pendingPlacement = true;
     },
     0.5,
   );
-  button("Exit XR", 0.84, -0.98, () => renderer.xr.getSession()?.end(), 0.46);
+  button("Exit XR", 0.84, y, () => renderer.xr.getSession()?.end(), 0.46);
 }
 function start() {
-  step = 0;
+  preservePose = null;
+  step = -2;
   elapsed = 0;
   noisy = false;
   prediction = "";
   draw();
 }
 function next() {
+  preservePose =
+    step === 4 && floatingModel
+      ? {
+          position: floatingModel.position.clone(),
+          quaternion: floatingModel.quaternion.clone(),
+          scale: floatingModel.scale.clone(),
+        }
+      : null;
   step++;
   draw();
 }
@@ -267,73 +293,92 @@ function planar() {
     );
   }
 }
+function resetModelView() {
+  if (!floatingModel) return;
+  grab?.cancel();
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  const forward = new THREE.Vector3();
+  cam.getWorldDirection(forward);
+  forward.y = 0;
+  if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
+  forward.normalize();
+  cam.getWorldPosition(floatingModel.position);
+  floatingModel.position.addScaledVector(forward, 1.3);
+  floatingModel.position.y -= 0.1;
+  floatingModel.quaternion.setFromEuler(
+    new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.35, 0, "YXZ"),
+  );
+  floatingModel.scale.setScalar(0.35);
+}
 function spatial() {
   const group = new THREE.Group();
-  content.add(group);
-  group.rotation.set(0.18, 0.45, 0);
-  group.scale.setScalar(0.48);
-  group.position.y = 0.04;
+  floatingModel = group;
+  scene.add(group);
   const beacons = beacons3D.map((p) => new THREE.Vector3(p.x, p.y, p.z));
   const t = new THREE.Vector3(target3D.x, target3D.y, target3D.z);
+  // Use the bounds of all FOUR shells for a stable shared center across stages.
+  const bounds = new THREE.Box3();
+  beacons.forEach((a) => {
+    const r = a.distanceTo(t);
+    bounds.expandByPoint(a.clone().addScalar(r));
+    bounds.expandByPoint(a.clone().addScalar(-r));
+  });
+  const center = bounds.getCenter(new THREE.Vector3());
   beacons.slice(0, step === 4 ? 3 : 4).forEach((a, i) => {
-    const radius = a.distanceTo(t);
     const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 24, 16),
+      new THREE.SphereGeometry(a.distanceTo(t), 28, 18),
       new THREE.MeshBasicMaterial({
         color: palette[i],
         wireframe: true,
         transparent: true,
-        opacity: 0.17,
+        opacity: 0.25,
         depthWrite: false,
       }),
     );
-    sphere.position.copy(a);
+    sphere.position.copy(a).sub(center);
     group.add(sphere);
-    const b = new THREE.Mesh(
-      new THREE.SphereGeometry(0.045, 12, 8),
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.038, 16, 12),
       new THREE.MeshBasicMaterial({ color: palette[i] }),
     );
-    b.position.copy(a);
-    group.add(b);
+    beacon.position.copy(a).sub(center);
+    group.add(beacon);
+    // A short radius spoke makes the assembly's rotation visible even for symmetric shells.
+    const spoke = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([
+        a.clone().sub(center),
+        a
+          .clone()
+          .add(new THREE.Vector3(a.distanceTo(t), 0, 0))
+          .sub(center),
+      ]),
+      new THREE.LineBasicMaterial({
+        color: palette[i],
+        transparent: true,
+        opacity: 0.55,
+      }),
+    );
+    group.add(spoke);
   });
   [t, ...(step === 4 ? [new THREE.Vector3(t.x, t.y, -t.z)] : [])].forEach(
     (p) => {
-      const m = new THREE.Mesh(
-        new THREE.SphereGeometry(0.045, 14, 10),
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.028, 16, 12),
         new THREE.MeshBasicMaterial({ color: 0xffffff }),
       );
-      m.position.copy(p);
-      group.add(m);
+      dot.position.copy(p).sub(center);
+      group.add(dot);
     },
   );
-  button(
-    "Rotate left",
-    -0.55,
-    -0.47,
-    () => {
-      group.rotation.y -= Math.PI / 6;
-    },
-    0.8,
-  );
-  button(
-    "Rotate right",
-    0.55,
-    -0.47,
-    () => {
-      group.rotation.y += Math.PI / 6;
-    },
-    0.8,
-  );
-  label(
-    step === 4
-      ? "Two white points fit the first three ranges."
-      : "The fourth beacon is outside the first three’s plane.",
-    0,
-    -0.64,
-    1.9,
-    0.1,
-    34,
-  );
+  group.userData.radius = bounds.getSize(new THREE.Vector3()).length() / 2;
+  grab = new ModelGrab(group);
+  resetModelView();
+  if (preservePose) {
+    group.position.copy(preservePose.position);
+    group.quaternion.copy(preservePose.quaternion);
+    group.scale.copy(preservePose.scale);
+    preservePose = null;
+  }
 }
 function draw() {
   drawScene();
@@ -358,13 +403,47 @@ function draw() {
 }
 function drawScene() {
   clear();
-  // Opaque backplate keeps text and controls legible in passthrough.
-  const back = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.6, 3.9),
-    new THREE.MeshBasicMaterial({ color: 0x0b2430, side: THREE.DoubleSide }),
-  );
-  back.position.set(0, -0.03, -1.15);
-  content.add(back);
+  // Only the planar lesson uses a backdrop; the 3D assembly lives in world space.
+  if (!isSpatial()) {
+    const back = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.6, 3.9),
+      new THREE.MeshBasicMaterial({ color: 0x0b2430, side: THREE.DoubleSide }),
+    );
+    back.position.set(0, -0.03, -1.15);
+    content.add(back);
+  }
+  if (step === -2) {
+    label("START WITH WHAT WE KNOW", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
+    label("Distance is not direction.", 0, 0.52, 2.15, 0.2, 52);
+    label(
+      "A beacon is a fixed point whose location we know.\nImagine a signal tells us how far away we are.\nIt does not tell us which direction to look.",
+      0,
+      0.13,
+      2.15,
+      0.4,
+      39,
+    );
+    label(
+      "Knowing the distance still leaves many possible places.\nLet’s find them in a small model of space.",
+      0,
+      -0.3,
+      2.15,
+      0.24,
+      36,
+    );
+    button(
+      "Show the possible locations",
+      0,
+      -0.64,
+      () => {
+        step = 0;
+        draw();
+      },
+      1.8,
+    );
+    navigation();
+    return;
+  }
   if (step === -1) {
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
@@ -413,6 +492,24 @@ function drawScene() {
     return;
   }
   const s = stages[step];
+  if (isSpatial()) {
+    spatial();
+    label(s.title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
+    label(s.body, 0, 0.79, 2.4, 0.29, 33, "#e6f4f5", "#0b2430");
+    label(
+      "Hold a SIDE GRIP to move / turn the whole model.\nHold BOTH grips and spread / squeeze to resize.",
+      0,
+      -0.59,
+      2.3,
+      0.22,
+      33,
+      "#e6f4f5",
+      "#0b2430",
+    );
+    button(s.action, 0, -0.79, next, 1.65);
+    navigation();
+    return;
+  }
   label(
     `${String(step + 1).padStart(2, "0")} / 06    ·    FIND YOURSELF WITHOUT GPS`,
     0,
@@ -423,9 +520,8 @@ function drawScene() {
     "#a6f5d9",
   );
   label(s.title, 0, 0.88, 2.15, 0.17, 48);
-  label(s.body, 0, 0.68, 2.15, 0.21, 32);
-  if (step < 4) planar();
-  else spatial();
+  label(s.body, 0, 0.66, 2.15, 0.28, 32);
+  planar();
   if (step === 2 && prediction)
     label(prediction, 0, -0.62, 2, 0.1, 29, "#a6f5d9");
   if (s.action) button(s.action, 0, -0.79, next, 1.65);
@@ -444,11 +540,19 @@ function place() {
   root.position.y = pos.y - 0.23;
   root.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
   pendingPlacement = false;
+  if (floatingModel) resetModelView();
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
   const c = renderer.xr.getController(i);
   scene.add(c);
+  const grip = renderer.xr.getControllerGrip(i);
+  scene.add(grip);
+  const handle = new THREE.Mesh(
+    new THREE.SphereGeometry(0.018, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0xa6f5d9 }),
+  );
+  grip.add(handle);
   const beam = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(),
@@ -459,10 +563,29 @@ for (let i = 0; i < 2; i++) {
   beam.scale.z = 4;
   c.add(beam);
   c.addEventListener("selectstart", () => {
+    if (grab?.hands.size) return;
     const hit = intersect(c);
     hit?.object.userData.action?.();
   });
-  controllers.push({ c, beam });
+  c.addEventListener("squeezestart", () => {
+    if (!floatingModel || !grip.visible) return;
+    grip.updateWorldMatrix(true, false);
+    const near =
+      grip
+        .getWorldPosition(new THREE.Vector3())
+        .distanceTo(floatingModel.position) <
+      floatingModel.userData.radius * floatingModel.scale.x + 0.08;
+    if (near || modelHit(c)) grab.begin(i, grip.matrixWorld);
+  });
+  c.addEventListener("squeezeend", () => grab?.release(i));
+  c.addEventListener("disconnected", () => grab?.release(i));
+  controllers.push({ c, grip, beam, handle, id: i });
+}
+function modelHit(c) {
+  if (!floatingModel) return null;
+  intersect(c); // Set the ray from the controller pose.
+  floatingModel.updateWorldMatrix(true, true);
+  return raycaster.intersectObjects(floatingModel.children, false)[0];
 }
 function intersect(c) {
   c.updateWorldMatrix(true, false);
@@ -481,6 +604,9 @@ async function enter(mode) {
     document.body.classList.add("xr-active");
     step = -1;
     elapsed = 0;
+    session.addEventListener("visibilitychange", () => {
+      if (session.visibilityState !== "visible") grab?.cancel();
+    });
     draw();
     pendingPlacement = true;
     status.textContent = "";
@@ -490,6 +616,7 @@ async function enter(mode) {
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
+  grab?.cancel();
   document.body.classList.remove("xr-active");
   status.textContent =
     "Session ended. Choose VR or mixed reality to start again.";
@@ -524,7 +651,7 @@ renderer.setAnimationLoop((time, frame) => {
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     if (
-      step >= 0 &&
+      (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
     ) {
@@ -534,10 +661,24 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
+    const poses = new Map();
+    for (const { grip, id } of controllers)
+      if (grip.visible) {
+        grip.updateWorldMatrix(true, false);
+        poses.set(id, grip.matrixWorld);
+      }
+    if (renderer.xr.getSession().visibilityState === "visible")
+      grab?.update(poses);
+    else grab?.cancel();
     for (const b of buttons) b.material.color.set(0xffffff);
-    for (const { c, beam } of controllers) {
+    for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
-      beam.scale.z = hit ? hit.distance : 4;
+      const model = modelHit(c);
+      beam.visible = !grab?.hands.has(id);
+      beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
+      handle.material.color.set(
+        grab?.hands.has(id) ? 0xffca83 : model ? 0xffffff : 0xa6f5d9,
+      );
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
@@ -558,7 +699,7 @@ if (
   );
   if (
     Number.isInteger(requestedStep) &&
-    requestedStep >= -1 &&
+    requestedStep >= -2 &&
     requestedStep <= stages.length
   )
     step = requestedStep;

@@ -15,20 +15,21 @@ npm run build
 
 Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a laptop's LAN address for immersive WebXR. GitHub Pages supplies HTTPS. There are no runtime API keys or external asset requests. Dependencies are bundled by Vite.
 
-A development-only `http://localhost:5173/?preview` view supports mouse selection of the same scene buttons for layout review. Optional `&stage=0` through `&stage=6` selects a stage for visual inspection; the small development toolbar calls the same actions as XR controls. It is removed from production builds; there is no desktop experience or walking mechanic.
+A development-only `http://localhost:5173/?preview` view supports mouse selection of the same scene buttons for layout review. Optional `&stage=-2` (introduction), `&stage=-1` (menu), or `&stage=0` through `&stage=6` selects a stage for visual inspection; the small development toolbar calls the same actions as XR controls. It is removed from production builds; there is no desktop experience or walking mechanic.
 
 ## Experience
 
 Enter VR or passthrough from Quest Browser, then use a controller ray and trigger to choose the experience. Both controllers work. The presentation is placed relative to the initial viewing direction and eye height, supporting seated or standing use. Recenter places it in front of the current view. No room scan, persistent anchor, physical-table placement, or hand tracking is required or implemented.
 
+0. A short introduction establishes a known beacon location and a distance measurement without direction.
 1. One range defines a circle of possible model positions.
 2. Two circles intersect at two selectable predictions.
 3. A third range identifies one candidate; feedback explains either choice.
 4. Toggle range tolerance; white dots satisfy all three bands.
-5. In 3D, three coplanar beacons admit two points. Rotate the model.
-6. A fourth, noncoplanar beacon resolves this example. Finish with takeaways.
+5. In 3D, three coplanar beacons admit two points. The model floats independently of the text and controls. Point at it or reach nearby and hold a controller side grip to move/rotate the entire assembly. Add the other grip and spread/squeeze to resize uniformly (scale 0.28–0.85; default 0.35). Release to leave it in place.
+6. A fourth, noncoplanar beacon resolves this example, preserving your model position, rotation, and scale. Finish with takeaways.
 
-The guided portion transitions to takeaways after 240 seconds of visible XR frame time. It can be completed sooner; paused/hidden sessions do not consume that time. Restart begins a new run. Menu, Restart, Recenter, and Exit XR remain available throughout.
+The guided portion transitions to takeaways after 240 seconds of visible XR frame time. It can be completed sooner; paused/hidden sessions do not consume that time. Restart begins a new run. Menu, Restart, and Exit XR remain available throughout. In 3D, Reset View replaces Recenter and restores the default model pose and controls in front of the viewer. The assembly has a shared center; individual beacons cannot be moved independently because that would invalidate the measured-distance relationships. Tracking loss, hidden sessions, reset, or stage changes release active grips.
 
 This is a scaled positioning model, **not a measurement of the visitor's real location**, a GPS implementation, or a probability model. Coordinates and tolerances use arbitrary model units. Headset tracking only places and views the content. The 3D example assumes exact ranges; GPS pseudoranges also require estimating receiver clock error. See SOURCES.md.
 
@@ -52,7 +53,7 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 - Left/right controller rays select menu buttons and both candidate points.
 - All text is readable and geometry remains stable in stereo.
 - Seated entry and Recenter place content comfortably.
-- Uncertainty toggle and 3D rotations work; no clipping when inspecting shells.
+- Uncertainty toggle works. One grip translates/rotates all shells together; two grips resize within limits. Check no jumps when adding/releasing the second grip, Reset View after moving the model away, and grip release on tracking loss/sleep.
 - Menu and Restart work from every stage and takeaways.
 - Four-minute wrap-up, headset sleep/resume, and fresh-session reset work.
 - Repeat several visitors and check comfort and frame rate.
