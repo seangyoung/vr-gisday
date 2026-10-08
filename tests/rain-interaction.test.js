@@ -192,7 +192,8 @@ for (const kind of ["drainage", "erosion"])
     assert.equal(r.water, water);
     assert.equal(r.water.stored, volume);
     r.setSource(id);
-    for (let i = 0; i < 100; i++) r.update(0.02, true);
+    // Drainage particles must finish their downhill path before delivering water.
+    for (let i = 0; i < 300; i++) r.update(0.02, true);
     assert.ok(r.water.added > 0.002);
     assert.equal(r.stroke.id, 0);
     r.endStroke(0);
