@@ -172,3 +172,22 @@ footer {
     display: none;
   }
 }
+.rain-art {
+  height: 150px;
+  text-align: center;
+  color: #d9f8ff;
+  font-size: 55px;
+  line-height: 0.85;
+  padding: 10px;
+}
+.rain-art span {
+  display: block;
+  font-size: 28px;
+  color: #6acfe0;
+  letter-spacing: 12px;
+}
+.rain-art div {
+  font-size: 38px;
+  color: #98bc85;
+  margin-top: 10px;
+}

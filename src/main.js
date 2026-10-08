@@ -10,11 +10,13 @@ import {
   target3D,
 } from "./model.js";
 import "./style.css";
+import { RainExperience } from "./rain/experience.js";
+import { cellAt } from "./rain/terrain.js";
 import { ModelGrab } from "./manipulation.js";
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Short, hands-on discoveries in virtual and mixed reality.<br>Choose your view, put on your Quest, and follow your curiosity.</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning · About 4 minutes</div><h2>Find Yourself Without GPS</h2><p>How much can a distance tell you? Reveal your possible locations, make a prediction, and discover why measurements never tell the whole story.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Use Quest controllers. Point and press the trigger to select.<br>Stay seated or standing in one place; no walking required.</p></article><article class="card planned"><div class="eyebrow">On the drawing board</div><h3>Make It Rain</h3><p class="small">Follow water across a miniature landscape.</p><h3>Scan the Hidden World</h3><p class="small">Discover a world one point at a time.</p><p class="small">Future experiences · Not yet playable</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · No account required</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Two short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Coming later: Scan the Hidden World</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -45,6 +47,9 @@ let buttons = [],
   pendingPlacement = false,
   noisy = false,
   prediction = "";
+let rain = null,
+  rainPointer = 0,
+  previewRaining = false;
 let floatingModel = null,
   grab = null,
   preservePose = null;
@@ -168,6 +173,9 @@ function navigation(y = -0.98) {
     -0.72,
     y,
     () => {
+      rain?.dispose();
+      rain = null;
+      stopRainInput();
       step = -1;
       draw();
     },
@@ -175,7 +183,7 @@ function navigation(y = -0.98) {
   );
   button("Restart", -0.23, y, () => start(), 0.46);
   button(
-    isSpatial() ? "Reset View" : "Recenter",
+    rain || isSpatial() ? "Reset View" : "Recenter",
     0.3,
     y,
     () => {
@@ -187,12 +195,120 @@ function navigation(y = -0.98) {
   button("Exit XR", 0.84, y, () => renderer.xr.getSession()?.end(), 0.46);
 }
 function start() {
+  if (rain) {
+    startRain();
+    return;
+  }
   preservePose = null;
   step = -2;
   elapsed = 0;
   noisy = false;
   prediction = "";
   draw();
+}
+function stopRainInput() {
+  previewRaining = false;
+  for (const { c } of controllers) c.userData.raining = false;
+}
+function startRain() {
+  stopRainInput();
+  rain?.dispose();
+  rain = new RainExperience(scene, draw);
+  rain.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function drawRainUI() {
+  const r = rain;
+  const copy = [
+    [
+      "Make It Rain",
+      "Water on the surface flows downhill.\nA ridge can send nearby drops toward different outlets.\nMake rain on this landscape and follow where it goes.",
+    ],
+    [
+      "Where will your rain go?",
+      "Point at the land and HOLD the TRIGGER to rain.\nThe cloud follows your aim. Try both sides of the ridge.\nA and B mark the two outlets.",
+    ],
+    [
+      "Predict the path",
+      "Rain will fall at the gold ring near the ridge.\nWhich outlet will this water reach?\nChoose A or B, then watch the path.",
+    ],
+    [
+      r.answer === r.destination
+        ? "Your prediction follows the slope."
+        : "The slope sends this rain the other way.",
+      `This rain reaches outlet ${r.destination}. Follow its glowing path.\nEach colored area drains to one outlet: a watershed.\nThe white ridge line is the divide between them.`,
+    ],
+    [
+      "One landscape. Two watersheds.",
+      "A watershed is land that drains to a common outlet.\nNearby drops can end up in different places.\nRidges divide the land into different drainage areas.",
+    ],
+  ];
+  const [title, body] = copy[r.stage];
+  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
+  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  if (r.stage === 0)
+    button("Make some rain", 0, -0.77, () => r.explore(), 1.65);
+  if (r.stage === 1) {
+    button(
+      r.overlay ? "Hide watersheds" : "Show watersheds",
+      -0.53,
+      -0.77,
+      () => r.toggleOverlay(),
+      1.02,
+    );
+    button(
+      "Try a prediction",
+      0.58,
+      -0.77,
+      () => {
+        stopRainInput();
+        r.challenge();
+      },
+      1.02,
+    );
+  }
+  if (r.stage === 2) {
+    button("Outlet A · left", -0.54, -0.77, () => r.choose("A"), 1.02);
+    button("Outlet B · right", 0.58, -0.77, () => r.choose("B"), 1.02);
+  }
+  if (r.stage === 3) {
+    button(
+      "Rain here again",
+      -0.54,
+      -0.77,
+      () => {
+        r.playback = 4;
+      },
+      1.02,
+    );
+    button("Takeaways", 0.58, -0.77, () => r.finish(), 1.02);
+  }
+  if (r.stage === 4) {
+    label(
+      "This model shows surface paths only. Real rain can\nalso soak into soil, evaporate, or collect in low spots.",
+      0,
+      -0.62,
+      2.3,
+      0.16,
+      28,
+      "#e6f4f5",
+      "#0b2430",
+    );
+    button("Make rain again", 0, -0.77, startRain, 1.65);
+  } else
+    label(
+      r.overlay
+        ? "A: blue / round outlet    ·    B: gold / square outlet"
+        : "Surface-flow model · Synthetic terrain · No flood prediction",
+      0,
+      -0.55,
+      2.3,
+      0.12,
+      28,
+      "#e6f4f5",
+      "#0b2430",
+    );
+  navigation();
 }
 function next() {
   preservePose =
@@ -392,6 +508,18 @@ function draw() {
       document.body.append(panel);
     }
     panel.replaceChildren();
+    if (rain?.stage === 1) {
+      for (const [name, x] of [
+        ["Rain on left slope", -0.3],
+        ["Rain on right slope", 0.3],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.style.cssText = "font-size:11px;padding:5px;margin:3px";
+        b.onclick = () => rain.burst(cellAt(x, -0.4));
+        panel.append(b);
+      }
+    }
     for (const mesh of buttons) {
       const b = document.createElement("button");
       b.textContent = mesh.userData.label || "Candidate";
@@ -403,6 +531,10 @@ function draw() {
 }
 function drawScene() {
   clear();
+  if (rain) {
+    drawRainUI();
+    return;
+  }
   // Only the planar lesson uses a backdrop; the 3D assembly lives in world space.
   if (!isSpatial()) {
     const back = new THREE.Mesh(
@@ -448,22 +580,22 @@ function drawScene() {
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
     button("Find Yourself Without GPS", 0, 0.15, start, 1.75);
+    button("Make It Rain", 0, -0.1, startRain, 1.75);
     label(
-      "About 4 minutes · Point and press the trigger",
+      "About 4 minutes each · Point and press the trigger",
       0,
-      -0.08,
-      1.9,
-      0.13,
-      35,
+      -0.32,
+      2,
+      0.12,
+      32,
     );
-    label("COMING LATER", 0, -0.38, 1.6, 0.12, 32, "#99b8c2");
     label(
-      "Make It Rain   /   Scan the Hidden World",
+      "COMING LATER: Scan the Hidden World",
       0,
       -0.54,
-      1.9,
+      2,
       0.14,
-      35,
+      32,
       "#99b8c2",
     );
     navigation();
@@ -541,6 +673,7 @@ function place() {
   root.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
   pendingPlacement = false;
   if (floatingModel) resetModelView();
+  if (rain) rain.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -565,7 +698,21 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("selectstart", () => {
     if (grab?.hands.size) return;
     const hit = intersect(c);
-    hit?.object.userData.action?.();
+    if (hit) {
+      hit.object.userData.action?.();
+      return;
+    }
+    if (rain?.stage === 1) {
+      const land = rainHit(c);
+      if (land) {
+        rainPointer = i;
+        rain.aim(land.point);
+        c.userData.raining = true;
+      }
+    }
+  });
+  c.addEventListener("selectend", () => {
+    c.userData.raining = false;
   });
   c.addEventListener("squeezestart", () => {
     if (!floatingModel || !grip.visible) return;
@@ -579,8 +726,17 @@ for (let i = 0; i < 2; i++) {
     if (grab.hands.size || near || modelHit(c)) grab.begin(i, grip.matrixWorld);
   });
   c.addEventListener("squeezeend", () => grab?.release(i));
-  c.addEventListener("disconnected", () => grab?.release(i));
+  c.addEventListener("disconnected", () => {
+    grab?.release(i);
+    c.userData.raining = false;
+  });
   controllers.push({ c, grip, beam, handle, id: i });
+}
+function rainHit(c) {
+  if (!rain) return null;
+  intersect(c);
+  rain.group.updateWorldMatrix(true, true);
+  return raycaster.intersectObject(rain.terrain, false)[0];
 }
 function modelHit(c) {
   if (!floatingModel) return null;
@@ -603,10 +759,16 @@ async function enter(mode) {
       mode === "immersive-ar" ? null : new THREE.Color(0x071820);
     await renderer.xr.setSession(session);
     document.body.classList.add("xr-active");
+    rain?.dispose();
+    rain = null;
+    stopRainInput();
     step = -1;
     elapsed = 0;
     session.addEventListener("visibilitychange", () => {
-      if (session.visibilityState !== "visible") grab?.cancel();
+      if (session.visibilityState !== "visible") {
+        grab?.cancel();
+        stopRainInput();
+      }
     });
     draw();
     pendingPlacement = true;
@@ -618,6 +780,7 @@ async function enter(mode) {
 }
 renderer.xr.addEventListener("sessionend", () => {
   grab?.cancel();
+  stopRainInput();
   document.body.classList.remove("xr-active");
   status.textContent =
     "Session ended. Choose VR or mixed reality to start again.";
@@ -652,6 +815,7 @@ renderer.setAnimationLoop((time, frame) => {
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     if (
+      !rain &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
@@ -661,6 +825,18 @@ renderer.setAnimationLoop((time, frame) => {
         step = stages.length;
         draw();
       }
+    }
+    if (rain && renderer.xr.getSession().visibilityState === "visible") {
+      const active = controllers[rainPointer];
+      let falling = false;
+      if (active?.c.visible && rain.stage === 1 && !intersect(active.c)) {
+        const land = rainHit(active.c);
+        if (land) {
+          rain.aim(land.point);
+          falling = !!active.c.userData.raining;
+        }
+      }
+      rain.update(dt, falling);
     }
     const poses = new Map();
     for (const { grip, id } of controllers)
@@ -674,7 +850,7 @@ renderer.setAnimationLoop((time, frame) => {
     for (const b of buttons) b.material.color.set(0xffffff);
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
-      const model = modelHit(c);
+      const model = modelHit(c) || rainHit(c);
       beam.visible = !grab?.hands.has(id);
       beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
       handle.material.color.set(
@@ -683,6 +859,8 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
+  if (devPreview && rain && !renderer.xr.isPresenting)
+    rain.update(dt, previewRaining);
   renderer.render(scene, camera);
 });
 window.addEventListener("resize", () => {
@@ -706,7 +884,8 @@ if (
     step = requestedStep;
   document.body.classList.add("xr-active");
   scene.background = new THREE.Color(0x071820);
-  draw();
+  if (new URLSearchParams(location.search).get("demo") === "rain") startRain();
+  else draw();
   place();
   renderer.domElement.addEventListener("pointerdown", (e) => {
     raycaster.setFromCamera(
@@ -716,6 +895,35 @@ if (
       ),
       camera,
     );
-    raycaster.intersectObjects(buttons, false)[0]?.object.userData.action?.();
+    const ui = raycaster.intersectObjects(buttons, false)[0];
+    if (ui) ui.object.userData.action?.();
+    else if (rain?.stage === 1) {
+      rain.group.updateWorldMatrix(true, true);
+      const land = raycaster.intersectObject(rain.terrain, false)[0];
+      if (land) {
+        rain.aim(land.point);
+        previewRaining = true;
+      }
+    }
+  });
+}
+
+if (devPreview) {
+  window.addEventListener("pointerup", () => {
+    previewRaining = false;
+  });
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (rain?.stage !== 1) return;
+    raycaster.setFromCamera(
+      new THREE.Vector2(
+        (e.clientX / innerWidth) * 2 - 1,
+        (-e.clientY / innerHeight) * 2 + 1,
+      ),
+      camera,
+    );
+    rain.group.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObject(rain.terrain, false)[0];
+    if (hit) rain.aim(hit.point);
+    else previewRaining = false;
   });
 }

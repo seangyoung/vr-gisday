@@ -25,3 +25,10 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Eight tests pass: prior geometry tests plus rigid child transforms, scale limits, grip transitions, coincident grips, and tracking-loss cancellation. Production build passes.
 - Browser preview: reviewed intro and 3D layout; checked stage transition, reset, and restart.
 - Still requires Quest validation: squeeze-event wiring and controller poses, real one/two-grip feel, stereo/AR layout, scale comfort, and recovery from real tracking loss. Unit tests do not simulate an actual Quest session.
+
+## 2026-10-08 — Make It Rain
+
+- Added a second selectable experience, a procedural landscape, rain/cloud interaction, bounded particle/trail rendering, basin overlays, a prediction/replay, takeaways, reset, and a four-minute wrap-up.
+- Three new terrain tests exhaustively check all 1,681 cells: strict downhill routing, no cycles, termination at the intended two outlets, opposite-side behavior, deterministic paths, and coordinate clamping. Existing positioning/manipulation tests remain in the suite.
+- Browser walkthrough: rain paths on both sides; overlay; both prediction answers; replay/takeaways; restart; return to the shared menu and launch of positioning. No browser console errors during that walkthrough.
+- Quest gate: trigger aiming and hold/release, left/right controllers, cloud placement, terrain readability, runoff visibility in stereo/passthrough, reset, sleep/resume, and event timing. Browser preview and terrain tests do not establish those results.

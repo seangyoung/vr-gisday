@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with a simple immersive experience menu. First module: **Find Yourself Without GPS**. Other experiences are labeled as future work.
+Quest-focused WebXR app with a simple immersive experience menu. Two playable modules: **Find Yourself Without GPS** and **Make It Rain**. Scan the Hidden World remains future work.
 
 ## Run
 
@@ -17,7 +17,7 @@ Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a lapt
 
 A development-only `http://localhost:5173/?preview` view supports mouse selection of the same scene buttons for layout review. Optional `&stage=-2` (introduction), `&stage=-1` (menu), or `&stage=0` through `&stage=6` selects a stage for visual inspection; the small development toolbar calls the same actions as XR controls. It is removed from production builds; there is no desktop experience or walking mechanic.
 
-## Experience
+## Find Yourself Without GPS
 
 Enter VR or passthrough from Quest Browser, then use a controller ray and trigger to choose the experience. Both controllers work. The presentation is placed relative to the initial viewing direction and eye height, supporting seated or standing use. Recenter places it in front of the current view. No room scan, persistent anchor, physical-table placement, or hand tracking is required or implemented.
 
@@ -32,6 +32,22 @@ Enter VR or passthrough from Quest Browser, then use a controller ray and trigge
 The guided portion transitions to takeaways after 240 seconds of visible XR frame time. It can be completed sooner; paused/hidden sessions do not consume that time. Restart begins a new run. Menu, Restart, and Exit XR remain available throughout. In 3D, Reset View replaces Recenter and restores the default model pose and controls in front of the viewer. The assembly has a shared center; individual beacons cannot be moved independently because that would invalidate the measured-distance relationships. Tracking loss, hidden sessions, reset, or stage changes release active grips.
 
 This is a scaled positioning model, **not a measurement of the visitor's real location**, a GPS implementation, or a probability model. Coordinates and tolerances use arbitrary model units. Headset tracking only places and views the content. The 3D example assumes exact ranges; GPS pseudoranges also require estimating receiver clock error. See SOURCES.md.
+
+## Make It Rain
+
+Choose **Make It Rain** inside the headset. This second experience is a floating synthetic landscape with two outlets, a drainage divide, contour lines, and a movable rain cloud.
+
+1. Read the short explanation of surface runoff and choose **Make some rain**.
+2. Point at the terrain and **hold the trigger**. The cloud follows the aiming point and rain travels downhill. Releasing the trigger stops new rain; existing drops finish their paths. Try both sides of the ridge.
+3. Toggle **Show watersheds** to color cells by their calculated outlet. Outlet A is blue and round; B is gold and square. Labels provide a cue independent of color.
+4. Choose **Try a prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
+5. Read the takeaways or restart. The experience transitions to takeaways after four minutes of visible XR frame time.
+
+**Reset View** places the landscape and controls in front of the current view. **Menu** switches experiences. Controller grip transforms belong to the positioning model; the landscape stays upright for runoff exploration. Use the trigger to position rain on the land.
+
+The 41×41 elevation grid and steepest-descent paths are computed locally. The illustration does not simulate infiltration, evaporation, ponding, erosion, rainfall intensity, flow volume, or flood risk. Trees are decoration and do not change runoff. Particle speed is illustrative; synthetic model units have no geographic scale. This is not a real watershed dataset.
+
+For browser development review only, `?preview&demo=rain` opens the rain experience. Test buttons emit rain on either slope; pointer/trigger ray selection still needs Quest verification. Production has no desktop experience.
 
 ## GitHub Pages
 
