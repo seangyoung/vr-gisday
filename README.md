@@ -66,11 +66,13 @@ Side grips move/rotate the tray; both grips resize. Rotation changes the viewing
 
 Choose the third experience in the shared menu, then **Start scanning**. Hold the trigger and sweep a controller through the outlined miniature scene to collect a point cloud. One side grip moves/rotates the model; both grips resize it (0.22–0.75, default 0.43). Rotate and scan another side to observe formerly blocked surfaces. **Reset View** restores the pose without discarding points.
 
-**Reveal scene** shows the synthetic ground, stone structure, and trees for comparison; **Cloud only** hides their solid surfaces again. **Hide plants** filters vegetation points, with **All points** restoring them. Filtering never changes what blocks a scan ray and never invents returns from unseen ground. **Clear scan** discards observations; **Takeaways** explains viewpoints, gaps, and classification. Each run wraps up after four minutes of visible session time.
+Four original procedural scenes rotate in shuffled order: **Woodland ruins**, **Ravine bridge**, **Hillside village**, and **Terraced lookout**. Starting or restarting the synthetic experience draws the next scene, with every scene appearing once per cycle and no immediate repeats across cycles. **Next scene** at the takeaways begins another run. Rotation is per app session; scenes never change during an active scan. **Clear scan** keeps the current scene. Real-room scanning is independent.
+
+**Reveal scene** shows the synthetic ground, structures, and trees for comparison; **Cloud only** hides their solid surfaces again. **Hide plants** filters vegetation points, with **All points** restoring them. Filtering never changes what blocks a scan ray and never invents returns from unseen ground. **Clear scan** discards observations; **Takeaways** explains viewpoints, gaps, and classification. Each run wraps up after four minutes of visible session time.
 
 This is a controller-driven illustration of first-surface range sampling. It does not use Quest room meshes, depth sensors, cameras, real lidar, multiple returns, or automated classification. Color/class labels come from known synthetic objects. Each sweep fires a small cone of rays; only the nearest hit is recorded. Samples are deduplicated in model coordinates and capped at 18,000. No scan leaves the device or persists after restart. Modeled scene positions and classifications are exact; real scanning also has measurement and positioning errors. See SOURCES.md for USGS background.
 
-Development-only `?preview&demo=scan` provides front/back sampling actions through the same nearest-hit routine for repeatable visual review. These controls are excluded from production; real controller sweeping still needs headset verification.
+Development-only `?preview&demo=scan` provides front/back sampling actions through the same nearest-hit routine for repeatable visual review. Add `&scene=ruins`, `bridge`, `village`, or `terraces` to inspect a particular model. These controls are excluded from production; real controller sweeping still needs headset verification.
 
 ### Scan your room (experimental Quest 3S path)
 

@@ -1,8 +1,10 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
+import { buildScanScene, SCAN_SCENES } from "./scenes.js";
 const COLORS = { ground: 0x65cfd1, structure: 0xffd39b, vegetation: 0x99eb91 };
 export class ScanExperience {
-  constructor(scene, onChange) {
+  constructor(scene, onChange, sceneInfo = SCAN_SCENES[0]) {
+    this.sceneInfo = sceneInfo;
     this.onChange = onChange;
     this.stage = 0;
     this.elapsed = 0;
@@ -32,22 +34,7 @@ export class ScanExperience {
       this.group.add(m);
       return m;
     };
-    mesh(new THREE.BoxGeometry(2, 0.04, 1.6), [0, -0.02, 0], "ground");
-    for (const x of [-0.48, 0.48])
-      mesh(new THREE.BoxGeometry(0.14, 0.55, 0.7), [x, 0.275, 0], "structure");
-    mesh(new THREE.BoxGeometry(1.1, 0.15, 0.18), [0, 0.61, 0.3], "structure");
-    mesh(new THREE.BoxGeometry(1.1, 0.32, 0.12), [0, 0.16, -0.34], "structure");
-    for (const [x, z] of [
-      [-0.65, 0.45],
-      [0.65, -0.4],
-    ]) {
-      mesh(
-        new THREE.CylinderGeometry(0.035, 0.05, 0.65, 8),
-        [x, 0.325, z],
-        "vegetation",
-      );
-      mesh(new THREE.SphereGeometry(0.31, 16, 10), [x, 0.69, z], "vegetation");
-    }
+    buildScanScene(sceneInfo.id, mesh);
     const frame = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.BoxGeometry(2.05, 1.05, 1.65)),
       new THREE.LineBasicMaterial({

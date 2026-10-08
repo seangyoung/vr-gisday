@@ -69,3 +69,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added optional AR hit testing, controller-bound sources, real-position-only sampling with reticles, feature/permission/no-hit status, frozen miniature and exact return to capture coordinates, range/height colors, clearing, source cancellation, and reference-space reset handling. Real-room capture is disposed at session exit.
 - Twenty-nine tests pass, including mocked hit-test pose ingestion gated by trigger, miniature/resume invariance, finite/range/dedup/cap guards, unavailable API, bounded permission failure/retry, late-source cancellation, and timeout cleanup. Production build passes.
 - Browser preview checks only room-mode navigation and its unavailable-session explanation. No headset surface capture has been verified. Quest 3S testing is required before claiming real-room support or accuracy.
+
+## 2026-10-08 — Shuffled synthetic scan scenes
+
+- Added original procedural woodland ruins, ravine bridge, hillside village, and terraced lookout models. New runs consume a shuffled bag, visiting each scene once before reshuffling and preventing immediate repeats across cycles. Active scans never switch automatically; clearing points preserves the scene.
+- `npm test`: all 34 tests pass. Added rotation-cycle checks and sampling/class/bounds/clear checks for each model; existing occlusion, filtering, transform, room-scan, and other demo tests still pass.
+- `npm run build`: passes (existing large-bundle warning). Browser preview inspected all four point clouds and the Takeaways → Next scene transition. Desktop screenshots show layout only; Quest stereo, controller scanning, and performance of the new scenes remain headset checks.

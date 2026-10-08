@@ -11,10 +11,12 @@ import {
 } from "./model.js";
 import "./style.css";
 import { RoomScan } from "./scan/room.js";
+import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
 import { cellAt } from "./rain/terrain.js";
 import { ModelGrab } from "./manipulation.js";
+const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
@@ -236,12 +238,13 @@ function startRain(kind = "drainage", explore = false) {
   if (explore) rain.stage = 1;
   draw();
 }
-function startScan() {
+function startScan(sceneInfo) {
+  if (!SCAN_SCENES.includes(sceneInfo)) sceneInfo = nextScanScene();
   stopRainInput();
   rain?.dispose();
   rain = null;
   scan?.dispose();
-  scan = new ScanExperience(scene, draw);
+  scan = new ScanExperience(scene, draw, sceneInfo);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -382,7 +385,7 @@ function drawScanUI() {
       0.52,
     );
     button(
-      s.stage === 2 ? "Scan again" : "Takeaways",
+      s.stage === 2 ? "Next scene" : "Takeaways",
       0.84,
       -0.77,
       () => {
@@ -393,7 +396,7 @@ function drawScanUI() {
       0.52,
     );
     label(
-      `${s.records.length.toLocaleString()} / 18,000 samples · First surface only · Synthetic class labels`,
+      `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
       0,
       -0.64,
       2.3,
@@ -1356,7 +1359,11 @@ if (
   scene.background = new THREE.Color(0x071820);
   if (new URLSearchParams(location.search).get("demo") === "rain") startRain();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
-    startScan();
+    startScan(
+      SCAN_SCENES.find(
+        (s) => s.id === new URLSearchParams(location.search).get("scene"),
+      ),
+    );
   else draw();
   place();
   renderer.domElement.addEventListener("pointerdown", (e) => {
