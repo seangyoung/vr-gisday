@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import {
   SIZE,
+  createHeights,
+  sculpt,
   cellPoint,
   cellAt,
   routeFrom,
@@ -9,15 +11,20 @@ import {
   OUTLET_A,
   OUTLET_B,
 } from "./terrain.js";
-const COLORS = { A: 0x60e3f0, B: 0xffce83 };
+const COLORS = { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff };
 export class RainExperience {
   constructor(scene, onChange) {
     this.onChange = onChange;
     this.stage = 0;
+    this.heights = createHeights();
+    this.mode = "rain";
+    this.edited = false;
+    this.stroke = null;
+    this.trees = [];
     this.elapsed = 0;
     this.overlay = false;
     this.answer = null;
-    this.counts = { A: 0, B: 0 };
+    this.counts = { A: 0, B: 0, sink: 0 };
     this.source = cellAt(-0.45, -0.3);
     this.drops = [];
     this.trails = [];
@@ -30,12 +37,14 @@ export class RainExperience {
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);
     sun.position.set(-2, 4, 1);
     this.group.add(sun);
-    this.routes = Array.from({ length: SIZE * SIZE }, (_, i) => routeFrom(i));
+    this.routes = Array.from({ length: SIZE * SIZE }, (_, i) =>
+      routeFrom(i, this.heights),
+    );
     this.basins = this.routes.map((p) => (p.at(-1) === OUTLET_A ? "A" : "B"));
     const vertices = [],
       indices = [];
     for (let i = 0; i < SIZE * SIZE; i++) {
-      const p = cellPoint(i);
+      const p = cellPoint(i, this.heights);
       vertices.push(p.x, p.y, p.z);
     }
     for (let r = 0; r < SIZE - 1; r++)
@@ -86,17 +95,16 @@ export class RainExperience {
         if (hits.length === 2) contourPoints.push(...hits);
       }
     }
-    this.group.add(
-      new THREE.LineSegments(
-        new THREE.BufferGeometry().setFromPoints(contourPoints),
-        new THREE.LineBasicMaterial({
-          color: 0xe3e4ab,
-          transparent: true,
-          opacity: 0.3,
-          depthWrite: false,
-        }),
-      ),
+    this.contours = new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(contourPoints),
+      new THREE.LineBasicMaterial({
+        color: 0xe3e4ab,
+        transparent: true,
+        opacity: 0.3,
+        depthWrite: false,
+      }),
     );
+    this.group.add(this.contours);
     // Visible rock sides close the terrain slab, rather than a floating paper surface.
     const rim = [];
     for (let c = 0; c < SIZE; c++) rim.push(c);
@@ -105,7 +113,7 @@ export class RainExperience {
     for (let r = SIZE - 2; r > 0; r--) rim.push(r * SIZE);
     const walls = [];
     for (let i = 0; i < rim.length; i++) {
-      const a = cellPoint(rim[i]),
+      const a = cellPoint(rim[i], this.heights),
         b = cellPoint(rim[(i + 1) % rim.length]);
       walls.push(
         a.x,
@@ -152,7 +160,7 @@ export class RainExperience {
     this.group.add(base);
     this.divide = this.line(
       Array.from({ length: SIZE }, (_, r) => {
-        const p = cellPoint(r * SIZE + 20);
+        const p = cellPoint(r * SIZE + 20, this.heights);
         return new THREE.Vector3(p.x, p.y + 0.012, p.z);
       }),
       0xffffff,
@@ -163,7 +171,7 @@ export class RainExperience {
       [OUTLET_A, "A"],
       [OUTLET_B, "B"],
     ]) {
-      const p = cellPoint(id);
+      const p = cellPoint(id, this.heights);
       const basin = new THREE.Mesh(
         name === "A"
           ? new THREE.CylinderGeometry(0.16, 0.16, 0.025, 32)
@@ -192,6 +200,8 @@ export class RainExperience {
         new THREE.MeshStandardMaterial({ color: 0x174d3c }),
       );
       tree.position.set(p.x, p.y + 0.08, p.z);
+      tree.userData.cell = cellAt(x, z);
+      this.trees.push(tree);
       this.group.add(tree);
     }
     this.cloud = new THREE.Group();
@@ -224,7 +234,112 @@ export class RainExperience {
     this.particles.count = 0;
     this.particles.frustumCulled = false;
     this.group.add(this.particles);
+    this.brush = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 24, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0xffcd85,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      }),
+    );
+    this.brush.scale.y = 0.22;
+    this.brush.visible = false;
+    this.group.add(this.brush);
     this.setSource(this.source);
+  }
+  setMode(mode) {
+    this.endStroke();
+    this.mode = mode;
+    this.drops = [];
+    this.particles.count = 0;
+    this.emission = 0;
+    this.clearTrails();
+    this.overlay = false;
+    this.divide.visible = false;
+    this.cloud.visible = mode === "rain";
+    this.brush.visible = false;
+    this.paint();
+    this.onChange();
+  }
+  beginStroke(id, worldHit, worldHand) {
+    if (this.stage !== 1 || this.mode !== "sculpt" || this.stroke) return;
+    const hit = this.group.worldToLocal(worldHit.clone());
+    const hand = this.group.worldToLocal(worldHand.clone());
+    this.stroke = { id, last: hand, offset: hit.clone().sub(hand) };
+  }
+  moveStroke(id, worldHand) {
+    if (this.stroke?.id !== id) return;
+    const p = this.group.worldToLocal(worldHand.clone());
+    const center = p.clone().add(this.stroke.offset);
+    const delta = THREE.MathUtils.clamp(p.y - this.stroke.last.y, -0.08, 0.08);
+    this.stroke.last.copy(p);
+    this.applyBrush(center.x, center.z, delta);
+  }
+  applyBrush(x, z, delta) {
+    if (this.mode !== "sculpt" || this.stage !== 1) return;
+    if (x < -1 || x > 1 || z < -1 || z > 1) {
+      this.brush.visible = false;
+      return;
+    }
+    sculpt(this.heights, x, z, delta);
+    this.edited = true;
+    this.brush.visible = true;
+    this.brush.position.set(
+      x,
+      cellPoint(cellAt(x, z), this.heights).y + 0.015,
+      z,
+    );
+    const geometry = this.terrain.geometry;
+    const positions = geometry.getAttribute("position");
+    for (let i = 0; i < this.heights.length; i++)
+      positions.setY(i, this.heights[i]);
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+    this.contours.visible = false;
+    this.divide.visible = false;
+    for (const tree of this.trees)
+      tree.position.y = this.heights[tree.userData.cell] + 0.08;
+    this.paint();
+  }
+  endStroke(id) {
+    if (id !== undefined && this.stroke?.id !== id) return;
+    this.stroke = null;
+    if (this.edited) this.rebuildRoutes();
+  }
+  rebuildRoutes() {
+    this.routes = Array.from({ length: SIZE * SIZE }, (_, i) =>
+      routeFrom(i, this.heights),
+    );
+    this.basins = this.routes.map((p) =>
+      p.at(-1) === OUTLET_A ? "A" : p.at(-1) === OUTLET_B ? "B" : "sink",
+    );
+    this.setSource(this.source);
+  }
+  restore(notify = true) {
+    this.stroke = null;
+    this.heights = createHeights();
+    // Refresh mesh and tree heights through the same edit path.
+    this.mode = "sculpt";
+    const oldStage = this.stage;
+    this.stage = 1;
+    this.applyBrush(0, 0, 0);
+    this.stage = oldStage;
+    this.edited = false;
+    this.contours.visible = true;
+    this.rebuildRoutes();
+    this.drops = [];
+    this.particles.count = 0;
+    this.clearTrails();
+    this.mode = "rain";
+    this.overlay = false;
+    this.brush.visible = false;
+    this.cloud.visible = true;
+    this.paint();
+    if (notify) this.onChange();
   }
   text(text, color) {
     const c = document.createElement("canvas");
@@ -266,28 +381,36 @@ export class RainExperience {
     for (let id = 0; id < SIZE * SIZE; id++) {
       const c = this.overlay
         ? new THREE.Color(COLORS[this.basins[id]]).multiplyScalar(0.65)
-        : low.clone().lerp(high, Math.min(1, cellPoint(id).y / 0.8));
+        : low
+            .clone()
+            .lerp(high, Math.min(1, cellPoint(id, this.heights).y / 0.8));
       attr.setXYZ(id, c.r, c.g, c.b);
     }
     attr.needsUpdate = true;
   }
   toggleOverlay() {
     this.overlay = !this.overlay;
-    this.divide.visible = this.overlay;
+    this.divide.visible = this.overlay && !this.edited;
     this.paint();
     this.onChange();
   }
   setSource(id) {
     this.source = id;
-    const p = cellPoint(id);
+    const p = cellPoint(id, this.heights);
     this.cloud.position.set(p.x, p.y + 0.4, p.z);
   }
   aim(world) {
     if (this.stage !== 1) return;
     const p = this.group.worldToLocal(world.clone());
     this.setSource(cellAt(p.x, p.z));
+    if (this.mode === "sculpt" && !this.stroke) {
+      const point = cellPoint(this.source, this.heights);
+      this.brush.position.set(point.x, point.y + 0.015, point.z);
+      this.brush.visible = true;
+    }
   }
   place(camera) {
+    this.endStroke();
     const pos = new THREE.Vector3(),
       dir = new THREE.Vector3();
     camera.getWorldPosition(pos);
@@ -305,6 +428,7 @@ export class RainExperience {
     this.onChange();
   }
   challenge() {
+    this.restore(false);
     this.stage = 2;
     this.drops = [];
     this.clearTrails();
@@ -312,7 +436,7 @@ export class RainExperience {
     this.divide.visible = false;
     this.paint();
     this.setSource(CHALLENGE);
-    const p = cellPoint(CHALLENGE);
+    const p = cellPoint(CHALLENGE, this.heights);
     this.marker.position.set(p.x, p.y + 0.025, p.z);
     this.marker.visible = true;
     this.onChange();
@@ -328,6 +452,10 @@ export class RainExperience {
     this.onChange();
   }
   finish() {
+    this.endStroke();
+    this.mode = "rain";
+    this.brush.visible = false;
+    this.cloud.visible = true;
     this.stage = 4;
     this.playback = 0;
     this.onChange();
@@ -347,7 +475,7 @@ export class RainExperience {
     if (this.drops.length >= 128) return;
     const ids = this.routes[id];
     const points = ids.map((n) => {
-      const p = cellPoint(n);
+      const p = cellPoint(n, this.heights);
       return new THREE.Vector3(p.x, p.y + 0.025, p.z);
     });
     const top = points[0].clone();
@@ -370,6 +498,7 @@ export class RainExperience {
     }
   }
   burst(id) {
+    if (this.mode !== "rain") return;
     this.setSource(id);
     for (let i = 0; i < 12; i++) this.emit(id);
   }
@@ -383,7 +512,8 @@ export class RainExperience {
       }
     }
     const active =
-      (this.stage === 1 && raining) || (this.stage === 3 && this.playback > 0);
+      (this.stage === 1 && this.mode === "rain" && raining) ||
+      (this.stage === 3 && this.playback > 0);
     this.playback = Math.max(0, this.playback - dt);
     if (active) {
       this.emission += dt;

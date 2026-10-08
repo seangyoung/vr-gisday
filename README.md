@@ -39,11 +39,15 @@ Choose **Make It Rain** inside the headset. This second experience is a floating
 
 1. Read the short explanation of surface runoff and choose **Make some rain**.
 2. Point at the terrain and **hold the trigger**. The cloud follows the aiming point and rain travels downhill. Releasing the trigger stops new rain; existing drops finish their paths. Try both sides of the ridge.
-3. Toggle **Show watersheds** to color cells by their calculated outlet. Outlet A is blue and round; B is gold and square. Labels provide a cue independent of color.
-4. Choose **Try a prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
+3. Toggle **Show basins** to color cells by their calculated outlet. Outlet A is blue and round; B is gold and square. Labels provide a cue independent of color.
+4. Choose **Prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
 5. Read the takeaways or restart. The experience transitions to takeaways after four minutes of visible XR frame time.
 
-**Reset View** places the landscape and controls in front of the current view. **Menu** switches experiences. Controller grip transforms belong to the positioning model; the landscape stays upright for runoff exploration. Use the trigger to position rain on the land.
+**Reset View** places the landscape and controls in front of the current view. **Menu** switches experiences. The landscape stays upright for runoff exploration. Use the trigger to position rain on the land.
+
+Choose **Shape terrain** during exploration for the sandbox. Point at the land, hold either controller side grip, and lift/lower the controller to raise/dig a soft patch of earth. Move sideways while lifting/lowering to shape adjacent ground. Release to end the stroke; one controller edits at a time. **Rain mode** retains the edited terrain and recalculates drainage; **Shape terrain → Restore terrain** restores the original landscape. Heights are bounded and the outer rim is anchored. Edits are temporary and cleared by Restart/Menu. Bare-hand tracking is not implemented.
+
+After editing, blue/gold basin colors still indicate A/B; purple groups areas draining to any closed low spot (not one shared watershed). Paths stop at those sinks; there is no filling or overflow simulation. Original contour and divide lines hide after editing so they cannot describe the old landscape. Trees follow the new surface. The prediction quiz is available on the original terrain; edited landscapes lead to takeaways. Sandbox time shares the four-minute experience cap.
 
 The 41×41 elevation grid and steepest-descent paths are computed locally. The illustration does not simulate infiltration, evaporation, ponding, erosion, rainfall intensity, flow volume, or flood risk. Trees are decoration and do not change runoff. Particle speed is illustrative; synthetic model units have no geographic scale. This is not a real watershed dataset.
 

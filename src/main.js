@@ -208,6 +208,7 @@ function start() {
 }
 function stopRainInput() {
   previewRaining = false;
+  rain?.endStroke();
   for (const { c } of controllers) c.userData.raining = false;
 }
 function startRain() {
@@ -243,6 +244,21 @@ function drawRainUI() {
       "A watershed is land that drains to a common outlet.\nNearby drops can end up in different places.\nRidges divide the land into different drainage areas.",
     ],
   ];
+  if (r.stage === 1 && r.mode === "sculpt")
+    copy[1] = [
+      "Sandbox · shape the land",
+      "Point at the land and HOLD a SIDE GRIP.\nLift to raise earth; lower to dig. Move sideways to sculpt.\nRelease, then choose Rain mode to test your changes.",
+    ];
+  else if (r.stage === 1 && r.edited)
+    copy[1] = [
+      "Rain mode · test your terrain",
+      "Point at the land and HOLD the TRIGGER to rain.\nDid your ridge redirect water? Did your hollow trap it?\nPurple paths end in low spots, with no filling or overflow.",
+    ];
+  if (r.stage === 4 && r.edited)
+    copy[4] = [
+      "Change the land. Change the flow.",
+      "A watershed is land that drains to a common outlet.\nNew ridges can redirect runoff; closed hollows trap it.\nThis model traces paths, not water depth or flood risk.",
+    ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
   label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
@@ -250,21 +266,40 @@ function drawRainUI() {
     button("Make some rain", 0, -0.77, () => r.explore(), 1.65);
   if (r.stage === 1) {
     button(
-      r.overlay ? "Hide watersheds" : "Show watersheds",
-      -0.53,
-      -0.77,
-      () => r.toggleOverlay(),
-      1.02,
-    );
-    button(
-      "Try a prediction",
-      0.58,
+      r.mode === "sculpt" ? "Rain mode" : "Shape terrain",
+      -0.76,
       -0.77,
       () => {
         stopRainInput();
-        r.challenge();
+        r.setMode(r.mode === "sculpt" ? "rain" : "sculpt");
       },
-      1.02,
+      0.7,
+    );
+    button(
+      r.mode === "sculpt"
+        ? "Restore terrain"
+        : r.overlay
+          ? "Hide basins"
+          : "Show basins",
+      0,
+      -0.77,
+      () => {
+        stopRainInput();
+        if (r.mode === "sculpt") r.restore();
+        else r.toggleOverlay();
+      },
+      0.7,
+    );
+    button(
+      r.edited || r.mode === "sculpt" ? "Takeaways" : "Prediction",
+      0.76,
+      -0.77,
+      () => {
+        stopRainInput();
+        if (r.edited || r.mode === "sculpt") r.finish();
+        else r.challenge();
+      },
+      0.7,
     );
   }
   if (r.stage === 2) {
@@ -297,9 +332,13 @@ function drawRainUI() {
     button("Make rain again", 0, -0.77, startRain, 1.65);
   } else
     label(
-      r.overlay
-        ? "A: blue / round outlet    ·    B: gold / square outlet"
-        : "Surface-flow model · Synthetic terrain · No flood prediction",
+      r.mode === "sculpt"
+        ? "One grip at a time · Edges anchored · Height limited"
+        : r.overlay && r.edited
+          ? "Blue: A · Gold: B · Purple: closed low spots (grouped)"
+          : r.overlay
+            ? "A: blue / round outlet    ·    B: gold / square outlet"
+            : "Surface-flow model · Synthetic terrain · No flood prediction",
       0,
       -0.55,
       2.3,
@@ -516,7 +555,18 @@ function draw() {
         const b = document.createElement("button");
         b.textContent = name;
         b.style.cssText = "font-size:11px;padding:5px;margin:3px";
-        b.onclick = () => rain.burst(cellAt(x, -0.4));
+        b.textContent =
+          rain.mode === "sculpt"
+            ? x < 0
+              ? "Dig hollow"
+              : "Raise ridge"
+            : name;
+        b.onclick = () => {
+          if (rain.mode === "sculpt") {
+            rain.applyBrush(x, -0.4, x < 0 ? -0.3 : 0.3);
+            rain.endStroke();
+          } else rain.burst(cellAt(x, -0.4));
+        };
         panel.append(b);
       }
     }
@@ -715,6 +765,16 @@ for (let i = 0; i < 2; i++) {
     c.userData.raining = false;
   });
   c.addEventListener("squeezestart", () => {
+    if (rain?.mode === "sculpt" && grip.visible && !intersect(c)) {
+      const land = rainHit(c);
+      if (land)
+        rain.beginStroke(
+          i,
+          land.point,
+          grip.getWorldPosition(new THREE.Vector3()),
+        );
+      return;
+    }
     if (!floatingModel || !grip.visible) return;
     grip.updateWorldMatrix(true, false);
     const near =
@@ -725,9 +785,13 @@ for (let i = 0; i < 2; i++) {
     // Once one hand holds the assembly, the other can join from anywhere.
     if (grab.hands.size || near || modelHit(c)) grab.begin(i, grip.matrixWorld);
   });
-  c.addEventListener("squeezeend", () => grab?.release(i));
+  c.addEventListener("squeezeend", () => {
+    grab?.release(i);
+    rain?.endStroke(i);
+  });
   c.addEventListener("disconnected", () => {
     grab?.release(i);
+    rain?.endStroke(i);
     c.userData.raining = false;
   });
   controllers.push({ c, grip, beam, handle, id: i });
@@ -836,6 +900,15 @@ renderer.setAnimationLoop((time, frame) => {
           falling = !!active.c.userData.raining;
         }
       }
+      if (rain.stroke) {
+        const held = controllers[rain.stroke.id];
+        if (held?.grip.visible)
+          rain.moveStroke(
+            held.id,
+            held.grip.getWorldPosition(new THREE.Vector3()),
+          );
+        else rain.endStroke();
+      }
       rain.update(dt, falling);
     }
     const poses = new Map();
@@ -854,7 +927,11 @@ renderer.setAnimationLoop((time, frame) => {
       beam.visible = !grab?.hands.has(id);
       beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
       handle.material.color.set(
-        grab?.hands.has(id) ? 0xffca83 : model ? 0xffffff : 0xa6f5d9,
+        grab?.hands.has(id) || rain?.stroke?.id === id
+          ? 0xffca83
+          : model
+            ? 0xffffff
+            : 0xa6f5d9,
       );
       if (hit) hit.object.material.color.set(0xffda8b);
     }

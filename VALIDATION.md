@@ -32,3 +32,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Three new terrain tests exhaustively check all 1,681 cells: strict downhill routing, no cycles, termination at the intended two outlets, opposite-side behavior, deterministic paths, and coordinate clamping. Existing positioning/manipulation tests remain in the suite.
 - Browser walkthrough: rain paths on both sides; overlay; both prediction answers; replay/takeaways; restart; return to the shared menu and launch of positioning. No browser console errors during that walkthrough.
 - Quest gate: trigger aiming and hold/release, left/right controllers, cloud placement, terrain readability, runoff visibility in stereo/passthrough, reset, sleep/resume, and event timing. Browser preview and terrain tests do not establish those results.
+
+## 2026-10-08 — Terrain sandbox
+
+- Added side-grip terrain sculpting and Rain/Shape modes, with bounded smooth brush edits, fixed outer rim, persistent edits between modes, recalculated drainage, and exact terrain restore. Closed sinks have a separate purple destination category; they do not simulate storage or overflow.
+- Fourteen tests pass, including brush falloff and limits, fixed boundaries, exhaustive edited-grid routing, controller motion through real Three.js transforms, mode switching, sink paths, restore, and timed stroke cancellation. Production build passes.
+- Browser preview reviewed sculpted terrain, rain/basin display after editing, and restore. Preview uses development buttons; actual Quest squeeze events, drag comfort, tracking loss, and stereo performance still require headset testing.

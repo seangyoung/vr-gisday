@@ -15,13 +15,13 @@ export function cellAt(x, z) {
   const row = Math.max(0, Math.min(SIZE - 1, Math.round((z + 1) / SPACING)));
   return row * SIZE + col;
 }
-export function cellPoint(id) {
+export function cellPoint(id, heights) {
   const x = (id % SIZE) * SPACING - 1,
     z = Math.floor(id / SIZE) * SPACING - 1;
-  return { x, y: elevation(x, z), z };
+  return { x, y: heights ? heights[id] : elevation(x, z), z };
 }
-export function downstream(id) {
-  const p = cellPoint(id),
+export function downstream(id, heights) {
+  const p = cellPoint(id, heights),
     row = Math.floor(id / SIZE),
     col = id % SIZE;
   let best = id,
@@ -37,7 +37,8 @@ export function downstream(id) {
       )
         continue;
       const n = (row + dr) * SIZE + col + dc;
-      const slope = (p.y - cellPoint(n).y) / (SPACING * Math.hypot(dr, dc));
+      const slope =
+        (p.y - cellPoint(n, heights).y) / (SPACING * Math.hypot(dr, dc));
       if (slope > bestSlope) {
         best = n;
         bestSlope = slope;
@@ -47,19 +48,40 @@ export function downstream(id) {
 }
 export const OUTLET_A = cellAt(-0.65, 1),
   OUTLET_B = cellAt(0.65, 1);
-export function routeFrom(id) {
+export function routeFrom(id, heights) {
   const ids = [id];
   for (let i = 0; i < SIZE * SIZE; i++) {
-    const next = downstream(ids.at(-1));
+    const next = downstream(ids.at(-1), heights);
     if (next === ids.at(-1)) return ids;
     ids.push(next);
   }
   throw new Error("Terrain drainage cycle");
 }
-export function outletFor(id) {
-  const last = routeFrom(id).at(-1);
+export function outletFor(id, heights) {
+  const last = routeFrom(id, heights).at(-1);
   if (last === OUTLET_A) return "A";
   if (last === OUTLET_B) return "B";
-  throw new Error(`Unexpected terrain sink: ${last}`);
+  return "sink";
 }
 export const CHALLENGE = cellAt(0.15, -0.25);
+
+// Outer rim stays anchored so the slab walls and outlet mouths remain joined.
+export function createHeights() {
+  return Float64Array.from({ length: SIZE * SIZE }, (_, id) => cellPoint(id).y);
+}
+export function sculpt(heights, x, z, delta, radius = 0.24) {
+  if (![x, z, delta, radius].every(Number.isFinite) || radius <= 0) return;
+  for (let row = 1; row < SIZE - 1; row++) {
+    for (let col = 1; col < SIZE - 1; col++) {
+      const id = row * SIZE + col;
+      const p = cellPoint(id, heights);
+      const distance = Math.hypot(p.x - x, p.z - z) / radius;
+      if (distance >= 1) continue;
+      const weight = (1 - distance * distance) ** 2;
+      heights[id] = Math.max(
+        0.015,
+        Math.min(1.05, heights[id] + delta * weight),
+      );
+    }
+  }
+}
