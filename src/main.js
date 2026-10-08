@@ -10,6 +10,7 @@ import {
   target3D,
 } from "./model.js";
 import "./style.css";
+import { RoomScan } from "./scan/room.js";
 import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
 import { cellAt } from "./rain/terrain.js";
@@ -49,6 +50,7 @@ let buttons = [],
   noisy = false,
   prediction = "";
 let scan = null;
+let xrMode = null;
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
@@ -200,7 +202,8 @@ function navigation(y = -0.98) {
 }
 function start() {
   if (scan) {
-    startScan();
+    if (scan.room) startRoomScan();
+    else startScan();
     return;
   }
   if (rain) {
@@ -242,8 +245,85 @@ function startScan() {
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
+function startRoomScan() {
+  stopRainInput();
+  rain?.dispose();
+  rain = null;
+  scan?.dispose();
+  scan = new RoomScan(scene, draw, renderer.xr.getSession(), xrMode);
+  scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function drawRoomUI() {
+  const s = scan;
+  const title =
+    s.stage === 0
+      ? "Scan your room · Quest 3S"
+      : s.stage === 2
+        ? "Your surroundings, sampled."
+        : s.frozen
+          ? "Frozen room cloud"
+          : "Sweep across real surfaces";
+  const body =
+    s.stage === 0
+      ? "Uses browser estimates of real surfaces, with permission.\nEnter MIXED REALITY, then start and look around.\nA sparse surface scan; no camera images are recorded."
+      : s.stage === 2
+        ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
+        : s.frozen
+          ? "GRIP to move / turn; BOTH grips to resize this copy.\nResume returns every point to its real-world position.\nKeep passthrough visible as you explore."
+          : "Aim at a real surface. A green dot means a return.\nHOLD TRIGGER and sweep slowly to accumulate points.\nFreeze to inspect a movable miniature of your scan.";
+  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
+  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  label(s.message, 0, -0.5, 2.3, 0.18, 28, "#e6f4f5", "#0b2430");
+  label(
+    `${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+    0,
+    -0.64,
+    2.3,
+    0.09,
+    24,
+    "#b6d1d9",
+    "#0b2430",
+  );
+  if (s.stage === 0) {
+    if (s.status !== "unavailable")
+      button("Start room scan", -0.55, -0.77, () => s.explore(), 1.02);
+    button("Synthetic scene", 0.55, -0.77, startScan, 1.02);
+  } else {
+    button(
+      s.stage === 2 ? "Scan again" : s.frozen ? "Resume" : "Freeze",
+      -0.84,
+      -0.77,
+      () => {
+        stopRainInput();
+        if (s.stage === 2) startRoomScan();
+        else if (s.frozen) s.resume();
+        else s.freeze();
+      },
+      0.52,
+    );
+    button("Color", -0.28, -0.77, () => s.toggleColor(), 0.52);
+    button(
+      s.status === "error" || s.status === "waiting" ? "Retry" : "Clear",
+      0.28,
+      -0.77,
+      () => {
+        stopRainInput();
+        if (s.status === "error" || s.status === "waiting") s.retry();
+        else s.clearScan();
+      },
+      0.52,
+    );
+    button("Synthetic", 0.84, -0.77, startScan, 0.52);
+  }
+  navigation();
+}
 function drawScanUI() {
   const s = scan;
+  if (s.room) {
+    drawRoomUI();
+    return;
+  }
   const copy = [
     [
       "Scan the Hidden World",
@@ -273,9 +353,10 @@ function drawScanUI() {
     "#e6f4f5",
     "#0b2430",
   );
-  if (s.stage === 0)
-    button("Start scanning", 0, -0.77, () => s.explore(), 1.65);
-  else {
+  if (s.stage === 0) {
+    button("Start scanning", -0.55, -0.77, () => s.explore(), 1.02);
+    button("Scan your room", 0.55, -0.77, startRoomScan, 1.02);
+  } else {
     button(
       s.reveal ? "Cloud only" : "Reveal scene",
       -0.84,
@@ -721,7 +802,7 @@ function draw() {
       document.body.append(panel);
     }
     panel.replaceChildren();
-    if (scan?.stage === 1) {
+    if (scan?.stage === 1 && !scan.room) {
       for (const [name, z] of [
         ["Scan front", 3],
         ["Scan back", -3],
@@ -952,6 +1033,9 @@ for (let i = 0; i < 2; i++) {
   );
   beam.scale.z = 4;
   c.add(beam);
+  c.addEventListener("connected", (event) => {
+    c.userData.xrInput = event.data;
+  });
   c.addEventListener("selectstart", () => {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
       return;
@@ -979,6 +1063,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezestart", () => {
     if (scan && grip.visible) {
+      if (scan.room && !scan.frozen) return;
       grip.updateWorldMatrix(true, false);
       if (scan.grab.hands.size || (!intersect(c) && scanHit(c))) {
         for (const { c: controller } of controllers)
@@ -1032,6 +1117,8 @@ for (let i = 0; i < 2; i++) {
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
+    if (scan?.room) scan.releaseInput(c.userData.xrInput);
+    c.userData.xrInput = null;
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -1068,10 +1155,22 @@ function intersect(c) {
 async function enter(mode) {
   let session;
   try {
-    session = await navigator.xr.requestSession(mode);
+    session = await navigator.xr.requestSession(
+      mode,
+      mode === "immersive-ar" ? { optionalFeatures: ["hit-test"] } : {},
+    );
+    xrMode = mode;
     scene.background =
       mode === "immersive-ar" ? null : new THREE.Color(0x071820);
     await renderer.xr.setSession(session);
+    renderer.xr.getReferenceSpace()?.addEventListener("reset", () => {
+      if (scan?.room) {
+        stopRainInput();
+        scan.clearScan();
+        scan.message = "Tracking origin changed. Scan cleared; begin again.";
+        draw();
+      }
+    });
     document.body.classList.add("xr-active");
     scan?.dispose();
     scan = null;
@@ -1095,6 +1194,11 @@ async function enter(mode) {
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
+  if (scan?.room) {
+    scan.dispose();
+    scan = null;
+  }
+  xrMode = null;
   grab?.cancel();
   stopRainInput();
   document.body.classList.remove("xr-active");
@@ -1170,11 +1274,21 @@ renderer.setAnimationLoop((time, frame) => {
       rain.update(dt, falling);
     }
     if (scan && renderer.xr.getSession().visibilityState === "visible") {
-      for (const { c } of controllers) {
-        if (!c.visible) c.userData.scanning = false;
-        if (c.visible && c.userData.scanning && !intersect(c))
-          scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
-      }
+      if (scan.room)
+        scan.updateFrame(
+          frame,
+          renderer.xr.getReferenceSpace(),
+          controllers,
+          dt,
+          renderer.xr.getCamera(),
+          intersect,
+        );
+      else
+        for (const { c } of controllers) {
+          if (!c.visible) c.userData.scanning = false;
+          if (c.visible && c.userData.scanning && !intersect(c))
+            scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
+        }
       scan.update(dt);
     }
     const poses = new Map();

@@ -72,6 +72,16 @@ This is a controller-driven illustration of first-surface range sampling. It doe
 
 Development-only `?preview&demo=scan` provides front/back sampling actions through the same nearest-hit routine for repeatable visual review. These controls are excluded from production; real controller sweeping still needs headset verification.
 
+### Scan your room (experimental Quest 3S path)
+
+Choose **Enter mixed reality → Scan the Hidden World → Scan your room → Start room scan**. Allow the browser's spatial permission if requested. Aim a controller at nearby physical surfaces; a green dot indicates an actual WebXR hit-test return. Hold the trigger and sweep slowly to accumulate a sparse point cloud. This path requests the WebXR `hit-test` feature and default plane-type surface estimates. It does not claim access to raw live depth, a global mesh, photogrammetry, camera images, or semantic classification; the runtime determines which surfaces are represented and whether its data is reconstructed or updated live.
+
+**Freeze** centers and scales a copy of the recorded points in front of you. Use one/two side grips to move/rotate/resize it. **Resume** restores the original recorded room coordinates. **Color** switches relative-height versus capture-range coloring. **Clear** discards points; **Retry** retries source creation when surface access fails or no hits arrive. Room registration is preserved during Reset View while live; only the controls move. Reset View restores the miniature when frozen.
+
+No synthetic positions are substituted for missing real data. Unsupported API, rejected permission, and no-hit states are shown explicitly. Each tracked controller uses one persistent hit-test source; samples are deduplicated at 1.5 cm, restricted to 0.2–8 m range, and capped at 18,000. These limits are application choices, not sensor accuracy claims. Captures stay in memory and clear on restart, session exit, or reference-space reset. Four-minute wrap-up freezes the cloud if it contains points. Keep passthrough visible; do not treat the cloud as a complete obstacle map.
+
+Device acceptance is still required on Quest 3S: API availability, actual surface-return quality, permissions, registration stability, tracking recovery, and useful point density. Desktop checks use mocked API results and cannot establish those properties.
+
 ## GitHub Pages
 
 Prepared workflow: `.github/workflows/deploy.yml` tests and builds on pushes to `main`, then deploys `dist/` using GitHub Actions. Relative Vite asset paths support a project subdirectory.

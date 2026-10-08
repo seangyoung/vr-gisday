@@ -31,3 +31,10 @@ Routing uses the largest downhill gradient among eight neighboring cells, accoun
 - USGS, *Lidar Base Specification: Glossary*: https://www.usgs.gov/ngp-standards-and-specifications/lidar-base-specification-glossary — definitions of point classification and data voids, including obstruction.
 
 All demo geometry is original procedural content. The sampler illustrates first-hit occlusion; it is not a physical laser or multi-return vegetation model. Synthetic class labels are assigned by object identity, not inferred from observed points. Filtering does not reconstruct unobserved ground.
+
+## Real-room sampling
+
+- W3C WebXR Hit Test Module: https://www.w3.org/TR/webxr-hit-test-1/ — session feature requests, controller-relative hit-test sources, default plane entity type, result poses, and cancellation.
+- Meta IWSDK Environment Raycast guide: https://iwsdk.dev/guides/14-environment-raycast.html — controller-based real-surface hit testing and runtime support checks.
+
+This prototype uses browser hit-test estimates directly, not raw depth or camera reconstruction. Actual headset support and data quality remain unverified until tested on the user's Quest 3S.

@@ -63,3 +63,9 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Third menu experience: a controller ray-cone scanner, bounded point cloud, alternate viewpoints via shared grip transforms, comparison scene, reversible vegetation filtering, clear/restart, and four-minute takeaways. First-hit occlusion applies even while solid objects are visually hidden.
 - Twenty-four tests pass, including first-surface hits, deduplication, reversible filtering with no invented points, opposite-view samples, coordinate stability after transforms, point cap, intro gate, clear/reset, and timed grip release. Production build passes.
 - Browser walkthrough reviewed front/back sampling, vegetation filtering, reveal/cloud comparison, clear, takeaways, reset, and shared-menu transitions. Actual Quest trigger/squeeze input, scan speed, stereo readability, passthrough, tracking recovery, and performance remain device acceptance checks.
+
+## 2026-10-08 — Experimental real-room scanner
+
+- Added optional AR hit testing, controller-bound sources, real-position-only sampling with reticles, feature/permission/no-hit status, frozen miniature and exact return to capture coordinates, range/height colors, clearing, source cancellation, and reference-space reset handling. Real-room capture is disposed at session exit.
+- Twenty-nine tests pass, including mocked hit-test pose ingestion gated by trigger, miniature/resume invariance, finite/range/dedup/cap guards, unavailable API, bounded permission failure/retry, late-source cancellation, and timeout cleanup. Production build passes.
+- Browser preview checks only room-mode navigation and its unavailable-session explanation. No headset surface capture has been verified. Quest 3S testing is required before claiming real-room support or accuracy.
