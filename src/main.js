@@ -575,7 +575,8 @@ for (let i = 0; i < 2; i++) {
         .getWorldPosition(new THREE.Vector3())
         .distanceTo(floatingModel.position) <
       floatingModel.userData.radius * floatingModel.scale.x + 0.08;
-    if (near || modelHit(c)) grab.begin(i, grip.matrixWorld);
+    // Once one hand holds the assembly, the other can join from anywhere.
+    if (grab.hands.size || near || modelHit(c)) grab.begin(i, grip.matrixWorld);
   });
   c.addEventListener("squeezeend", () => grab?.release(i));
   c.addEventListener("disconnected", () => grab?.release(i));
