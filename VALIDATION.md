@@ -88,3 +88,8 @@ No hand tracking, room mesh, persistent anchoring, networked visitors, or deskto
 - Added and linked `public/manifest.json`, standalone display preference, relative app ID/start URL/scope, regular 192/512 PNG icons, a maskable 512 PNG, favicon, and Apple touch icon. Original globe artwork and regeneration script are included.
 - Production build passes with the existing chunk warning. Parsed the built manifest and verified URL resolution under `/vr-gisday/`, PNG formats/dimensions, and the built HTML manifest link. Visually inspected the 512 icon; foreground fits the maskable central safe area.
 - Quest Add to Library and installed relaunch remain device acceptance checks. No offline capability or store package is claimed.
+
+## 2026-10-08 — Sound effects
+
+- Added original synthesized UI tones, scan-return pings, and water noise, plus persistent mute in shared navigation. Master gain fades when the document/session is hidden or XR ends; scan pings are capped to one per 140 ms; water fades after the last delivery. No audio asset downloads.
+- All 37 tests pass, including audio lazy initialization, cue throttling, mute, and visibility behavior with a mocked audio graph. Production build passes (existing chunk warning). Browser preview verifies mute persistence across reload, navigation, and pouring without console errors. Audibility, volume balance, and headset session interruption remain Quest listening checks; mock tests do not validate sound quality.

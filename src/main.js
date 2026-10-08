@@ -10,6 +10,8 @@ import {
   target3D,
 } from "./model.js";
 import "./style.css";
+import { LabSound } from "./sound.js";
+const sound = new LabSound();
 import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
@@ -48,6 +50,7 @@ let buttons = [],
   step = -1,
   elapsed = 0,
   lastTime = 0,
+  waterSoundUntil = 0,
   pendingPlacement = false,
   noisy = false,
   prediction = "";
@@ -136,7 +139,10 @@ function label(
 function button(text, x, y, action, w = 0.75) {
   const m = label(text, x, y, w, 0.16, 48, "#08241e", "#a6f5d9");
   m.position.z = 0.08;
-  m.userData.action = action;
+  m.userData.action = () => {
+    sound.click();
+    action();
+  };
   m.userData.label = text;
   buttons.push(m);
   return m;
@@ -175,8 +181,18 @@ function point(p, color, r = 0.026, z = 0.045) {
 }
 function navigation(y = -0.98) {
   button(
+    sound.muted ? "Sound: off" : "Sound: on",
+    0.46,
+    y,
+    () => {
+      sound.toggle();
+      draw();
+    },
+    0.44,
+  );
+  button(
     "Menu",
-    -0.72,
+    -0.92,
     y,
     () => {
       scan?.dispose();
@@ -187,20 +203,20 @@ function navigation(y = -0.98) {
       step = -1;
       draw();
     },
-    0.42,
+    0.44,
   );
-  button("Restart", -0.23, y, () => start(), 0.46);
+  button("Restart", -0.46, y, () => start(), 0.44);
   button(
     rain || scan || isSpatial() ? "Reset View" : "Recenter",
-    0.3,
+    0,
     y,
     () => {
       if (devPreview) place();
       else pendingPlacement = true;
     },
-    0.5,
+    0.44,
   );
-  button("Exit XR", 0.84, y, () => renderer.xr.getSession()?.end(), 0.46);
+  button("Exit XR", 0.92, y, () => renderer.xr.getSession()?.end(), 0.44);
 }
 function start() {
   if (scan) {
@@ -220,6 +236,8 @@ function start() {
   draw();
 }
 function stopRainInput() {
+  sound.setWater(false);
+  waterSoundUntil = 0;
   scan?.grab.cancel();
   for (const { c } of controllers) c.userData.scanning = false;
   previewRaining = false;
@@ -669,6 +687,7 @@ function planar() {
     [target, alternative].forEach((p, i) => {
       const m = point(p, 0xffffff, 0.065);
       m.userData.action = () => {
+        sound.click();
         prediction =
           i === 0
             ? "Your choice matches the third distance."
@@ -1165,6 +1184,8 @@ function intersect(c) {
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode) {
+  sound.setActive(true);
+  sound.unlock();
   let session;
   try {
     session = await navigator.xr.requestSession(
@@ -1192,6 +1213,7 @@ async function enter(mode) {
     step = -1;
     elapsed = 0;
     session.addEventListener("visibilitychange", () => {
+      sound.setActive(session.visibilityState === "visible");
       if (session.visibilityState !== "visible") {
         grab?.cancel();
         stopRainInput();
@@ -1206,6 +1228,7 @@ async function enter(mode) {
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
+  sound.setActive(false);
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -1244,6 +1267,8 @@ for (const [id, mode, name] of [
 renderer.setAnimationLoop((time, frame) => {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.1) : 0;
   lastTime = time;
+  const previousSamples = scan?.records.length ?? 0;
+  const previousWater = rain?.water.added ?? 0;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     if (
@@ -1343,7 +1368,27 @@ renderer.setAnimationLoop((time, frame) => {
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
+  const audible =
+    !document.hidden &&
+    (devPreview ||
+      (renderer.xr.isPresenting &&
+        renderer.xr.getSession()?.visibilityState === "visible"));
+  sound.setActive(audible);
+  if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan();
+  if (audible && rain && rain.water.added > previousWater)
+    waterSoundUntil = time + 1500;
+  sound.setWater(
+    !!(
+      audible &&
+      rain?.stage === 1 &&
+      rain.mode === "rain" &&
+      time < waterSoundUntil
+    ),
+  );
   renderer.render(scene, camera);
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) sound.setActive(false);
 });
 window.addEventListener("resize", () => {
   camera.aspect = innerWidth / innerHeight;
