@@ -4,8 +4,13 @@ import * as THREE from "three";
 import {
   LayerExperience,
   LAYER_KEYS,
+  LANDSCAPE_EXTENT,
+  TREE_POSITIONS,
   landscapeHeight,
   riverX,
+  riverWaterHeight,
+  highwayZ,
+  highwayDeckHeight,
   densityAt,
 } from "../src/layers/experience.js";
 
@@ -52,10 +57,15 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   l.updateClipboard(null, camera, true);
   assert.equal(l.clipboard.visible, true);
   assert.equal(landscapeHeight(0, 0), 0);
-  assert.equal(landscapeHeight(8, 6) > 0, true);
-  assert.equal(riverX(0), 4);
+  assert.equal(LANDSCAPE_EXTENT, 110);
+  assert.ok(landscapeHeight(-60, -35) > landscapeHeight(riverX(-35), -35));
+  assert.ok(TREE_POSITIONS.length > 1000);
+  assert.equal(l.view, "layers");
+  l.setView("map");
+  assert.equal(l.view, "map");
+  l.setView("layers");
   assert.deepEqual(
-    new Set([densityAt(0, 0), densityAt(-8, 0), densityAt(13, 13)]),
+    new Set([densityAt(0, 0), densityAt(-80, 0), densityAt(100, 100)]),
     new Set(["high", "medium", "low"]),
   );
   l.update(240);
@@ -70,4 +80,39 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   l.dispose();
   scene.remove(leftGrip);
   assert.equal(scene.children.length, 0);
+});
+
+test("the river runs downhill inside a carved channel and the highway bridges it", () => {
+  const scene = new THREE.Scene();
+  const oldSky = new THREE.Color(0x071820);
+  scene.background = oldSky;
+  const l = new LayerExperience(scene, () => {});
+  assert.notEqual(scene.background, oldSky);
+  assert.ok(scene.fog);
+  const water = l.variants.raised.hydrology.children[1];
+  const shoreline = l.variants.raised.hydrology.children[0];
+  for (let z = -LANDSCAPE_EXTENT + 2; z < LANDSCAPE_EXTENT - 2; z += 2) {
+    const center = riverX(z);
+    const level = riverWaterHeight(z);
+    assert.ok(riverWaterHeight(z + 1) < level);
+    for (const offset of [-1.8, 0, 1.8])
+      assert.ok(
+        landscapeHeight(center + offset, z) < level + 0.02,
+        `river is buried at z=${z}, offset=${offset}`,
+      );
+    if ((z + LANDSCAPE_EXTENT - 2) % 20 === 0) {
+      const ray = new THREE.Raycaster(
+        new THREE.Vector3(center, 10, z),
+        new THREE.Vector3(0, -1, 0),
+      );
+      assert.equal(ray.intersectObjects([shoreline, water])[0]?.object, water);
+    }
+  }
+  const crossingX = riverX(highwayZ(0));
+  assert.ok(
+    highwayDeckHeight(crossingX) > riverWaterHeight(highwayZ(crossingX)) + 1.5,
+  );
+  l.dispose();
+  assert.equal(scene.background, oldSky);
+  assert.equal(scene.fog, null);
 });

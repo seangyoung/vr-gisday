@@ -23,6 +23,7 @@ import {
   LAYER_NAMES,
   LAYER_HINTS,
 } from "./layers/experience.js";
+import { renderLayerMap } from "./layers/map.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
@@ -41,7 +42,7 @@ const camera = new THREE.PerspectiveCamera(
   65,
   innerWidth / innerHeight,
   0.03,
-  30,
+  400,
 );
 camera.position.set(0, 0, 0);
 const root = new THREE.Group();
@@ -475,13 +476,43 @@ function drawLayersUI() {
       "#0b2430",
     );
     button("Build another view", 0, -0.62, () => l.reset(), 1.5);
-    navigation();
+    navigation(-1.02);
+    return;
+  }
+  button("Layers", -0.57, 0.69, () => l.setView("layers"), 0.98)
+    .material.color.set(l.view === "layers" ? 0xffffff : 0x91a6a4);
+  button("Map", 0.57, 0.69, () => l.setView("map"), 0.98)
+    .material.color.set(l.view === "map" ? 0xffffff : 0x91a6a4);
+  if (l.view === "map") {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 384;
+    renderLayerMap(canvas.getContext("2d"), l.selected);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const map = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.17, 1.17),
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+    );
+    map.position.set(-0.52, 0.01, 0.04);
+    uiParent.add(map);
+    LAYER_KEYS.forEach((key, i) => {
+      const marked = l.selected.has(key) ? "[x]" : "[ ]";
+      button(`${marked} ${LAYER_NAMES[key]}`, 0.65, 0.47 - i * 0.2, () => l.toggle(key), 1.02);
+    });
+    label("The map and the world use the same layers.", 0, -0.69, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label(
+      l.selected.has("population")
+        ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
+        : "Synthetic place · Map north is an arbitrary model direction",
+      0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
+    );
+    navigation(-1.02);
     return;
   }
   label(
     "Raise your left hand. Point and trigger to add a layer.",
     0,
-    0.7,
+    0.51,
     2.3,
     0.12,
     31,
@@ -493,7 +524,7 @@ function drawLayersUI() {
     button(
       `${marked} ${LAYER_NAMES[key]}`,
       0,
-      0.47 - i * 0.18,
+      0.29 - i * 0.18,
       () => l.toggle(key),
       1.85,
     );
@@ -503,7 +534,7 @@ function drawLayersUI() {
       ? LAYER_HINTS[l.lastLayer]
       : "Begin with topography, or choose any layer first.",
     0,
-    -0.61,
+    -0.66,
     2.35,
     0.21,
     29,
@@ -515,14 +546,14 @@ function drawLayersUI() {
       ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
       : "Synthetic landscape · Population values are illustrative",
     0,
-    -0.8,
+    -0.83,
     2.3,
     0.1,
     25,
     "#b6d1d9",
     "#0b2430",
   );
-  navigation();
+  navigation(-1.02);
 }
 function drawRainUI() {
   const r = rain;
