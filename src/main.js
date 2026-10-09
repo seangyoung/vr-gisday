@@ -17,11 +17,17 @@ import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
 import { ModelGrab } from "./manipulation.js";
+import {
+  LayerExperience,
+  LAYER_KEYS,
+  LAYER_NAMES,
+  LAYER_HINTS,
+} from "./layers/experience.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Three short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Three hands-on experiences</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Four short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Four hands-on experiences</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -54,6 +60,7 @@ let buttons = [],
   noisy = false,
   prediction = "";
 let scan = null;
+let layers = null;
 let xrMode = null;
 let rain = null,
   rainPointer = 0,
@@ -196,6 +203,8 @@ function navigation(y = -0.98) {
     () => {
       scan?.dispose();
       scan = null;
+      layers?.dispose();
+      layers = null;
       rain?.dispose();
       rain = null;
       stopRainInput();
@@ -206,7 +215,7 @@ function navigation(y = -0.98) {
   );
   button("Restart", -0.46, y, () => start(), 0.44);
   button(
-    rain || scan || isSpatial() ? "Reset View" : "Recenter",
+    rain || scan || layers || isSpatial() ? "Reset View" : "Recenter",
     0,
     y,
     () => {
@@ -218,6 +227,10 @@ function navigation(y = -0.98) {
   button("Exit XR", 0.92, y, () => renderer.xr.getSession()?.end(), 0.44);
 }
 function start() {
+  if (layers) {
+    startLayers();
+    return;
+  }
   if (scan) {
     if (scan.room) startRoomScan();
     else startScan();
@@ -263,6 +276,17 @@ function startScan(sceneInfo) {
   scan?.dispose();
   scan = new ScanExperience(scene, draw, sceneInfo);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function startLayers() {
+  stopRainInput();
+  rain?.dispose();
+  rain = null;
+  scan?.dispose();
+  scan = null;
+  layers?.dispose();
+  layers = new LayerExperience(scene, draw);
+  layers.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
 function startRoomScan() {
@@ -423,6 +447,79 @@ function drawScanUI() {
       "#0b2430",
     );
   }
+  navigation();
+}
+function drawLayersUI() {
+  const l = layers;
+  label(
+    l.finished ? "A place, many datasets" : "Stand Inside the Layers",
+    0,
+    0.91,
+    2.35,
+    0.19,
+    48,
+    "#e6f4f5",
+    "#0b2430",
+  );
+  if (l.finished) {
+    label(
+      "Each layer answers a different question.\nTogether they suggest relationships, not proof of cause.\nPopulation values here are fictional teaching data.",
+      0,
+      0.48,
+      2.35,
+      0.39,
+      35,
+      "#e6f4f5",
+      "#0b2430",
+    );
+    button("Build another view", 0, -0.62, () => l.reset(), 1.5);
+    navigation();
+    return;
+  }
+  label(
+    "Check a layer to change the world around you.",
+    0,
+    0.7,
+    2.3,
+    0.12,
+    31,
+    "#b6d1d9",
+    "#0b2430",
+  );
+  LAYER_KEYS.forEach((key, i) => {
+    const marked = l.selected.has(key) ? "[x]" : "[ ]";
+    button(
+      `${marked} ${LAYER_NAMES[key]}`,
+      0,
+      0.47 - i * 0.18,
+      () => l.toggle(key),
+      1.85,
+    );
+  });
+  label(
+    l.lastLayer
+      ? LAYER_HINTS[l.lastLayer]
+      : "Begin with topography, or choose any layer first.",
+    0,
+    -0.61,
+    2.35,
+    0.21,
+    29,
+    "#e6f4f5",
+    "#0b2430",
+  );
+  label(
+    l.selected.has("population")
+      ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
+      : "Synthetic landscape · Population values are illustrative",
+    0,
+    -0.8,
+    2.3,
+    0.1,
+    25,
+    "#b6d1d9",
+    "#0b2430",
+  );
   navigation();
 }
 function drawRainUI() {
@@ -859,6 +956,10 @@ function draw() {
 }
 function drawScene() {
   clear();
+  if (layers) {
+    drawLayersUI();
+    return;
+  }
   if (scan) {
     drawScanUI();
     return;
@@ -912,16 +1013,17 @@ function drawScene() {
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
     button("Find Yourself Without GPS", 0, 0.15, start, 1.75);
-    button("Make It Rain", 0, -0.1, startRain, 1.75);
+    button("Make It Rain", 0, -0.05, startRain, 1.75);
     label(
       "About 4 minutes each · Point and press the trigger",
       0,
-      -0.62,
+      -0.7,
       2,
       0.12,
       32,
     );
-    button("Scan the Hidden World", 0, -0.4, startScan, 1.75);
+    button("Scan the Hidden World", 0, -0.25, startScan, 1.75);
+    button("Stand Inside the Layers", 0, -0.45, startLayers, 1.75);
     navigation();
     return;
   }
@@ -999,6 +1101,7 @@ function place() {
   if (floatingModel) resetModelView();
   if (rain) rain.place(cam);
   scan?.place(cam);
+  layers?.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -1160,6 +1263,8 @@ async function enter(mode) {
     document.body.classList.add("xr-active");
     scan?.dispose();
     scan = null;
+    layers?.dispose();
+    layers = null;
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -1182,6 +1287,8 @@ async function enter(mode) {
 }
 renderer.xr.addEventListener("sessionend", () => {
   sound.setActive(false);
+  layers?.dispose();
+  layers = null;
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -1227,6 +1334,7 @@ renderer.setAnimationLoop((time, frame) => {
     if (
       !rain &&
       !scan &&
+      !layers &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
@@ -1237,6 +1345,8 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
+    if (layers && renderer.xr.getSession().visibilityState === "visible")
+      layers.update(dt);
     if (rain && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
       let falling = false;
@@ -1319,6 +1429,7 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
+  if (devPreview && layers && !renderer.xr.isPresenting) layers.update(dt);
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
@@ -1358,7 +1469,11 @@ if (
     step = requestedStep;
   document.body.classList.add("xr-active");
   scene.background = new THREE.Color(0x071820);
-  if (new URLSearchParams(location.search).get("demo") === "rain") startRain();
+  if (new URLSearchParams(location.search).get("demo") === "layers") {
+    camera.position.y = 1.6;
+    startLayers();
+  } else if (new URLSearchParams(location.search).get("demo") === "rain")
+    startRain();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
     startScan(
       SCAN_SCENES.find(

@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with a simple immersive experience menu. Three playable modules: **Find Yourself Without GPS**, **Make It Rain**, and **Scan the Hidden World**.
+Quest-focused WebXR app with a simple immersive experience menu. Four playable modules: **Find Yourself Without GPS**, **Make It Rain**, **Scan the Hidden World**, and **Stand Inside the Layers**.
 
 ## Run
 
@@ -65,6 +65,14 @@ Right-trigger sculpting works while water flows. Manual edits shift the erosion 
 The erosion bed and water solver use a **65×65 grid** (4,225 samples; drainage remains 41×41). A joined triangular water surface replaces flat water tiles. Terrain/water geometry refreshes at 10 Hz; the conservative simulation uses 50 fixed steps per second. A simple wet-bank slump transfers material from over-steep banks into adjacent cells, softening needle-like cuts while conserving earth. Shorelines are approximate at cell scale.
 
 Either side grip moves/rotates the tray; both grips resize. Rotation changes the viewing pose, not the fixed physical slope. This experiment does not include soil selection, roots, rainfall calibration, or realistic time/length units. The erosion experiment routes each cell toward its steepest neighboring water-surface drop to emphasize rivulets; the pond experiment retains its multi-neighbor spreading rule. Sediment capacity is a heuristic based on local flux and slope; erosion is accelerated, limited to a 0.24-model-unit loose layer, and the rim stays fixed. Sediment transfers use the water transfers and can leave the open rim. Channels are computed from evolving heights, not prerecorded lines. Water and sediment conservation are tested; this is not a predictive erosion model.
+
+## Stand Inside the Layers
+
+Choose the fourth experience in VR. The visitor stands at the center of a 30-by-30-model-unit fictional landscape. A floating table of contents has five checkboxes: **Topography**, **Vegetation**, **Hydrology**, **Roads**, and **Population density**. The starting ground is flat and otherwise blank. Layers can be turned on/off in any order, and each changes the surrounding 3D world rather than a map panel. Reset View places the panel and landscape relative to the visitor again. The activity wraps up after four minutes with a short takeaway; **Build another view** clears the checks and restarts the timer.
+
+Topography raises a valley and hills while preserving a flat standing area. Trees, a river and feeder stream, and crossing roads follow either the flat or raised terrain, so combinations remain aligned. The population layer is a translucent district choropleth draped on the ground. Its pale/teal/gold classes represent fictional values of <500, 500–2,000, and >2,000 people per km². The categories illustrate how a statistical layer can be placed in the scene; they are invented teaching data and do not describe a real place or imply causal relationships. Generated geometry has no runtime data download. There is no locomotion; visitors look around from the central viewpoint.
+
+Development-only `?preview&demo=layers` exposes the same layer buttons in a browser for visual review. Height alignment, controller checkboxes, comfort, and performance still require Quest validation.
 
 ## Scan the Hidden World
 
