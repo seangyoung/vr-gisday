@@ -212,6 +212,24 @@ export class LayerExperience {
     this.lastLayer = null;
     this.group = new THREE.Group();
     scene.add(this.group);
+    this.clipboard = new THREE.Group();
+    this.clipboard.scale.setScalar(0.18);
+    this.clipboard.visible = false;
+    scene.add(this.clipboard);
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(2.55, 2.25, 0.07),
+      new THREE.MeshBasicMaterial({ color: 0x143441 }),
+    );
+    board.position.z = -0.07;
+    this.clipboard.add(board);
+    const clip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.45, 0.12, 0.055),
+      new THREE.MeshBasicMaterial({ color: 0xb8c9c9 }),
+    );
+    clip.position.set(0, 1.12, 0.01);
+    this.clipboard.add(clip);
+    this.ui = new THREE.Group();
+    this.clipboard.add(this.ui);
     this.ground = {};
     this.variants = {};
     for (const [name, raised] of [
@@ -253,6 +271,27 @@ export class LayerExperience {
     this.group.position.set(p.x, p.y - 1.6, p.z);
     this.group.rotation.y = 0;
   }
+  updateClipboard(leftGrip, camera, preview = false) {
+    if (!leftGrip && !preview) {
+      this.clipboard.visible = false;
+      return;
+    }
+    if (preview) {
+      camera.updateWorldMatrix(true, false);
+      this.clipboard.position.copy(
+        camera.localToWorld(new THREE.Vector3(-0.47, -0.12, -1.05)),
+      );
+    } else {
+      leftGrip.updateWorldMatrix(true, false);
+      this.clipboard.position.copy(
+        leftGrip.localToWorld(new THREE.Vector3(-0.045, 0.19, -0.12)),
+      );
+    }
+    camera.getWorldPosition(this._viewPosition ??= new THREE.Vector3());
+    this.clipboard.lookAt(this._viewPosition);
+    this.clipboard.visible = true;
+    this.clipboard.updateWorldMatrix(true, true);
+  }
   toggle(key) {
     if (!LAYER_KEYS.includes(key) || this.finished) return;
     if (this.selected.has(key)) this.selected.delete(key);
@@ -286,14 +325,18 @@ export class LayerExperience {
     }
   }
   dispose() {
-    this.group.removeFromParent();
-    this.group.traverse((obj) => {
-      obj.geometry?.dispose();
-      if (obj.material)
-        for (const material of Array.isArray(obj.material)
-          ? obj.material
-          : [obj.material])
-          material.dispose();
-    });
+    for (const group of [this.group, this.clipboard]) {
+      group.removeFromParent();
+      group.traverse((obj) => {
+        obj.geometry?.dispose();
+        if (obj.material)
+          for (const material of Array.isArray(obj.material)
+            ? obj.material
+            : [obj.material]) {
+            material.map?.dispose();
+            material.dispose();
+          }
+      });
+    }
   }
 }

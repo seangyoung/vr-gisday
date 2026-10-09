@@ -48,6 +48,7 @@ const root = new THREE.Group();
 scene.add(root);
 const content = new THREE.Group();
 root.add(content);
+let uiParent = content;
 const raycaster = new THREE.Raycaster();
 raycaster.params.Line.threshold = 0.025;
 const rotation = new THREE.Matrix4();
@@ -82,19 +83,20 @@ function clear() {
     grab = null;
   }
   buttons = [];
-  while (content.children.length) {
-    const obj = content.children[0];
-    obj.traverse((n) => {
-      n.geometry?.dispose();
-      if (n.material) {
-        for (const m of Array.isArray(n.material) ? n.material : [n.material]) {
-          m.map?.dispose();
-          m.dispose();
+  for (const group of [content, layers?.ui].filter(Boolean))
+    while (group.children.length) {
+      const obj = group.children[0];
+      obj.traverse((n) => {
+        n.geometry?.dispose();
+        if (n.material) {
+          for (const m of Array.isArray(n.material) ? n.material : [n.material]) {
+            m.map?.dispose();
+            m.dispose();
+          }
         }
-      }
-    });
-    content.remove(obj);
-  }
+      });
+      group.remove(obj);
+    }
 }
 function label(
   text,
@@ -139,7 +141,7 @@ function label(
     }),
   );
   mesh.position.set(x, y, 0.02);
-  content.add(mesh);
+  uiParent.add(mesh);
   return mesh;
 }
 function button(text, x, y, action, w = 0.75) {
@@ -477,7 +479,7 @@ function drawLayersUI() {
     return;
   }
   label(
-    "Check a layer to change the world around you.",
+    "Raise your left hand. Point and trigger to add a layer.",
     0,
     0.7,
     2.3,
@@ -956,6 +958,7 @@ function draw() {
 }
 function drawScene() {
   clear();
+  uiParent = layers?.ui ?? content;
   if (layers) {
     drawLayersUI();
     return;
@@ -1237,6 +1240,7 @@ function intersect(c) {
   rotation.extractRotation(c.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
+  if (layers && !layers.clipboard.visible) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode) {
@@ -1345,8 +1349,17 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    if (layers && renderer.xr.getSession().visibilityState === "visible")
-      layers.update(dt);
+    if (layers) {
+      const visible = renderer.xr.getSession().visibilityState === "visible";
+      if (visible) layers.update(dt);
+      const left = visible
+        ? controllers.find(
+            ({ c, grip }) =>
+              c.userData.xrInput?.handedness === "left" && grip.visible,
+          )
+        : null;
+      layers.updateClipboard(left?.grip, renderer.xr.getCamera());
+    }
     if (rain && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
       let falling = false;
@@ -1429,7 +1442,10 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
-  if (devPreview && layers && !renderer.xr.isPresenting) layers.update(dt);
+  if (devPreview && layers && !renderer.xr.isPresenting) {
+    layers.update(dt);
+    layers.updateClipboard(null, camera, true);
+  }
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
