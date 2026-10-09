@@ -471,7 +471,7 @@ function drawRainUI() {
       r.kind === "erosion"
         ? "Shape the land. Watch water reshape it."
         : "Shape the land. Follow the water.",
-      "HOLD TRIGGER on land: add water. HOLD SIDE GRIP: sculpt.\nLift to raise earth; lower to dig. Both work together.\nGRIP blue handles: move / turn. BOTH grips: resize.",
+      "LEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nWhile sculpting, lift to raise earth; lower to dig.\nEither GRIP: move / turn the model. BOTH grips: resize.",
     ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
@@ -1038,13 +1038,19 @@ for (let i = 0; i < 2; i++) {
     if (rain?.stage === 1) {
       const land = rainHit(c);
       if (land) {
-        rainPointer = i;
-        rain.aim(land.point);
-        c.userData.raining = true;
+        const action = rain.beginTrigger(
+          c.userData.xrInput?.handedness,
+          i,
+          land.point,
+          grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null,
+        );
+        c.userData.raining = action === "rain";
+        if (c.userData.raining) rainPointer = i;
       }
     }
   });
   c.addEventListener("selectend", () => {
+    rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
   });
@@ -1059,23 +1065,22 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
-    if (rain && grip.visible && !intersect(c)) {
+    if (rain && grip.visible) {
       grip.updateWorldMatrix(true, false);
       rain.group.updateWorldMatrix(true, true);
-      const handle = raycaster.intersectObjects(rain.moveHandles, false)[0];
-      if (rain.grab.hands.size || handle) {
+      const local = rain.group.worldToLocal(
+        grip.getWorldPosition(new THREE.Vector3()),
+      );
+      const near =
+        Math.abs(local.x) < 1.1 &&
+        Math.abs(local.z) < 1.1 &&
+        local.y > -0.15 &&
+        local.y < 1.1;
+      if (rain.grab.hands.size || (!intersect(c) && (near || rainHit(c)))) {
         rain.endStroke();
         for (const { c: controller } of controllers)
           controller.userData.raining = false;
         rain.grab.begin(i, grip.matrixWorld);
-      } else {
-        const land = rainHit(c);
-        if (land)
-          rain.beginStroke(
-            i,
-            land.point,
-            grip.getWorldPosition(new THREE.Vector3()),
-          );
       }
       return;
     }
@@ -1237,6 +1242,7 @@ renderer.setAnimationLoop((time, frame) => {
       let falling = false;
       if (
         active?.c.visible &&
+        active.c.userData.xrInput?.handedness === "left" &&
         rain.stage === 1 &&
         !rain.grab.hands.size &&
         !intersect(active.c)

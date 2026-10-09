@@ -50,15 +50,6 @@ export class RainExperience {
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
     scene.add(this.group);
-    this.moveHandles = [-1.15, 1.15].map((x) => {
-      const handle = new THREE.Mesh(
-        new THREE.SphereGeometry(0.09, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0x60e3f0 }),
-      );
-      handle.position.set(x, 0.22, 0.8);
-      this.group.add(handle);
-      return handle;
-    });
     this.group.add(new THREE.HemisphereLight(0xd4f5ff, 0x39513a, 2.3));
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);
     sun.position.set(-2, 4, 1);
@@ -440,6 +431,18 @@ export class RainExperience {
     this.ponds.count = count;
     this.ponds.instanceMatrix.needsUpdate = true;
     if (this.ponds.instanceColor) this.ponds.instanceColor.needsUpdate = true;
+  }
+  beginTrigger(handedness, id, worldHit, worldHand) {
+    if (this.stage !== 1 || this.grab.hands.size) return null;
+    if (handedness === "left") {
+      this.aim(worldHit);
+      return "rain";
+    }
+    if (handedness === "right" && worldHand) {
+      this.beginStroke(id, worldHit, worldHand);
+      return this.stroke?.id === id ? "sculpt" : null;
+    }
+    return null;
   }
   beginStroke(id, worldHit, worldHand) {
     if (this.stage !== 1 || this.grab.hands.size || this.stroke) return;

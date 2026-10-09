@@ -198,9 +198,35 @@ for (const kind of ["drainage", "erosion"])
     assert.equal(r.stroke.id, 0);
     r.endStroke(0);
     assert.equal(r.stroke, null);
-    assert.equal(r.moveHandles.length, 2);
     r.grab.begin(1, new THREE.Matrix4());
     r.beginStroke(0, new THREE.Vector3(), new THREE.Vector3());
     assert.equal(r.stroke, null);
+    r.dispose();
+  });
+
+for (const kind of ["drainage", "erosion"])
+  test(`${kind}: trigger roles follow handedness rather than controller index`, () => {
+    const r = new RainExperience(new THREE.Scene(), () => {}, kind);
+    r.explore();
+    const hit = new THREE.Vector3(0, 0.4, -0.4),
+      hand = new THREE.Vector3(0, 1, -0.4);
+    for (const [left, right] of [
+      [0, 1],
+      [1, 0],
+    ]) {
+      assert.equal(r.beginTrigger("left", left, hit, hand), "rain");
+      assert.equal(r.stroke, null);
+      assert.equal(r.beginTrigger("right", right, hit, hand), "sculpt");
+      assert.equal(r.stroke.id, right);
+      r.endStroke(left);
+      assert.equal(r.stroke.id, right);
+      r.endStroke(right);
+      assert.equal(r.stroke, null);
+    }
+    assert.equal(r.beginTrigger("none", 0, hit, hand), null);
+    assert.equal(r.beginTrigger("right", 0, hit, null), null);
+    r.grab.begin(0, new THREE.Matrix4());
+    assert.equal(r.beginTrigger("left", 1, hit, hand), null);
+    assert.equal(r.beginTrigger("right", 1, hit, hand), null);
     r.dispose();
   });
