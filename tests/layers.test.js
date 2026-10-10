@@ -11,6 +11,7 @@ import {
   riverWaterHeight,
   highwayZ,
   highwayDeckHeight,
+  highwayWalkingHeight,
   floodplainAt,
   boundaryX,
   boundaryZ,
@@ -131,6 +132,80 @@ test("left-stick walking follows the view, terrain, bounds, and clipboard locati
   assert.equal(l.group.position.y, 0);
   l.dispose();
   map.geometry.dispose();
+});
+
+test("highway shoulders meet the ground while the bridge stays open underneath", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const positions = l.variants.raised.roads.children[0].geometry.attributes.position;
+  for (let i = 0; i < positions.count; i += 4) {
+    const x = positions.getX(i);
+    for (const edge of [i, i + 3]) {
+      const z = positions.getZ(edge);
+      if (Math.abs(x - riverX(highwayZ(x))) > 17)
+        assert.ok(positions.getY(edge) < landscapeHeight(x, z),
+          `shoulder should enter the ground at x=${x}`);
+    }
+  }
+  const crossing = riverX(highwayZ(0));
+  const z = highwayZ(crossing);
+  assert.ok(highwayWalkingHeight(crossing, z) - landscapeHeight(crossing, z) > 1.5);
+  assert.equal(highwayWalkingHeight(crossing, z + 10), null);
+  l.dispose();
+});
+
+test("walking reaches the bridge from the road but stays below it from the river", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  l.place(camera);
+  l.selected = new Set(["topography", "roads"]);
+  l.applyVisibility();
+  l.group.rotation.y = 0;
+  const shoulderX = -80;
+  l.group.position.set(-shoulderX, 0, -(highwayZ(shoulderX) + 10));
+  l.walk(0, 0, 0.02, camera);
+  assert.equal(l.onRoad, false);
+  for (let i = 0; i < 25; i++) l.walk(0, -1, 0.05, camera);
+  assert.equal(l.onRoad, true);
+  assert.ok(Math.abs(l.group.position.y +
+    highwayWalkingHeight(l.visitor.x, l.visitor.y)) < 1e-6);
+  l.place(camera);
+  l.group.rotation.y = 0;
+  const startX = -30, startZ = highwayZ(startX);
+  l.group.position.set(-startX, 0, -startZ);
+  l.walk(0, 0, 0.02, camera);
+  assert.equal(l.onRoad, true);
+  const crossing = riverX(highwayZ(0));
+  let reachedBridge = false;
+  for (let i = 0; i < 400; i++) {
+    l.walk(1, 0, 0.05, camera);
+    if (!reachedBridge && l.visitor.x >= crossing) {
+      reachedBridge = true;
+      assert.equal(l.onRoad, true);
+      assert.ok(Math.abs(l.group.position.y +
+        highwayWalkingHeight(l.visitor.x, l.visitor.y)) < 1e-6);
+    }
+  }
+  assert.equal(reachedBridge, true);
+  assert.equal(l.onRoad, true);
+  l.place(camera);
+  l.group.rotation.y = 0;
+  l.group.position.set(-crossing, 0, -(highwayZ(crossing) - 12));
+  let passedUnder = false;
+  for (let i = 0; i < 175; i++) {
+    l.walk(0, 1, 0.05, camera);
+    if (!passedUnder && l.visitor.y >= highwayZ(crossing)) {
+      passedUnder = true;
+      assert.equal(l.onRoad, false);
+      assert.ok(Math.abs(l.group.position.y +
+        landscapeHeight(l.visitor.x, l.visitor.y)) < 1e-6);
+      assert.ok(highwayWalkingHeight(l.visitor.x, l.visitor.y) -
+        landscapeHeight(l.visitor.x, l.visitor.y) > 1.5);
+    }
+  }
+  assert.equal(passedUnder, true);
+  assert.equal(l.onRoad, false);
+  l.dispose();
 });
 
 test("the river runs downhill inside a carved channel and the highway bridges it", () => {

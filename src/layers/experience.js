@@ -31,6 +31,9 @@ export const riverX = (z) =>
 export const riverWaterHeight = (z) => -0.8 - 0.008 * z;
 export const highwayZ = (x) =>
   -22 + 2.6 * Math.sin(x * 0.025) + 0.9 * Math.sin(x * 0.08);
+const ROAD_EDGE = 6.1;
+const SHOULDER_EDGE = 9;
+const BRIDGE_ACCESS_STEP = 0.55;
 const topographicHeight = (x, z) => {
   const fromRiver = Math.abs(x - riverX(z));
   const floor = riverWaterHeight(z) - 0.26;
@@ -286,13 +289,69 @@ function makeHydrology(group, raised) {
 export function highwayDeckHeight(x, raised = true) {
   const z = highwayZ(x);
   const ground = Math.max(
-    landscapeHeight(x, z - 4.9, raised),
-    landscapeHeight(x, z + 4.9, raised),
+    landscapeHeight(x, z - ROAD_EDGE, raised),
+    landscapeHeight(x, z - 3, raised),
     landscapeHeight(x, z, raised),
+    landscapeHeight(x, z + 3, raised),
+    landscapeHeight(x, z + ROAD_EDGE, raised),
   ) + 0.09;
   const fromBridge = Math.abs(x - riverX(z));
   const bridge = 1 - THREE.MathUtils.smoothstep(fromBridge, 7, 17);
   return Math.max(ground, (raised ? riverWaterHeight(z) : 0) + 1.9 * bridge);
+}
+function shoulderOuterHeight(x, side, raised) {
+  const z = highwayZ(x) + side * SHOULDER_EDGE;
+  const fromBridge = Math.abs(x - riverX(highwayZ(x)));
+  const bridge = 1 - THREE.MathUtils.smoothstep(fromBridge, 7, 17);
+  return THREE.MathUtils.lerp(
+    landscapeHeight(x, z, raised) - 0.06,
+    highwayDeckHeight(x, raised) - 0.12,
+    bridge,
+  );
+}
+// Null outside the highway. A visitor below the bridge only adopts this
+// elevated surface after entering from a shoulder connected to the ground.
+export function highwayWalkingHeight(x, z, raised = true) {
+  const offset = z - highwayZ(x);
+  const distance = Math.abs(offset);
+  if (distance > SHOULDER_EDGE) return null;
+  const deck = highwayDeckHeight(x, raised);
+  if (distance <= ROAD_EDGE) return deck;
+  const outer = shoulderOuterHeight(x, Math.sign(offset), raised);
+  const t = (distance - ROAD_EDGE) / (SHOULDER_EDGE - ROAD_EDGE);
+  return Math.max(landscapeHeight(x, z, raised), THREE.MathUtils.lerp(deck, outer, t));
+}
+function roadShoulderRibbon(raised) {
+  const vertices = [], indices = [];
+  const segments = Math.ceil((2 * extent) / 0.65);
+  const offsets = [-SHOULDER_EDGE, -ROAD_EDGE, ROAD_EDGE, SHOULDER_EDGE];
+  for (let i = 0; i <= segments; i++) {
+    const x = -extent + (2 * extent * i) / segments;
+    const centerZ = highwayZ(x);
+    const deck = highwayDeckHeight(x, raised);
+    for (const offset of offsets)
+      vertices.push(
+        x,
+        Math.abs(offset) === SHOULDER_EDGE
+          ? shoulderOuterHeight(x, Math.sign(offset), raised)
+          : deck,
+        centerZ + offset,
+      );
+    if (i < segments)
+      for (let strip = 0; strip < offsets.length - 1; strip++) {
+        const a = i * offsets.length + strip;
+        const b = a + offsets.length;
+        indices.push(a, a + 1, b, a + 1, b + 1, b);
+      }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(
+    geometry,
+    new THREE.MeshStandardMaterial({ color: 0x777a70, roughness: 0.9, side: THREE.DoubleSide }),
+  );
 }
 function roadRibbon(raised, halfWidth, lift, color, start = -extent, end = extent, step = 0.65) {
   const vertices = [], indices = [];
@@ -316,7 +375,7 @@ function roadRibbon(raised, halfWidth, lift, color, start = -extent, end = exten
   );
 }
 function makeRoads(group, raised) {
-  group.add(roadRibbon(raised, 6.1, 0, 0x777a70));
+  group.add(roadShoulderRibbon(raised));
   group.add(roadRibbon(raised, 5.2, 0.016, 0x353b3d));
   const markings = { white: { vertices: [], indices: [] }, yellow: { vertices: [], indices: [] } };
   const addMark = (x0, x1, offset, width, kind) => {
@@ -464,6 +523,7 @@ export class LayerExperience {
     this.reveal = null;
     this.view = "map";
     this.visitor = new THREE.Vector2();
+    this.onRoad = false;
     this.visitorMarkers = [];
     this.floorY = 0;
     this.walkForward = new THREE.Vector3();
@@ -540,6 +600,7 @@ export class LayerExperience {
     );
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z) - 0.25;
     this.visitor.set(0, 0);
+    this.onRoad = false;
     this.updateVisitorMarkers();
   }
   turn(angle, camera) {
@@ -578,9 +639,17 @@ export class LayerExperience {
       local.z = nextZ;
     }
     this.visitor.set(local.x, local.z);
-    const relief = this.selected.has("topography")
-      ? landscapeHeight(local.x, local.z) * this.variants.raised.world.scale.y
-      : 0;
+    const raised = this.selected.has("topography");
+    const variant = raised ? this.variants.raised : this.variants.flat;
+    const scaleY = variant.world.scale.y;
+    const ground = landscapeHeight(local.x, local.z, raised) * scaleY;
+    const roadLocal = this.selected.has("roads") && variant.roads.scale.y > 0.95
+      ? highwayWalkingHeight(local.x, local.z, raised)
+      : null;
+    const road = roadLocal === null ? null : roadLocal * scaleY;
+    if (road === null) this.onRoad = false;
+    else if (!this.onRoad && road - ground <= BRIDGE_ACCESS_STEP) this.onRoad = true;
+    const relief = this.onRoad ? road : ground;
     this.group.position.y = this.floorY - relief;
     this.updateVisitorMarkers();
   }
@@ -681,6 +750,8 @@ export class LayerExperience {
     }
     this.elapsed = 0;
     this.finished = false;
+    this.onRoad = false;
+    this.group.position.y = this.floorY;
     this.applyVisibility();
     this.onChange();
   }
