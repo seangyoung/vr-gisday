@@ -24,11 +24,12 @@ import {
   LAYER_HINTS,
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
+import { ViewshedExperience } from "./viewshed/experience.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Four short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Four hands-on experiences</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Five short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Five hands-on experiences</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -42,7 +43,7 @@ const camera = new THREE.PerspectiveCamera(
   65,
   innerWidth / innerHeight,
   0.03,
-  400,
+  550,
 );
 camera.position.set(0, 0, 0);
 const root = new THREE.Group();
@@ -63,6 +64,7 @@ let buttons = [],
   prediction = "";
 let scan = null;
 let layers = null;
+let viewshed = null;
 let xrMode = null;
 let rain = null,
   rainPointer = 0,
@@ -84,7 +86,7 @@ function clear() {
     grab = null;
   }
   buttons = [];
-  for (const group of [content, layers?.ui].filter(Boolean))
+  for (const group of [content, layers?.ui, viewshed?.ui].filter(Boolean))
     while (group.children.length) {
       const obj = group.children[0];
       obj.traverse((n) => {
@@ -208,6 +210,8 @@ function navigation(y = -0.98) {
       scan = null;
       layers?.dispose();
       layers = null;
+      viewshed?.dispose();
+      viewshed = null;
       rain?.dispose();
       rain = null;
       stopRainInput();
@@ -218,7 +222,7 @@ function navigation(y = -0.98) {
   );
   button("Restart", -0.46, y, () => start(), 0.44);
   button(
-    rain || scan || layers || isSpatial() ? "Reset View" : "Recenter",
+    rain || scan || layers || viewshed || isSpatial() ? "Reset View" : "Recenter",
     0,
     y,
     () => {
@@ -230,6 +234,10 @@ function navigation(y = -0.98) {
   button("Exit XR", 0.92, y, () => renderer.xr.getSession()?.end(), 0.44);
 }
 function start() {
+  if (viewshed) {
+    startViewshed();
+    return;
+  }
   if (layers) {
     startLayers();
     return;
@@ -264,6 +272,10 @@ function startRain(kind = "drainage", explore = false) {
   if (kind !== "erosion") kind = "drainage";
   scan?.dispose();
   scan = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = null;
   stopRainInput();
   rain?.dispose();
   rain = new RainExperience(scene, draw, kind);
@@ -276,6 +288,10 @@ function startScan(sceneInfo) {
   stopRainInput();
   rain?.dispose();
   rain = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = null;
   scan?.dispose();
   scan = new ScanExperience(scene, draw, sceneInfo);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -287,15 +303,34 @@ function startLayers() {
   rain = null;
   scan?.dispose();
   scan = null;
+  viewshed?.dispose();
+  viewshed = null;
   layers?.dispose();
   layers = new LayerExperience(scene, draw);
   layers.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function startViewshed() {
+  stopRainInput();
+  rain?.dispose();
+  rain = null;
+  scan?.dispose();
+  scan = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = new ViewshedExperience(scene, draw);
+  viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
 function startRoomScan() {
   stopRainInput();
   rain?.dispose();
   rain = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = null;
   scan?.dispose();
   scan = new RoomScan(scene, draw, renderer.xr.getSession(), xrMode);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -552,6 +587,66 @@ function drawLayersUI() {
     25,
     "#b6d1d9",
     "#0b2430",
+  );
+  navigation(-1.02);
+}
+function drawViewshedUI() {
+  const v = viewshed;
+  label(
+    v.finished ? "What blocks the view?" : "Can You See It?",
+    0, 0.91, 2.35, 0.19, 48, "#e6f4f5", "#0b2430",
+  );
+  if (v.finished) {
+    label(
+      "A viewshed marks ground visible from one place.\nRidges hide areas behind them; a higher viewpoint may reveal more.\nThis model tests terrain only, not trees or buildings.",
+      0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
+    );
+    button("Try another viewpoint", 0, -0.62, () => v.reset(), 1.5);
+    navigation(-1.02);
+    return;
+  }
+  button("Landscape", -0.57, 0.69, () => v.setView("scene"), 0.98)
+    .material.color.set(v.view === "scene" ? 0xffffff : 0x91a6a4);
+  button("Map", 0.57, 0.69, () => v.setView("map"), 0.98)
+    .material.color.set(v.view === "map" ? 0xffffff : 0x91a6a4);
+  if (v.view === "map") {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 384;
+    v.renderMap(canvas.getContext("2d"));
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const map = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.17, 1.17),
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+    );
+    map.position.set(-0.52, 0.01, 0.06);
+    map.userData.action = (hit) => v.placeFromMap(hit);
+    map.userData.debugHidden = true;
+    uiParent.add(map);
+    buttons.push(map);
+    label("Point and trigger on the map\nto move the observation point.", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
+    button("Eye level · 2 m", 0.64, 0.18, () => v.setHeight(2), 1.04)
+      .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
+    button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
+      .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
+    button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
+    label("Map and landscape show the same visible ground.", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+  } else {
+    label(
+      "The gold marker is an observer. Green ground is visible;\npurple ground is hidden by higher terrain.",
+      0, 0.44, 2.3, 0.26, 32, "#e6f4f5", "#0b2430",
+    );
+    label("Point at the ground and press trigger to move the observer.", 0, 0.17, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
+    button("Eye level · 2 m", -0.56, -0.12, () => v.setHeight(2), 0.98)
+      .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
+    button("Tower · 12 m", 0.56, -0.12, () => v.setHeight(12), 0.98)
+      .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
+    button("Reset point", 0, -0.43, () => v.reset(), 1.05);
+    label("Try the same spot at both heights. What changes?", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
+  }
+  label(
+    `${v.visiblePercent}% of nearby ground is visible · Terrain only`,
+    0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
   navigation(-1.02);
 }
@@ -979,6 +1074,7 @@ function draw() {
       }
     }
     for (const mesh of buttons) {
+      if (mesh.userData.debugHidden) continue;
       const b = document.createElement("button");
       b.textContent = mesh.userData.label || "Candidate";
       b.style.cssText = "font-size:11px;padding:5px;margin:3px";
@@ -989,7 +1085,11 @@ function draw() {
 }
 function drawScene() {
   clear();
-  uiParent = layers?.ui ?? content;
+  uiParent = viewshed?.ui ?? layers?.ui ?? content;
+  if (viewshed) {
+    drawViewshedUI();
+    return;
+  }
   if (layers) {
     drawLayersUI();
     return;
@@ -1046,19 +1146,20 @@ function drawScene() {
   if (step === -1) {
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
-    button("Find Yourself Without GPS", 0, 0.15, start, 1.75);
-    button("Make It Rain", 0, -0.05, startRain, 1.75);
+    button("Find Yourself Without GPS", 0, 0.19, start, 1.75);
+    button("Make It Rain", 0, 0, startRain, 1.75);
     label(
       "About 4 minutes each · Point and press the trigger",
       0,
-      -0.7,
+      -0.78,
       2,
       0.12,
       32,
     );
-    button("Scan the Hidden World", 0, -0.25, startScan, 1.75);
-    button("Stand Inside the Layers", 0, -0.45, startLayers, 1.75);
-    navigation();
+    button("Scan the Hidden World", 0, -0.19, startScan, 1.75);
+    button("Stand Inside the Layers", 0, -0.38, startLayers, 1.75);
+    button("Can You See It?", 0, -0.57, startViewshed, 1.75);
+    navigation(-1.06);
     return;
   }
   if (step >= stages.length) {
@@ -1136,6 +1237,7 @@ function place() {
   if (rain) rain.place(cam);
   scan?.place(cam);
   layers?.place(cam);
+  viewshed?.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -1165,7 +1267,11 @@ for (let i = 0; i < 2; i++) {
       return;
     const hit = intersect(c);
     if (hit) {
-      hit.object.userData.action?.();
+      hit.object.userData.action?.(hit);
+      return;
+    }
+    if (viewshed) {
+      viewshed.placeFromRay(raycaster);
       return;
     }
     if (scan?.stage === 1) {
@@ -1271,7 +1377,7 @@ function intersect(c) {
   rotation.extractRotation(c.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
-  if (layers && !layers.clipboard.visible) return null;
+  if ((layers && !layers.clipboard.visible) || (viewshed && !viewshed.clipboard.visible)) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode) {
@@ -1300,6 +1406,8 @@ async function enter(mode) {
     scan = null;
     layers?.dispose();
     layers = null;
+    viewshed?.dispose();
+    viewshed = null;
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -1324,6 +1432,8 @@ renderer.xr.addEventListener("sessionend", () => {
   sound.setActive(false);
   layers?.dispose();
   layers = null;
+  viewshed?.dispose();
+  viewshed = null;
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -1370,6 +1480,7 @@ renderer.setAnimationLoop((time, frame) => {
       !rain &&
       !scan &&
       !layers &&
+      !viewshed &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
@@ -1380,16 +1491,17 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    if (layers) {
+    const landscapeDemo = viewshed ?? layers;
+    if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
-      if (visible) layers.update(dt);
+      if (visible) landscapeDemo.update(dt);
       const left = visible
         ? controllers.find(
             ({ c, grip }) =>
               c.userData.xrInput?.handedness === "left" && grip.visible,
           )
         : null;
-      layers.updateClipboard(left?.grip, renderer.xr.getCamera());
+      landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
     }
     if (rain && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
@@ -1451,15 +1563,19 @@ renderer.setAnimationLoop((time, frame) => {
       rain?.grab.cancel();
       scan?.grab.cancel();
     }
-    for (const b of buttons) b.material.color.set(0xffffff);
+    for (const b of buttons) {
+      b.userData.baseColor ??= b.material.color.clone();
+      b.material.color.copy(b.userData.baseColor);
+    }
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
       const model = modelHit(c) || rainHit(c) || scanHit(c);
+      const ground = viewshed?.hitTerrain(raycaster);
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id);
-      beam.scale.z = hit ? hit.distance : model ? model.distance : 4;
+      beam.scale.z = hit ? hit.distance : model ? model.distance : ground ? ground.distance : 4;
       handle.material.color.set(
         grab?.hands.has(id) ||
           scan?.grab.hands.has(id) ||
@@ -1467,15 +1583,17 @@ renderer.setAnimationLoop((time, frame) => {
           rain?.stroke?.id === id
           ? 0xffca83
           : model
+            || ground
             ? 0xffffff
             : 0xa6f5d9,
       );
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
-  if (devPreview && layers && !renderer.xr.isPresenting) {
-    layers.update(dt);
-    layers.updateClipboard(null, camera, true);
+  if (devPreview && (viewshed || layers) && !renderer.xr.isPresenting) {
+    const landscapeDemo = viewshed ?? layers;
+    landscapeDemo.update(dt);
+    landscapeDemo.updateClipboard(null, camera, true);
   }
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
@@ -1519,6 +1637,9 @@ if (
   if (new URLSearchParams(location.search).get("demo") === "layers") {
     camera.position.y = 1.6;
     startLayers();
+  } else if (new URLSearchParams(location.search).get("demo") === "viewshed") {
+    camera.position.y = 1.6;
+    startViewshed();
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
     startRain();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
@@ -1538,7 +1659,8 @@ if (
       camera,
     );
     const ui = raycaster.intersectObjects(buttons, false)[0];
-    if (ui) ui.object.userData.action?.();
+    if (ui) ui.object.userData.action?.(ui);
+    else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (rain?.stage === 1) {
       rain.group.updateWorldMatrix(true, true);
       const land = raycaster.intersectObject(rain.terrain, false)[0];

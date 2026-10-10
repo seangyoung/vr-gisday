@@ -22,7 +22,7 @@ export const LAYER_HINTS = {
   population:
     "Population is summarized by district, not measured at each point.",
 };
-export const LANDSCAPE_EXTENT = 110;
+export const LANDSCAPE_EXTENT = 160;
 const extent = LANDSCAPE_EXTENT;
 export const riverX = (z) =>
   7 + 3.5 * Math.sin(z * 0.018) + 1.1 * Math.sin(z * 0.065);
@@ -42,7 +42,9 @@ const topographicHeight = (x, z) => {
     4.8 * Math.exp(-((x + 59) ** 2 + (z + 35) ** 2) / 1450) +
     3.4 * Math.exp(-((x + 53) ** 2 + (z - 70) ** 2) / 1050) +
     4.5 * Math.exp(-((x - 66) ** 2 + (z + 62) ** 2) / 1750) +
-    3.1 * Math.exp(-((x - 74) ** 2 + (z - 52) ** 2) / 1280);
+    3.1 * Math.exp(-((x - 74) ** 2 + (z - 52) ** 2) / 1280) +
+    6.0 * Math.exp(-((x + 126) ** 2 + (z + 112) ** 2) / 2400) +
+    4.7 * Math.exp(-((x - 122) ** 2 + (z - 99) ** 2) / 2200);
   const channel =
     0.2 * (1 - THREE.MathUtils.smoothstep(fromRiver, 0.6, 3));
   const raw =
@@ -60,14 +62,18 @@ export function densityAt(x, z) {
   return "low";
 }
 
-function surfaceGeometry(raised, size = 320) {
+function surfaceGeometry(raised, size = 400) {
   const vertices = [],
     colors = [],
     indices = [];
+  const spread = (index) => {
+    const unit = (index * 2) / size - 1;
+    return Math.sign(unit) * Math.abs(unit) ** 1.28 * extent;
+  };
   for (let row = 0; row <= size; row++)
     for (let col = 0; col <= size; col++) {
-      const x = -extent + (col * extent * 2) / size;
-      const z = -extent + (row * extent * 2) / size;
+      const x = spread(col);
+      const z = spread(row);
       const y = landscapeHeight(x, z, raised);
       vertices.push(x, y, z);
       const grain =
@@ -93,7 +99,7 @@ function surfaceGeometry(raised, size = 320) {
   return geometry;
 }
 function outerTerrainGeometry(raised) {
-  const far = 270, segments = 64;
+  const far = 380, segments = 64;
   const vertices = [], colors = [], indices = [];
   const add = (x, z) => {
     const y = landscapeHeight(x, z, raised);
@@ -127,7 +133,7 @@ const seeded = (i) => {
   const v = Math.sin(i * 127.1 + 311.7) * 43758.5453;
   return v - Math.floor(v);
 };
-export const TREE_POSITIONS = Array.from({ length: 2600 }, (_, i) => ({
+export const TREE_POSITIONS = Array.from({ length: 3600 }, (_, i) => ({
   x: (seeded(i * 2 + 1) - 0.5) * (extent * 1.92),
   z: (seeded(i * 2 + 2) - 0.5) * (extent * 1.92),
   scale: 0.76 + seeded(i + 6000) * 0.85,
@@ -403,7 +409,7 @@ export class LayerExperience {
     this.previousFog = scene.fog;
     if (scene.background !== null) {
       scene.background = new THREE.Color(0xa8c8ca);
-      scene.fog = new THREE.Fog(0xa8c8ca, 65, 170);
+      scene.fog = new THREE.Fog(0xa8c8ca, 90, 300);
     }
     this.selected = new Set();
     this.elapsed = 0;

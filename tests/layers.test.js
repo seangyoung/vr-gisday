@@ -57,7 +57,7 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   l.updateClipboard(null, camera, true);
   assert.equal(l.clipboard.visible, true);
   assert.equal(landscapeHeight(0, 0), 0);
-  assert.equal(LANDSCAPE_EXTENT, 110);
+  assert.equal(LANDSCAPE_EXTENT, 160);
   assert.ok(landscapeHeight(-60, -35) > landscapeHeight(riverX(-35), -35));
   assert.ok(TREE_POSITIONS.length > 1000);
   assert.equal(l.view, "layers");

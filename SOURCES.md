@@ -38,3 +38,10 @@ All demo geometry is original procedural content. The sampler illustrates first-
 - Meta IWSDK Environment Raycast guide: https://iwsdk.dev/guides/14-environment-raycast.html — controller-based real-surface hit testing and runtime support checks.
 
 This prototype uses browser hit-test estimates directly, not raw depth or camera reconstruction. Actual headset support and data quality remain unverified until tested on the user's Quest 3S.
+
+## Can You See It? — checked 2026-10-09
+
+- USGS, *Visual Impacts*: https://www.usgs.gov/special-topics/significant-topographic-changes-in-the-united-states/science/visual-impacts — viewshed/intervisibility as a terrain-based GIS analysis, with a bounded observer radius.
+- Esri, *Viewshed (Spatial Analyst)*: https://pro.arcgis.com/en/pro-app/3.5/tool-reference/spatial-analyst/viewshed.htm — raster cells visible from observer locations and the effect of input resolution.
+
+The expanded landscape and visibility overlay use original synthetic geometry and calculations. The 2 m and 12 m observer heights are model values; no measured elevation, vegetation obstruction, or real-world visibility data are used.

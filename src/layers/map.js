@@ -15,7 +15,7 @@ const colors = {
 };
 const reliefCache = new Map();
 
-export function renderLayerMap(ctx, selected) {
+export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
   const size = ctx.canvas.width;
   const coord = (value) => ((value + extent) / (2 * extent)) * size;
   const point = (x, z) => [coord(x), coord(z)];
@@ -107,21 +107,23 @@ export function renderLayerMap(ctx, selected) {
     ctx.stroke();
   }
 
-  ctx.beginPath();
-  ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = "#17363d";
-  ctx.stroke();
-  ctx.font = "bold 20px system-ui, sans-serif";
-  ctx.fillStyle = "#17363d";
-  ctx.fillText("YOU", size / 2 + 11, size / 2 - 11);
-  ctx.font = "bold 18px system-ui, sans-serif";
-  ctx.fillText("MODEL N ↑", 13, 26);
-  ctx.fillStyle = "#17363dcc";
-  ctx.fillRect(0, size - 28, size, 28);
-  ctx.fillStyle = "#ffffff";
-  ctx.font = "16px system-ui, sans-serif";
-  ctx.fillText("Same synthetic layers · overhead view", 12, size - 8);
+  if (annotations) {
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = "#17363d";
+    ctx.stroke();
+    ctx.font = "bold 20px system-ui, sans-serif";
+    ctx.fillStyle = "#17363d";
+    ctx.fillText("YOU", size / 2 + 11, size / 2 - 11);
+    ctx.font = "bold 18px system-ui, sans-serif";
+    ctx.fillText("MODEL N ↑", 13, 26);
+    ctx.fillStyle = "#17363dcc";
+    ctx.fillRect(0, size - 28, size, 28);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "16px system-ui, sans-serif";
+    ctx.fillText("Same synthetic layers · overhead view", 12, size - 8);
+  }
 }
