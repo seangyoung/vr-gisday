@@ -39,7 +39,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -1409,10 +1409,10 @@ function drawScene() {
     content.add(back);
   }
   if (step === -2) {
-    label("START WITH WHAT WE KNOW", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
+    label("HOW SATELLITES FIND YOU", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
     label("Distance is not direction.", 0, 0.52, 2.15, 0.2, 52);
     label(
-      "A beacon is a fixed point whose location we know.\nImagine a signal tells us how far away we are.\nIt does not tell us which direction to look.",
+      "GNSS means Global Navigation Satellite System.\nGPS is one GNSS network. A receiver measures\nsignal travel times to estimate satellite distances.",
       0,
       0.13,
       2.15,
@@ -1420,11 +1420,11 @@ function drawScene() {
       39,
     );
     label(
-      "Knowing the distance still leaves many possible places.\nLet’s find them in a small model of space.",
+      "Known beacons stand in for satellites.\nEach distance has no direction. Combine them\nto see how GNSS narrows down your location.",
       0,
       -0.3,
       2.15,
-      0.24,
+      0.3,
       36,
     );
     button(
@@ -1456,7 +1456,7 @@ function drawScene() {
     }
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
-    button("Find Yourself Without GPS", 0, 0.27, start, 1.75);
+    button("Find Yourself", 0, 0.27, start, 1.75);
     button("Make It Rain", 0, 0.09, startRain, 1.75);
     label(
       "About 4 minutes each · Point and press the trigger",
@@ -1486,11 +1486,11 @@ function drawScene() {
       43,
     );
     label(
-      "A positioning model, not a GPS receiver.\nGPS uses satellites and also estimates receiver clock error.",
+      "Satellites broadcast their positions and times.\nA GNSS receiver uses those signals to calculate\nits 3D position and estimate its clock error.",
       0,
       -0.3,
       2,
-      0.24,
+      0.3,
       33,
     );
     button("Explore again", 0, -0.64, start, 1.2);

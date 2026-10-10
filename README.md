@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with a simple immersive experience menu. Six playable modules: **Find Yourself Without GPS**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, and **How Big Is a Pixel?**.
+Quest-focused WebXR app with a simple immersive experience menu. Six playable modules: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, and **How Big Is a Pixel?**.
 
 ## Run
 
@@ -17,13 +17,13 @@ Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a lapt
 
 A development-only `http://localhost:5173/?preview` view supports mouse selection of the same scene buttons for layout review. Optional `&stage=-2` (introduction), `&stage=-1` (menu), or `&stage=0` through `&stage=8` selects a stage for visual inspection; `&guide` loads simulated Touch Plus controller models and labels (`&hand=right` focuses the right controller). The small development toolbar calls the same actions as XR controls. It is removed from production builds; there is no desktop experience.
 
-## Find Yourself Without GPS
+## Find Yourself
 
 Enter VR from Quest Browser, then use a controller ray and trigger to choose an experience. The room scan has a separate mixed reality launch. Both controllers work. The presentation is placed relative to the initial viewing direction and eye height, supporting seated or standing use. Reset View places it in front of the current view. No persistent anchor, physical-table placement, or hand tracking is required.
 
 Quest Touch shortcuts replace the persistent navigation row: **X** restarts the current experience, **Y** resets/recenters the view, **A** opens or closes a compact sound menu, and **B** leaves the current demo for the in-headset menu. On that menu, **B** exits VR or MR; X has no menu action. In the three landscape demos, the left thumbstick moves through the scene and the right thumbstick turns in 30° steps. The flat **Menu** button on the left controller is reserved by Quest Browser to leave WebXR, so the web app cannot bind it. Tracked controllers use locally bundled models from the [WebXR Input Profiles assets](https://github.com/immersive-web/webxr-input-profiles/tree/main/packages/assets), chosen from the headset's reported profile. When a controller is deliberately raised and looked at, compact labels sit beside its actual button nodes; each paired label stays outside its own button relative to its neighbor as the wrist turns, and ambiguous edge-on pairs hide. All labels hide when the controller is lowered or looked away from. These Quest-specific indices follow the [WebXR Input Profiles registry](https://github.com/immersive-web/webxr-input-profiles/tree/main/packages/registry); the [WebXR Gamepads specification](https://www.w3.org/TR/webxr-gamepads-module-1/#ua-platform-reserved-buttons) forbids exposing platform-reserved buttons, and [Meta's WebXR guidance](https://developers.meta.com/vr/documentation/web/webxr-hands/) says the left Menu button leaves a WebXR session. Actual Quest Browser model choice, guide alignment, legibility, and comfort still need headset validation.
 
-0. A short introduction establishes a known beacon location and a distance measurement without direction.
+0. The introduction defines GNSS (Global Navigation Satellite System), explains satellite-distance positioning, and establishes that each known beacon supplies distance without direction.
 1. Each newly added range expands visibly from its known beacon; earlier circles stay in place at full size. One range defines a circle of possible model positions.
 2. Two circles intersect at two selectable predictions.
 3. A third range identifies one candidate; feedback explains either choice.
