@@ -1,6 +1,10 @@
 # Teaching and implementation references
 
-Checked 2026-10-02. Original text and procedural diagrams; no copied OER assets.
+Checked 2026-10-02. Original text and procedural lesson diagrams; controller models are attributed below.
+
+## Controller models — checked 2026-10-09
+
+- Immersive Web, [WebXR Input Profiles assets](https://github.com/immersive-web/webxr-input-profiles/tree/main/packages/assets) and [Three.js XRControllerModelFactory](https://threejs.org/docs/pages/XRControllerModelFactory.html): locally bundled Quest Touch and fallback controller models, selected from the headset's WebXR input profile. The asset package is MIT licensed; see `public/controller-profiles/LICENSE.md` and THIRD_PARTY_NOTICES.md. These models are hardware UI, not educational landscape assets. On-device profile selection, model alignment, and label readability remain to be checked on Quest.
 
 - FAA, *Satellite Navigation — GPS — How It Works*: https://www.faa.gov/about/office_org/headquarters_offices/ato/service_units/techops/navservices/gnss/gps/howitworks — GPS solves position and receiver clock time. The fourth range in our exact-ranging model should not be equated with a complete GPS solution.
 - GPS.gov, *Trilateration*: https://www.gps.gov/trilateration — public educational activity relevant to future facilitator materials. Referenced, not reproduced or adapted in this prototype.

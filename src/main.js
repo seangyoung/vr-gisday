@@ -473,7 +473,7 @@ function drawRoomUI() {
   if (s.stage === 0) {
     if (s.status !== "unavailable")
       button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
-    label("Look at either controller for navigation shortcuts",
+    label("Raise a controller and look at its buttons for shortcuts",
       0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
@@ -594,7 +594,7 @@ function drawScanChooserUI() {
     scan.explore();
   });
   drawScanChoiceCard("room", 0.61, "Room scan · MR", "Scan nearby real surfaces", switchToRoomScan);
-  label("Look at either controller for navigation shortcuts",
+  label("Raise a controller and look at its buttons for shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawLayersUI() {
@@ -779,7 +779,7 @@ function drawRainChooserUI() {
     0, 0.69, 2.3, 0.2, 31, "#b6d1d9", "#0b2430");
   drawRainChoiceCard("drainage", -0.61, "Drainage sandbox", "Follow runoff and ponds");
   drawRainChoiceCard("erosion", 0.61, "Erosion tray", "Watch channels form");
-  label("Look at either controller for navigation shortcuts",
+  label("Raise a controller and look at its buttons for shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawRainUI() {
@@ -1091,7 +1091,7 @@ function spatial() {
 function draw() {
   drawScene();
   for (const { guide } of controllers)
-    guide.setCopy(controllerGuideCopy(guide.handedness));
+    guide.setContext(...controllerGuideContext(guide.handedness));
   if (devPreview) {
     let panel = document.querySelector("#dev-controls");
     if (!panel) {
@@ -1182,40 +1182,27 @@ function draw() {
     }
   }
 }
-function controllerGuideCopy(hand) {
-  if (hand !== "left" && hand !== "right") return "";
-  const lines = hand === "left"
-    ? ["LEFT CONTROLLER", "Stick click  Menu", "X  Restart", "Y  Reset view", "Flat Menu  Leave XR"]
-    : ["RIGHT CONTROLLER", `A  Sound ${sound.muted ? "on" : "off"}`, "B  Exit XR"];
+function controllerGuideContext(hand) {
   if (rain?.stage === 1) {
-    lines.push(hand === "left" ? "Trigger  Rain / pour" : "Trigger  Sculpt");
-    lines.push("Grip  Move / resize");
-  } else if (scan?.stage === 1) {
-    lines.push("Trigger  Sweep scan");
-    lines.push(scan.room && !scan.frozen ? "Grip  Freeze first" : "Grip  Move / resize");
-  } else if (layers || viewshed || pixels) {
-    lines.push(hand === "left" ? "Raise hand  Clipboard" : "Stick L/R  Turn 30°");
-    lines.push("Trigger  Select");
-  } else if (isSpatial()) {
-    lines.push("Grip  Move / resize");
-    lines.push("Trigger  Select");
-  } else {
-    lines.push("Trigger  Select");
+    return [hand === "left" ? "Rain" : "Sculpt", "Move/size"];
   }
-  return lines.join("\n");
+  if (scan?.stage === 1)
+    return ["Scan", scan.room && !scan.frozen ? null : "Move/size"];
+  if (isSpatial()) return ["Select", "Move/size"];
+  return [null, null];
 }
-function updateControllerGuides(cam, tracked) {
+function updateControllerGuides(cam, tracked, dt) {
   let closest = null;
   let best = -Infinity;
   for (const { guide, grip } of controllers) {
-    const score = guide.update(cam, tracked && grip.visible);
+    const score = guide.update(cam, tracked && grip.visible, dt);
     if (score > best) {
       best = score;
       closest = guide;
     }
   }
   for (const { guide } of controllers)
-    if (guide !== closest) guide.panel.visible = false;
+    guide.setVisible(guide === closest);
 }
 function updateRangeAnimations(dt) {
   if (!rangeAnimations.length) return;
@@ -1304,7 +1291,7 @@ function drawScene() {
       },
       1.8,
     );
-    label("Look at either controller for Menu, Restart, Reset, Sound, and Exit XR",
+    label("Raise a controller and look at its buttons for shortcuts",
       0, -1.04, 2.3, 0.13, 27, "#b6d1d9", "#0b2430");
 
     return;
@@ -1326,7 +1313,7 @@ function drawScene() {
     button("Stand Inside the Layers", 0, -0.27, startLayers, 1.75);
     button("Can You See It?", 0, -0.45, startViewshed, 1.75);
     button("How Big Is a Pixel?", 0, -0.63, startPixels, 1.75);
-    label("Look at either controller for navigation shortcuts",
+    label("Raise a controller and look at its buttons for shortcuts",
       0, -1.03, 2.3, 0.13, 29, "#b6d1d9", "#0b2430");
 
     return;
@@ -1395,11 +1382,6 @@ for (let i = 0; i < 2; i++) {
   const grip = renderer.xr.getControllerGrip(i);
   scene.add(grip);
   const guide = new ControllerGuide(scene, grip);
-  const handle = new THREE.Mesh(
-    new THREE.SphereGeometry(0.018, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0xa6f5d9 }),
-  );
-  grip.add(handle);
   const beam = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints([
       new THREE.Vector3(),
@@ -1412,7 +1394,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("connected", (event) => {
     c.userData.xrInput = event.data;
     guide.setHandedness(event.data.handedness);
-    guide.setCopy(controllerGuideCopy(guide.handedness));
+    guide.setContext(...controllerGuideContext(guide.handedness));
   });
   c.addEventListener("selectstart", () => {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
@@ -1510,7 +1492,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.raining = false;
     c.userData.scanning = false;
   });
-  controllers.push({ c, grip, beam, handle, guide, id: i });
+  controllers.push({ c, grip, beam, guide, id: i });
 }
 function scanHit(c) {
   if (!scan || (!scan.room && scan.stage === 0)) return null;
@@ -1664,7 +1646,7 @@ renderer.setAnimationLoop((time, frame) => {
       );
       if (actions.length) runControllerShortcut(actions[0]);
     } else controllerShortcuts.reset();
-    updateControllerGuides(renderer.xr.getCamera(), visibleSession);
+    updateControllerGuides(renderer.xr.getCamera(), visibleSession, dt);
     if (
       !rain &&
       !scan &&
@@ -1769,7 +1751,7 @@ renderer.setAnimationLoop((time, frame) => {
       b.userData.baseColor ??= b.material.color.clone();
       b.material.color.copy(b.userData.baseColor);
     }
-    for (const { c, beam, handle, id } of controllers) {
+    for (const { c, beam, id } of controllers) {
       const hit = intersect(c);
       const model = modelHit(c) || rainHit(c) || scanHit(c);
       const ground = hit ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
@@ -1778,7 +1760,7 @@ renderer.setAnimationLoop((time, frame) => {
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id);
       beam.scale.z = hit ? hit.distance : model ? model.distance : ground ? ground.distance : 4;
-      handle.material.color.set(
+      beam.material.color.set(
         grab?.hands.has(id) ||
           scan?.grab.hands.has(id) ||
           rain?.grab.hands.has(id) ||
@@ -1803,11 +1785,15 @@ renderer.setAnimationLoop((time, frame) => {
   if (previewGuide && !renderer.xr.isPresenting)
     for (const { grip, id } of controllers) {
       grip.visible = true;
-      grip.position.set(id === 0 ? -0.25 : 0.25, -0.18, -0.55);
+      const previewHand = new URLSearchParams(location.search).get("hand");
+      const focused = previewHand === "right" ? 1 : 0;
+      grip.position.set(id === focused ? 0 : id === 0 ? -0.32 : 0.32,
+        id === focused ? -0.12 : -0.38, id === focused ? -0.36 : -0.55);
+      grip.rotation.set(id === focused ? -0.65 : 0, 0, 0);
       grip.updateWorldMatrix(true, false);
     }
   if (previewGuide && !renderer.xr.isPresenting)
-    updateControllerGuides(camera, true);
+    updateControllerGuides(camera, true, dt);
   const audible =
     !document.hidden &&
     (devPreview ||
@@ -1869,7 +1855,21 @@ if (
       grip.visible = true;
       grip.position.set(id === 0 ? -0.25 : 0.25, -0.18, -0.45);
       guide.setHandedness(id === 0 ? "left" : "right");
-      guide.setCopy(controllerGuideCopy(guide.handedness));
+      guide.setContext(...controllerGuideContext(guide.handedness));
+      grip.dispatchEvent({
+        type: "connected",
+        data: {
+          handedness: id === 0 ? "left" : "right",
+          targetRayMode: "tracked-pointer",
+          profiles: ["meta-quest-touch-plus-v2", "meta-quest-touch-plus"],
+          gamepad: {
+            mapping: "xr-standard",
+            buttons: Array.from({ length: 7 },
+              () => ({ pressed: false, touched: false, value: 0 })),
+            axes: [0, 0, 0, 0],
+          },
+        },
+      });
     }
   renderer.domElement.addEventListener("pointerdown", (e) => {
     raycaster.setFromCamera(

@@ -23,3 +23,11 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
+
+## WebXR Input Profiles assets
+
+Controller profile JSON and GLB models in `public/controller-profiles/` come from
+`@webxr-input-profiles/assets@1.0.20` (Immersive Web project). They are
+distributed under the MIT License; the full package notice is copied to
+`public/controller-profiles/LICENSE.md`. The local `profilesList.json` selects
+the bundled Quest profiles and generic fallback from that package.
