@@ -45,3 +45,10 @@ This prototype uses browser hit-test estimates directly, not raw depth or camera
 - Esri, *Viewshed (Spatial Analyst)*: https://pro.arcgis.com/en/pro-app/3.5/tool-reference/spatial-analyst/viewshed.htm — raster cells visible from observer locations and the effect of input resolution.
 
 The expanded landscape and visibility overlay use original synthetic geometry and calculations. The 2 m and 12 m observer heights are model values; no measured elevation, vegetation obstruction, or real-world visibility data are used.
+
+## How Big Is a Pixel? — checked 2026-10-09
+
+- USGS, *Landsat 10 — Finer Spatial Resolution*: https://www.usgs.gov/landsat-missions/landsat-10 — spatial resolution as the size of ground represented by an image pixel, and finer pixels revealing smaller features.
+- USGS, *Prevalence of pure versus mixed snow cover pixels across spatial resolutions*: https://www.usgs.gov/publications/prevalence-pure-versus-mixed-snow-cover-pixels-across-spatial-resolutions-alpine — real-world example of fractional land-cover mixtures in pixels at different sizes.
+
+The app uses original synthetic colors and known model categories, averaged over fixed square ground areas. It illustrates ground pixel size and mixing; it does not simulate a particular satellite, spectral response, image sharpness, or physical radiance measurement.

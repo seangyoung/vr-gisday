@@ -25,11 +25,12 @@ import {
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
+import { PixelExperience } from "./pixels/experience.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Five short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Five hands-on experiences</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Six hands-on experiences</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -65,6 +66,7 @@ let buttons = [],
 let scan = null;
 let layers = null;
 let viewshed = null;
+let pixels = null;
 let xrMode = null;
 let rain = null,
   rainPointer = 0,
@@ -86,7 +88,7 @@ function clear() {
     grab = null;
   }
   buttons = [];
-  for (const group of [content, layers?.ui, viewshed?.ui].filter(Boolean))
+  for (const group of [content, layers?.ui, viewshed?.ui, pixels?.ui].filter(Boolean))
     while (group.children.length) {
       const obj = group.children[0];
       obj.traverse((n) => {
@@ -212,6 +214,8 @@ function navigation(y = -0.98) {
       layers = null;
       viewshed?.dispose();
       viewshed = null;
+      pixels?.dispose();
+      pixels = null;
       rain?.dispose();
       rain = null;
       stopRainInput();
@@ -222,7 +226,7 @@ function navigation(y = -0.98) {
   );
   button("Restart", -0.46, y, () => start(), 0.44);
   button(
-    rain || scan || layers || viewshed || isSpatial() ? "Reset View" : "Recenter",
+    rain || scan || layers || viewshed || pixels || isSpatial() ? "Reset View" : "Recenter",
     0,
     y,
     () => {
@@ -234,6 +238,10 @@ function navigation(y = -0.98) {
   button("Exit XR", 0.92, y, () => renderer.xr.getSession()?.end(), 0.44);
 }
 function start() {
+  if (pixels) {
+    startPixels();
+    return;
+  }
   if (viewshed) {
     startViewshed();
     return;
@@ -276,6 +284,8 @@ function startRain(kind = "drainage", explore = false) {
   layers = null;
   viewshed?.dispose();
   viewshed = null;
+  pixels?.dispose();
+  pixels = null;
   stopRainInput();
   rain?.dispose();
   rain = new RainExperience(scene, draw, kind);
@@ -292,6 +302,8 @@ function startScan(sceneInfo) {
   layers = null;
   viewshed?.dispose();
   viewshed = null;
+  pixels?.dispose();
+  pixels = null;
   scan?.dispose();
   scan = new ScanExperience(scene, draw, sceneInfo);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -305,6 +317,8 @@ function startLayers() {
   scan = null;
   viewshed?.dispose();
   viewshed = null;
+  pixels?.dispose();
+  pixels = null;
   layers?.dispose();
   layers = new LayerExperience(scene, draw);
   layers.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -318,9 +332,26 @@ function startViewshed() {
   scan = null;
   layers?.dispose();
   layers = null;
+  pixels?.dispose();
+  pixels = null;
   viewshed?.dispose();
   viewshed = new ViewshedExperience(scene, draw);
   viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function startPixels() {
+  stopRainInput();
+  rain?.dispose();
+  rain = null;
+  scan?.dispose();
+  scan = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = null;
+  pixels?.dispose();
+  pixels = new PixelExperience(scene, draw);
+  pixels.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
 function startRoomScan() {
@@ -331,6 +362,8 @@ function startRoomScan() {
   layers = null;
   viewshed?.dispose();
   viewshed = null;
+  pixels?.dispose();
+  pixels = null;
   scan?.dispose();
   scan = new RoomScan(scene, draw, renderer.xr.getSession(), xrMode);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -647,6 +680,69 @@ function drawViewshedUI() {
   label(
     `${v.visiblePercent}% of nearby ground is visible · Terrain only`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
+  );
+  navigation(-1.02);
+}
+function drawPixelsUI() {
+  const p = pixels;
+  label(
+    p.finished ? "What did the pixel miss?" : "How Big Is a Pixel?",
+    0, 0.91, 2.35, 0.19, 48, "#e6f4f5", "#0b2430",
+  );
+  if (p.finished) {
+    label(
+      "A pixel represents an area on the ground.\nBigger pixels cover more land, so narrow features can blend away.\nThe best pixel size depends on the question you ask.",
+      0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
+    );
+    button("Compare again", 0, -0.62, () => p.reset(), 1.5);
+    navigation(-1.02);
+    return;
+  }
+  label(
+    "Here, spatial resolution is ground width per pixel.",
+    0, 0.68, 2.3, 0.12, 30, "#b6d1d9", "#0b2430",
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 384;
+  p.renderMap(canvas.getContext("2d"));
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const map = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.17, 1.17),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+  );
+  map.position.set(-0.52, 0.02, 0.06);
+  map.userData.action = (hit) => p.placeFromMap(hit);
+  map.userData.debugHidden = true;
+  uiParent.add(map);
+  buttons.push(map);
+  for (const [size, x, y] of [
+    [2, 0.38, 0.47], [8, 0.91, 0.47],
+    [24, 0.38, 0.25], [48, 0.91, 0.25],
+  ])
+    button(`${size} m`, x, y, () => p.setSize(size), 0.46)
+      .material.color.set(p.size === size ? 0xffffff : 0x91a6a4);
+  const cell = p.cell;
+  const percent = (index) => Math.round((cell.counts[index] / (p.size ** 2)) * 100);
+  label(
+    `${p.size} × ${p.size} m = ${p.size ** 2} m²`,
+    0.65, 0.02, 1.1, 0.16, 34, "#e6f4f5", "#0b2430",
+  );
+  label(
+    `This pixel contains:\nForest ${percent(1)}% · Water ${percent(2)}%\nRoad ${percent(3)}% · Other ${percent(0)}%`,
+    0.65, -0.29, 1.1, 0.36, 26, "#e6f4f5", "#0b2430",
+  );
+  label(
+    "Its color averages those model surfaces.",
+    0.65, -0.53, 1.1, 0.11, 25, "#b6d1d9", "#0b2430",
+  );
+  label(
+    "Point at the map or ground; trigger selects a pixel.",
+    0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430",
+  );
+  label(
+    "Synthetic 144 m image · Highlighted square matches ground",
+    0, -0.84, 2.3, 0.1, 24, "#d8f3e6", "#0b2430",
   );
   navigation(-1.02);
 }
@@ -1085,7 +1181,11 @@ function draw() {
 }
 function drawScene() {
   clear();
-  uiParent = viewshed?.ui ?? layers?.ui ?? content;
+  uiParent = pixels?.ui ?? viewshed?.ui ?? layers?.ui ?? content;
+  if (pixels) {
+    drawPixelsUI();
+    return;
+  }
   if (viewshed) {
     drawViewshedUI();
     return;
@@ -1146,20 +1246,21 @@ function drawScene() {
   if (step === -1) {
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
-    button("Find Yourself Without GPS", 0, 0.19, start, 1.75);
-    button("Make It Rain", 0, 0, startRain, 1.75);
+    button("Find Yourself Without GPS", 0, 0.27, start, 1.75);
+    button("Make It Rain", 0, 0.09, startRain, 1.75);
     label(
       "About 4 minutes each · Point and press the trigger",
       0,
-      -0.78,
+      -0.82,
       2,
       0.12,
       32,
     );
-    button("Scan the Hidden World", 0, -0.19, startScan, 1.75);
-    button("Stand Inside the Layers", 0, -0.38, startLayers, 1.75);
-    button("Can You See It?", 0, -0.57, startViewshed, 1.75);
-    navigation(-1.06);
+    button("Scan the Hidden World", 0, -0.09, startScan, 1.75);
+    button("Stand Inside the Layers", 0, -0.27, startLayers, 1.75);
+    button("Can You See It?", 0, -0.45, startViewshed, 1.75);
+    button("How Big Is a Pixel?", 0, -0.63, startPixels, 1.75);
+    navigation(-0.98);
     return;
   }
   if (step >= stages.length) {
@@ -1238,6 +1339,7 @@ function place() {
   scan?.place(cam);
   layers?.place(cam);
   viewshed?.place(cam);
+  pixels?.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -1272,6 +1374,10 @@ for (let i = 0; i < 2; i++) {
     }
     if (viewshed) {
       viewshed.placeFromRay(raycaster);
+      return;
+    }
+    if (pixels) {
+      pixels.placeFromRay(raycaster);
       return;
     }
     if (scan?.stage === 1) {
@@ -1377,7 +1483,9 @@ function intersect(c) {
   rotation.extractRotation(c.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
-  if ((layers && !layers.clipboard.visible) || (viewshed && !viewshed.clipboard.visible)) return null;
+  if ((layers && !layers.clipboard.visible) ||
+      (viewshed && !viewshed.clipboard.visible) ||
+      (pixels && !pixels.clipboard.visible)) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode) {
@@ -1408,6 +1516,8 @@ async function enter(mode) {
     layers = null;
     viewshed?.dispose();
     viewshed = null;
+    pixels?.dispose();
+    pixels = null;
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -1434,6 +1544,8 @@ renderer.xr.addEventListener("sessionend", () => {
   layers = null;
   viewshed?.dispose();
   viewshed = null;
+  pixels?.dispose();
+  pixels = null;
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -1481,6 +1593,7 @@ renderer.setAnimationLoop((time, frame) => {
       !scan &&
       !layers &&
       !viewshed &&
+      !pixels &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
       renderer.xr.getSession().visibilityState === "visible"
@@ -1491,7 +1604,7 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    const landscapeDemo = viewshed ?? layers;
+    const landscapeDemo = pixels ?? viewshed ?? layers;
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
       if (visible) landscapeDemo.update(dt);
@@ -1570,7 +1683,7 @@ renderer.setAnimationLoop((time, frame) => {
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
       const model = modelHit(c) || rainHit(c) || scanHit(c);
-      const ground = viewshed?.hitTerrain(raycaster);
+      const ground = (viewshed ?? pixels)?.hitTerrain(raycaster);
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
@@ -1590,8 +1703,8 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(0xffda8b);
     }
   }
-  if (devPreview && (viewshed || layers) && !renderer.xr.isPresenting) {
-    const landscapeDemo = viewshed ?? layers;
+  if (devPreview && (pixels || viewshed || layers) && !renderer.xr.isPresenting) {
+    const landscapeDemo = pixels ?? viewshed ?? layers;
     landscapeDemo.update(dt);
     landscapeDemo.updateClipboard(null, camera, true);
   }
@@ -1640,6 +1753,9 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "viewshed") {
     camera.position.y = 1.6;
     startViewshed();
+  } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
+    camera.position.y = 1.6;
+    startPixels();
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
     startRain();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
@@ -1661,6 +1777,7 @@ if (
     const ui = raycaster.intersectObjects(buttons, false)[0];
     if (ui) ui.object.userData.action?.(ui);
     else if (viewshed) viewshed.placeFromRay(raycaster);
+    else if (pixels) pixels.placeFromRay(raycaster);
     else if (rain?.stage === 1) {
       rain.group.updateWorldMatrix(true, true);
       const land = raycaster.intersectObject(rain.terrain, false)[0];

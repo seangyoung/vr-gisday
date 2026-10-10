@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with a simple immersive experience menu. Five playable modules: **Find Yourself Without GPS**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, and **Can You See It?**.
+Quest-focused WebXR app with a simple immersive experience menu. Six playable modules: **Find Yourself Without GPS**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, and **How Big Is a Pixel?**.
 
 ## Run
 
@@ -79,6 +79,12 @@ Development-only `?preview&demo=layers` shows a stationary left-side clipboard a
 Choose the fifth experience in VR to explore a terrain-only viewshed on the **same generated landscape** as Stand Inside the Layers. A gold marker starts at the visitor's location. Point at the terrain with a controller and press the trigger to move it, or choose **Map** on the left-hand clipboard and point at the overhead map. The green overlay marks ground with an unobstructed terrain sightline to the marker; purple marks ground hidden by higher terrain. Compare **Eye level · 2 m** with **Tower · 12 m**, or move the marker to a ridge. The map and landscape use the same calculated visibility grid. **Reset point** returns the marker to the center and eye level. The four-minute takeaway explains the role of ridges and observer height.
 
 The analysis samples a procedural elevation model on a 257-by-257 grid, checks line of sight to 129-by-129 ground cells within 115 model units, and updates when the marker or height changes. Tree canopies, structures, atmospheric effects, and Earth curvature are not blockers in this teaching model; the percentages describe sampled ground within the analysis radius, not a surveyed real-world viewshed. Development-only `?preview&demo=viewshed` shows the clipboard and its controls. Quest controller targeting, map readability, stereo contrast, and frame rate still require headset testing.
+
+## How Big Is a Pixel?
+
+Choose the sixth experience in VR. It uses the same synthetic terrain, forest, river, and highway as the Layers and Viewshed experiences. A gold outline on the ground marks the area represented by one pixel in a simulated overhead image on the left-hand clipboard. Change the pixel width among **2 m, 8 m, 24 m, and 48 m**; the outline changes size while the landscape stays the same. Point at the map or terrain and press the trigger to select another pixel. The clipboard shows that pixel's area and the proportions of forest, water, road, and other ground inside it. At four minutes, a short takeaway explains why narrow features can blend away as pixels get larger.
+
+The image covers a 144-by-144-model-meter window centered on the visitor. Its 1 m synthetic land-cover samples are grouped into larger square pixels, and each displayed RGB value is the arithmetic mean of the model colors in that square. Tree canopies, river width, and highway position come from the same procedural world geometry, but the image is **not** satellite imagery or a physical sensor simulation: it does not model reflectance, optics, atmosphere, geolocation error, or real measured land cover. The square outline and area display teach nominal ground pixel size. Development-only `?preview&demo=pixels` supports visual review; Quest clipboard legibility, ground-targeting, and frame rate still need headset testing.
 
 ## Scan the Hidden World
 
