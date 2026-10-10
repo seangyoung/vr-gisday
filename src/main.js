@@ -1650,7 +1650,7 @@ renderer.setAnimationLoop((time, frame) => {
       const axis = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
       if (Math.abs(axis) < 0.3) rightTurnReady = true;
       else if (rightTurnReady && Math.abs(axis) > 0.7) {
-        landscapeDemo.turn(-Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
+        landscapeDemo.turn(Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
         rightTurnReady = false;
       }
       const left = visible
