@@ -172,6 +172,7 @@ export class RainExperience {
     for (let c = this.size - 2; c >= 0; c--)
       rim.push((this.size - 1) * this.size + c);
     for (let r = this.size - 2; r > 0; r--) rim.push(r * this.size);
+    const baseTop = this.kind === "erosion" ? -0.14 : -0.04;
     const walls = [];
     for (let i = 0; i < rim.length; i++) {
       const a = cellPoint(rim[i], this.heights),
@@ -184,16 +185,16 @@ export class RainExperience {
         b.y,
         b.z,
         a.x,
-        -0.06,
+        baseTop - 0.02,
         a.z,
         b.x,
         b.y,
         b.z,
         b.x,
-        -0.06,
+        baseTop - 0.02,
         b.z,
         a.x,
-        -0.06,
+        baseTop - 0.02,
         a.z,
       );
     }
@@ -217,7 +218,7 @@ export class RainExperience {
       new THREE.BoxGeometry(2, 0.08, 2),
       new THREE.MeshStandardMaterial({ color: 0x3f4939 }),
     );
-    base.position.y = -0.08;
+    base.position.y = baseTop - 0.04;
     this.group.add(base);
     this.divide = this.line(
       Array.from({ length: this.size }, (_, r) => {
@@ -508,25 +509,33 @@ export class RainExperience {
     if (this.stage !== 1 || this.grab.hands.size || this.stroke) return;
     const hit = this.group.worldToLocal(worldHit.clone());
     const hand = this.group.worldToLocal(worldHand.clone());
-    this.stroke = { id, last: hand, offset: hit.clone().sub(hand) };
+    this.stroke = {
+      id,
+      last: hand,
+      offset: hit.clone().sub(hand),
+      center: hit,
+    };
   }
-  moveStroke(id, worldHand, aimedAtTerrain = true) {
+  moveStroke(id, worldHand, aimedAtTerrain = true, worldHit = null) {
     if (this.stroke?.id !== id) return;
     const p = this.group.worldToLocal(worldHand.clone());
-    if (!aimedAtTerrain) {
-      this.stroke.last.copy(p);
-      this.brush.visible = false;
-      return;
-    }
-    const center = p.clone().add(this.stroke.offset);
+    if (aimedAtTerrain)
+      this.stroke.center.copy(
+        worldHit ? this.group.worldToLocal(worldHit.clone()) : p.clone().add(this.stroke.offset),
+      );
     const delta = THREE.MathUtils.clamp(p.y - this.stroke.last.y, -0.08, 0.08);
     this.stroke.last.copy(p);
-    this.applyBrush(center.x, center.z, delta);
+    this.applyBrush(this.stroke.center.x, this.stroke.center.z, delta);
   }
   applyBrush(x, z, delta) {
     if (this.stage !== 1 || this.grab.hands.size) return;
     if (x < -1 || x > 1 || z < -1 || z > 1) {
       this.brush.visible = false;
+      return;
+    }
+    if (delta === 0) {
+      this.brush.position.set(x, cellPoint(this.cellAt(x, z), this.heights).y + 0.015, z);
+      this.brush.visible = true;
       return;
     }
     const before = this.kind === "erosion" ? this.heights.slice() : null;
@@ -707,8 +716,13 @@ export class RainExperience {
     if (dir.lengthSq() < 0.01) dir.set(0, 0, -1);
     dir.normalize();
     this.group.position.copy(pos).addScaledVector(dir, 1.4);
-    this.group.position.y += 0.02;
-    this.group.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
+    this.group.position.y += this.kind === "erosion" ? 0.08 : 0.02;
+    this.group.rotation.set(
+      this.kind === "erosion" ? 0.18 : 0,
+      Math.atan2(-dir.x, -dir.z),
+      0,
+      "YXZ",
+    );
     this.group.scale.setScalar(0.43);
   }
   explore() {

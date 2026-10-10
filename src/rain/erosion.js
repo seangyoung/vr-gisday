@@ -2,13 +2,14 @@ import { SurfaceWater } from "./water.js";
 import { SIZE, cellPoint } from "./terrain.js";
 
 export const EROSION_SIZE = 65;
+export const EROSION_MAX_CUT = 0.4;
 export function createTray(size = SIZE) {
   return Float64Array.from({ length: size * size }, (_, id) => {
     const { x, z } = cellPoint(id, undefined, size);
     // Tilt plus a broad cross-slope and deterministic roughness; no carved channels.
     return (
       0.24 +
-      0.28 * (1 - z) +
+      0.34 * (1 - z) +
       0.16 * x * x +
       0.006 * ((Math.sin(id * 12.9898) * 43758.5453) % 1)
     );
@@ -97,7 +98,7 @@ export class ErosionWater extends SurfaceWater {
           0.0015,
           Math.max(
             0,
-            this.heights[id] - Math.max(0.015, this.initial[id] - 0.24),
+            this.heights[id] - Math.max(0.015, this.initial[id] - EROSION_MAX_CUT),
           ),
         );
         this.heights[id] -= removed;
@@ -139,7 +140,7 @@ export class ErosionWater extends SurfaceWater {
               0,
               this.heights[from] +
                 this.bankChange[from] -
-                Math.max(0.015, this.initial[from] - 0.24),
+                Math.max(0.015, this.initial[from] - EROSION_MAX_CUT),
             ),
           );
           this.bankChange[from] -= amount;

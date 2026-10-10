@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTray, ErosionWater } from "../src/rain/erosion.js";
+import { createTray, ErosionWater, EROSION_MAX_CUT } from "../src/rain/erosion.js";
 import { SIZE, cellAt, cellPoint } from "../src/rain/terrain.js";
 
 test("dry tray is stable and initial roughness is reproducible", () => {
@@ -30,7 +30,7 @@ test("pouring cuts the bed, deposits sediment, and conserves water and sediment"
   assert.ok(water.exported > 0);
   assert.ok(
     [...h].every(
-      (v, i) => Number.isFinite(v) && v >= water.initial[i] - 0.240000001,
+      (v, i) => Number.isFinite(v) && v >= water.initial[i] - EROSION_MAX_CUT - 1e-9,
     ),
   );
   assert.ok([...water.sediment].every((v) => v >= 0 && Number.isFinite(v)));
@@ -64,6 +64,17 @@ test("a ten-second pour produces visible channels extending down the tray", () =
   assert.ok(
     cuts.filter((v, i) => v > 0.02 && cellPoint(i).z > -0.4).length > 100,
   );
+});
+
+test("a sustained pour can cut deeper than the former shallow bed", () => {
+  const h = createTray(),
+    water = new ErosionWater(h),
+    source = cellAt(0, -0.8);
+  for (let i = 0; i < 2000; i++) {
+    if (i % 5 === 0) water.add(source, 0.00035);
+    water.update(0.02);
+  }
+  assert.ok(Math.max(...h.map((v, i) => water.initial[i] - v)) > 0.26);
 });
 
 test("fast runoff erodes a cell even when it empties during the step", () => {
@@ -102,7 +113,7 @@ test("65-grid bed conserves water and earth during channel and bank changes", ()
     [...h].every(
       (v, i) =>
         Number.isFinite(v) &&
-        v >= Math.max(0.015, water.initial[i] - 0.24) - 1e-9,
+        v >= Math.max(0.015, water.initial[i] - EROSION_MAX_CUT) - 1e-9,
     ),
   );
 });

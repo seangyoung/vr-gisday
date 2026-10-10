@@ -88,6 +88,22 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   r.dispose();
 });
 
+test("erosion tray resets to a forward pitch above a deeper physical base", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  r.place(camera);
+  assert.ok(r.group.rotation.x > 0.15);
+  const base = r.group.children.find(
+    (child) => child.geometry?.type === "BoxGeometry" && child.geometry.parameters.width === 2,
+  );
+  assert.ok(base.position.y < -0.15);
+  r.group.rotation.x = 0;
+  r.place(camera);
+  assert.ok(r.group.rotation.x > 0.15);
+  r.dispose();
+});
+
 test("a sculpted pond announces real overflow only after water crosses its divide", () => {
   const events = [];
   const r = new RainExperience(new THREE.Scene(), () => {}, "drainage", (event) => events.push(event));
@@ -219,10 +235,20 @@ for (const kind of ["drainage", "erosion"])
     r.moveStroke(0, new THREE.Vector3(-0.3, 1.07, -0.4));
     assert.ok(r.heights[id] > before[id]);
     assert.equal(r.brush.visible, true);
-    const pausedHeight = r.heights[id];
+    const heldHeight = r.heights[id];
     r.moveStroke(0, new THREE.Vector3(-0.3, 1.1, -0.4), false);
-    assert.equal(r.brush.visible, false);
-    assert.equal(r.heights[id], pausedHeight);
+    assert.equal(r.brush.visible, true);
+    assert.ok(r.heights[id] > heldHeight);
+    assert.equal(r.stroke.center.x, -0.3);
+    assert.equal(r.stroke.center.z, -0.4);
+    const other = r.cellAt(0.4, 0.3),
+      otherBefore = r.heights[other];
+    r.moveStroke(0, new THREE.Vector3(-0.3, 1.12, -0.4), true,
+      new THREE.Vector3(0.4, 0.5, 0.3));
+    r.moveStroke(0, new THREE.Vector3(1, 1.16, 1), false);
+    assert.equal(r.stroke.center.x, 0.4);
+    assert.equal(r.stroke.center.z, 0.3);
+    assert.ok(r.heights[other] > otherBefore);
     assert.equal(r.water, water);
     assert.equal(r.water.stored, volume);
     r.setSource(id);

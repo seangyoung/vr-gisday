@@ -1864,23 +1864,23 @@ renderer.setAnimationLoop((time, frame) => {
         active?.c.visible &&
         active.c.userData.xrInput?.handedness === "left" &&
         rain.stage === 1 &&
-        !rain.grab.hands.size &&
-        !intersect(active.c)
+        !rain.grab.hands.size
       ) {
-        const land = rainHit(active.c);
-        if (land) {
-          rain.aim(land.point);
-          falling = !!active.c.userData.raining;
+        falling = !!active.c.userData.raining;
+        if (!intersect(active.c)) {
+          const land = rainHit(active.c);
+          if (land) rain.aim(land.point);
         }
       }
       if (rain.stroke) {
         const held = controllers[rain.stroke.id];
         if (held?.grip.visible) {
-          const aimedAtTerrain = !intersect(held.c) && !!rainHit(held.c);
+          const hit = !intersect(held.c) ? rainHit(held.c) : null;
           rain.moveStroke(
             held.id,
             held.grip.getWorldPosition(new THREE.Vector3()),
-            aimedAtTerrain,
+            !!hit,
+            hit?.point,
           );
         } else rain.endStroke();
       }
@@ -2093,6 +2093,6 @@ if (devPreview) {
     rain.group.updateWorldMatrix(true, true);
     const hit = raycaster.intersectObject(rain.terrain, false)[0];
     if (hit) rain.aim(hit.point);
-    else previewRaining = false;
+    // A held press keeps watering its last valid source beyond the terrain edge.
   });
 }
