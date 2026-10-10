@@ -39,6 +39,7 @@ test("controller stroke edits mesh, survives mode switch, cancels safely, and re
   for (let i = 0; i < 240; i++) r.update(0.05);
   assert.ok(r.water.added > 0);
   assert.ok(r.ponds.count > 0);
+  assert.ok(r.shoreline.geometry.drawRange.count > 0);
   r.setMode("sculpt");
   assert.equal(r.water.stored, 0);
   assert.equal(r.ponds.count, 0);
@@ -87,6 +88,23 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   r.dispose();
 });
 
+test("a sculpted pond announces real overflow only after water crosses its divide", () => {
+  const events = [];
+  const r = new RainExperience(new THREE.Scene(), () => {}, "drainage", (event) => events.push(event));
+  r.explore();
+  r.applyBrush(-0.3, -0.4, -0.5);
+  r.endStroke();
+  const sink = r.cellAt(-0.3, -0.4);
+  assert.equal(r.basins[sink], "sink");
+  for (let i = 0; i < 200 && !r.overflowAnnounced; i++) {
+    r.water.add(sink, 0.001);
+    r.update(0.02);
+  }
+  assert.equal(r.overflowAnnounced, true);
+  assert.equal(events.filter((event) => event === "spill").length, 1);
+  r.dispose();
+});
+
 test("erosion tray updates rendered heights and reset restores the experiment without moving the model", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
   r.explore();
@@ -105,6 +123,17 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   for (let i = 0; i < original.length; i++)
     assert.ok(Math.abs(geometry.getY(i) - r.heights[i]) < 0.005);
   r.pouring = false;
+  assert.ok(r.replayFrames.length > 2);
+  const changed = [...original].findIndex((v, i) => Math.abs(v - r.heights[i]) > 0.05);
+  assert.ok(changed >= 0);
+  const finalBed = r.heights.slice(), stored = r.water.stored;
+  assert.equal(r.startReplay(), true);
+  r.update(0.01);
+  assert.ok(Math.abs(geometry.getY(changed) - original[changed]) < 1e-6);
+  assert.deepEqual(r.heights, finalBed);
+  assert.equal(r.water.stored, stored);
+  r.endReplay();
+  assert.ok(Math.abs(geometry.getY(changed) - finalBed[changed]) < 1e-6);
   r.restore();
   assert.deepEqual(r.heights, original);
   assert.equal(r.water.eroded, 0);

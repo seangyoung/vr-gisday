@@ -76,21 +76,24 @@ function footprint(cell) {
 }
 
 export class PixelExperience extends LayerExperience {
-  constructor(scene, onChange) {
+  constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
-    this.clipboard.scale.setScalar(0.22);
+    this.onEvent = onEvent;
+    this.clipboard.scale.setScalar(0.26);
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.model = new PixelModel();
     this.size = 24;
     this.probe = { x: 0, z: -3 };
+    this.answer = null;
+    this.footprintAge = 1;
     this.footprint = null;
     this.refreshFootprint();
   }
   get cell() {
     return this.model.cellAt(this.probe.x, this.probe.z, this.size);
   }
-  refreshFootprint() {
+  refreshFootprint(previousSize = null) {
     if (this.footprint) {
       this.footprint.removeFromParent();
       this.footprint.traverse((object) => {
@@ -99,12 +102,44 @@ export class PixelExperience extends LayerExperience {
       });
     }
     this.footprint = footprint(this.cell);
+    const centerX = this.cell.x0 + this.size / 2;
+    const centerZ = this.cell.z0 + this.size / 2;
+    const pivot = new THREE.Group();
+    pivot.position.set(centerX, 0, centerZ);
+    this.footprint.position.set(-centerX, 0, -centerZ);
+    pivot.add(this.footprint);
+    this.footprint = pivot;
+    this.footprintAge = previousSize ? 0 : 1;
+    if (previousSize) {
+      const start = THREE.MathUtils.clamp(previousSize / this.size, 0.35, 2);
+      this.footprint.scale.set(start, 1, start);
+    }
     this.variants.raised.world.add(this.footprint);
   }
   setSize(size) {
     if (this.finished || !PIXEL_SIZES.includes(size) || this.size === size) return;
+    const previous = this.size;
     this.size = size;
-    this.refreshFootprint();
+    this.refreshFootprint(previous);
+    this.onEvent(size > previous ? "merge" : "reveal");
+    this.onChange();
+  }
+  update(dt) {
+    super.update(dt);
+    if (!this.footprint || this.footprintAge >= 1) return;
+    this.footprintAge = Math.min(1, this.footprintAge + dt / 0.7);
+    const current = this.footprint.scale.x;
+    const next = THREE.MathUtils.damp(current, 1, 9, dt);
+    this.footprint.scale.set(next, 1, next);
+    if (this.footprintAge >= 1) this.footprint.scale.set(1, 1, 1);
+  }
+  get pureWaterAt48() {
+    return this.model.raster(48).pixels.some(({ counts }) => counts[2] === 48 ** 2);
+  }
+  predictPureWater(answer) {
+    if (this.finished || this.answer !== null) return;
+    this.answer = answer;
+    this.onEvent(answer === this.pureWaterAt48 ? "correct" : "blocked");
     this.onChange();
   }
   setProbe(x, z) {
@@ -141,11 +176,12 @@ export class PixelExperience extends LayerExperience {
     this.finished = false;
     this.size = 24;
     this.probe = { x: 0, z: -3 };
+    this.answer = null;
     this.refreshFootprint();
     this.onChange();
   }
-  renderMap(ctx) {
-    const raster = this.model.raster(this.size);
+  renderMap(ctx, size = this.size) {
+    const raster = this.model.raster(size);
     const width = ctx.canvas.width;
     const cellPixels = width / raster.cells;
     ctx.fillStyle = "#163b3b";
@@ -167,7 +203,7 @@ export class PixelExperience extends LayerExperience {
         ctx.stroke();
       }
     }
-    const cell = this.cell;
+    const cell = this.model.cellAt(this.probe.x, this.probe.z, size);
     ctx.strokeStyle = "#163039";
     ctx.lineWidth = 7;
     ctx.strokeRect(cell.col * cellPixels, cell.row * cellPixels, cellPixels, cellPixels);
@@ -175,9 +211,9 @@ export class PixelExperience extends LayerExperience {
     ctx.lineWidth = 4;
     ctx.strokeRect(cell.col * cellPixels, cell.row * cellPixels, cellPixels, cellPixels);
     ctx.fillStyle = "#17313add";
-    ctx.fillRect(0, 0, width, 32);
+    ctx.fillRect(0, 0, width, 42);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 17px system-ui, sans-serif";
-    ctx.fillText(`SIMULATED IMAGE · ${this.size} m PIXELS`, 9, 22);
+    ctx.font = "bold 23px system-ui, sans-serif";
+    ctx.fillText(`MODEL COLORS · ${size} m`, 12, 29);
   }
 }

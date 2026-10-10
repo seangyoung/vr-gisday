@@ -44,7 +44,7 @@ const camera = new THREE.PerspectiveCamera(
   65,
   innerWidth / innerHeight,
   0.03,
-  550,
+  700,
 );
 camera.position.set(0, 0, 0);
 const root = new THREE.Group();
@@ -74,9 +74,17 @@ let rain = null,
 let floatingModel = null,
   grab = null,
   preservePose = null;
+let rangeAnimations = [];
+let animationAge = 0;
+let uiFadeMeshes = [];
+let uiFadeAge = 1;
+let lastUIKey = "";
 const isSpatial = () => step === 4 || step === 5;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
+  rangeAnimations = [];
+  animationAge = 0;
+  uiFadeMeshes = [];
   grab?.cancel();
   if (floatingModel) {
     floatingModel.traverse((n) => {
@@ -121,7 +129,7 @@ function label(
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, c.width, c.height);
   }
-  size = (size * 1.6) / w;
+  size = (size * (w >= 0.8 ? 2.3 : 1.6)) / w;
   ctx.font = `500 ${size}px system-ui, sans-serif`;
   ctx.fillStyle = color;
   ctx.textAlign = "center";
@@ -145,6 +153,11 @@ function label(
       side: THREE.DoubleSide,
     }),
   );
+  if (uiFadeAge < 0.45) {
+    mesh.material.transparent = true;
+    mesh.material.opacity = uiFadeAge / 0.45;
+    uiFadeMeshes.push(mesh);
+  }
   mesh.position.set(x, y, 0.02);
   uiParent.add(mesh);
   return mesh;
@@ -170,18 +183,22 @@ function line(points, color, opacity = 1) {
   return m;
 }
 function circle(a, r, color) {
-  return line(
+  const ring = line(
     Array.from(
-      { length: 129 },
+      { length: 257 },
       (_, i) =>
         new THREE.Vector3(
-          a.x + Math.cos((i / 128) * Math.PI * 2) * r,
-          a.y + Math.sin((i / 128) * Math.PI * 2) * r,
+          Math.cos((i / 256) * Math.PI * 2) * r,
+          Math.sin((i / 256) * Math.PI * 2) * r,
           0,
         ),
     ),
     color,
   );
+  ring.position.set(a.x, a.y, 0);
+  ring.material.transparent = true;
+  ring.material.depthWrite = false;
+  return ring;
 }
 function point(p, color, r = 0.026, z = 0.045) {
   const m = new THREE.Mesh(
@@ -288,7 +305,7 @@ function startRain(kind = "drainage", explore = false) {
   pixels = null;
   stopRainInput();
   rain?.dispose();
-  rain = new RainExperience(scene, draw, kind);
+  rain = new RainExperience(scene, draw, kind, (event) => sound.cue(event));
   rain.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   if (explore) rain.stage = 1;
   draw();
@@ -320,7 +337,7 @@ function startLayers() {
   pixels?.dispose();
   pixels = null;
   layers?.dispose();
-  layers = new LayerExperience(scene, draw);
+  layers = new LayerExperience(scene, draw, (event) => sound.cue(event));
   layers.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -335,7 +352,7 @@ function startViewshed() {
   pixels?.dispose();
   pixels = null;
   viewshed?.dispose();
-  viewshed = new ViewshedExperience(scene, draw);
+  viewshed = new ViewshedExperience(scene, draw, (event) => sound.cue(event));
   viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -350,7 +367,7 @@ function startPixels() {
   viewshed?.dispose();
   viewshed = null;
   pixels?.dispose();
-  pixels = new PixelExperience(scene, draw);
+  pixels = new PixelExperience(scene, draw, (event) => sound.cue(event));
   pixels.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -442,15 +459,15 @@ function drawScanUI() {
   const copy = [
     [
       "Scan the Hidden World",
-      "A scanner measures distance along a known direction.\nEach return becomes one 3D point, building a point cloud.\nThis is a synthetic scene, not a scan of your room.",
+      "A range return becomes one measured 3D point.\nMany returns form a point cloud; the first surface blocks others.\nThis is synthetic, not a lidar scan of your room.",
     ],
     [
-      "Sweep. Change your viewpoint. Discover.",
-      "Point into the box and HOLD TRIGGER to collect points.\nGRIP to turn / move; BOTH grips to resize. Scan another side.\nGaps can be blocked views. Filtering cannot fill them in.",
+      "Which surfaces are still hidden?",
+      "HOLD TRIGGER to sweep. Each bright ray stops at a first return.\nGRIP to turn / move; BOTH grips to resize. Scan another side.\nA missing patch may be occluded. Compare with the solid scene.",
     ],
     [
-      "A point cloud is a set of observations.",
-      "New viewpoints reveal surfaces that were blocked.\nFiltering removes selected points; it cannot see through objects.\nReal lidar needs careful positioning and classification.",
+      "Different viewpoints fill different gaps.",
+      "Occlusion means one surface blocks another from view.\nClassification labels measured points; it cannot invent hidden ground.\nReal lidar also needs georeferencing and error checks.",
     ],
   ];
   const [title, body] = copy[s.stage];
@@ -473,7 +490,7 @@ function drawScanUI() {
     button("Scan your room", 0.55, -0.77, startRoomScan, 1.02);
   } else {
     button(
-      s.reveal ? "Cloud only" : "Reveal scene",
+      s.reveal ? "Cloud only" : "Compare surfaces",
       -0.84,
       -0.77,
       () => s.toggleReveal(),
@@ -553,7 +570,7 @@ function drawLayersUI() {
     .material.color.set(l.view === "map" ? 0xffffff : 0x91a6a4);
   if (l.view === "map") {
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 384;
+    canvas.width = canvas.height = 512;
     renderLayerMap(canvas.getContext("2d"), l.selected);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -567,7 +584,8 @@ function drawLayersUI() {
       const marked = l.selected.has(key) ? "[x]" : "[ ]";
       button(`${marked} ${LAYER_NAMES[key]}`, 0.65, 0.47 - i * 0.2, () => l.toggle(key), 1.02);
     });
-    label("The map and the world use the same layers.", 0, -0.69, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label(l.lastLayer ? LAYER_HINTS[l.lastLayer] : "Select a map layer; watch it appear around you.",
+      0, -0.69, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
     label(
       l.selected.has("population")
         ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
@@ -631,7 +649,7 @@ function drawViewshedUI() {
   );
   if (v.finished) {
     label(
-      "A viewshed marks ground visible from one place.\nRidges hide areas behind them; a higher viewpoint may reveal more.\nThis model tests terrain only, not trees or buildings.",
+      "A viewshed tests line of sight across a DEM.\nThe ridge blocks the blue target at eye level; a tower can see it.\nThis model tests terrain only, not trees or buildings.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Try another viewpoint", 0, -0.62, () => v.reset(), 1.5);
@@ -644,7 +662,7 @@ function drawViewshedUI() {
     .material.color.set(v.view === "map" ? 0xffffff : 0x91a6a4);
   if (v.view === "map") {
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 384;
+    canvas.width = canvas.height = 512;
     v.renderMap(canvas.getContext("2d"));
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -657,7 +675,7 @@ function drawViewshedUI() {
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
-    label("Point and trigger on the map\nto move the observation point.", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
+    label("Move the gold observer.\nCan it see the blue target?", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
     button("Eye level · 2 m", 0.64, 0.18, () => v.setHeight(2), 1.04)
       .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
@@ -666,7 +684,7 @@ function drawViewshedUI() {
     label("Map and landscape show the same visible ground.", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   } else {
     label(
-      "The gold marker is an observer. Green ground is visible;\npurple ground is hidden by higher terrain.",
+      "Gold is the observer; blue is the target. The sightline\nstops at the blocking ridge. Green ground is visible.",
       0, 0.44, 2.3, 0.26, 32, "#e6f4f5", "#0b2430",
     );
     label("Point at the ground and press trigger to move the observer.", 0, 0.17, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
@@ -675,10 +693,10 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.56, -0.12, () => v.setHeight(12), 0.98)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0, -0.43, () => v.reset(), 1.05);
-    label("Try the same spot at both heights. What changes?", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
+    label("Try a radio lookout at both heights. What changes?", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
   }
   label(
-    `${v.visiblePercent}% of nearby ground is visible · Terrain only`,
+    `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
   navigation(-1.02);
@@ -691,7 +709,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "A pixel represents an area on the ground.\nBigger pixels cover more land, so narrow features can blend away.\nThe best pixel size depends on the question you ask.",
+      "Ground sample distance (GSD) is the pixel's ground width.\nLarge pixels mix narrow roads, rivers, and other cover.\nThese are averaged model colors, not satellite reflectance.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Compare again", 0, -0.62, () => p.reset(), 1.5);
@@ -699,52 +717,44 @@ function drawPixelsUI() {
     return;
   }
   label(
-    "Here, spatial resolution is ground width per pixel.",
+    "Ground sample distance (GSD) = ground width of one pixel.",
     0, 0.68, 2.3, 0.12, 30, "#b6d1d9", "#0b2430",
   );
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 384;
-  p.renderMap(canvas.getContext("2d"));
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const map = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.17, 1.17),
-    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
-  );
-  map.position.set(-0.52, 0.02, 0.06);
-  map.userData.action = (hit) => p.placeFromMap(hit);
-  map.userData.debugHidden = true;
-  uiParent.add(map);
-  buttons.push(map);
-  for (const [size, x, y] of [
-    [2, 0.38, 0.47], [8, 0.91, 0.47],
-    [24, 0.38, 0.25], [48, 0.91, 0.25],
-  ])
-    button(`${size} m`, x, y, () => p.setSize(size), 0.46)
+  for (const [size, x] of [[2, -0.84], [8, -0.28], [24, 0.28], [48, 0.84]])
+    button(`${size} m`, x, 0.5, () => p.setSize(size), 0.48)
       .material.color.set(p.size === size ? 0xffffff : 0x91a6a4);
+  for (const [size, x] of [[2, -0.56], [p.size, 0.56]]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 512;
+    p.renderMap(canvas.getContext("2d"), size);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const map = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.03, 1.03),
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+    );
+    map.position.set(x, -0.07, 0.06);
+    map.userData.action = (hit) => p.placeFromMap(hit);
+    map.userData.debugHidden = true;
+    uiParent.add(map);
+    buttons.push(map);
+  }
   const cell = p.cell;
   const percent = (index) => Math.round((cell.counts[index] / (p.size ** 2)) * 100);
   label(
-    `${p.size} × ${p.size} m = ${p.size ** 2} m²`,
-    0.65, 0.02, 1.1, 0.16, 34, "#e6f4f5", "#0b2430",
+    `Selected ${p.size} m GSD · ${p.size ** 2} m²\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`,
+    0, -0.675, 2.3, 0.14, 27, "#e6f4f5", "#0b2430",
   );
-  label(
-    `This pixel contains:\nForest ${percent(1)}% · Water ${percent(2)}%\nRoad ${percent(3)}% · Other ${percent(0)}%`,
-    0.65, -0.29, 1.1, 0.36, 26, "#e6f4f5", "#0b2430",
-  );
-  label(
-    "Its color averages those model surfaces.",
-    0.65, -0.53, 1.1, 0.11, 25, "#b6d1d9", "#0b2430",
-  );
-  label(
-    "Point at the map or ground; trigger selects a pixel.",
-    0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430",
-  );
-  label(
-    "Synthetic 144 m image · Highlighted square matches ground",
-    0, -0.84, 2.3, 0.1, 24, "#d8f3e6", "#0b2430",
-  );
-  navigation(-1.02);
+  if (p.answer === null) {
+    label("Prediction: any all-water pixel at 48 m?", -0.35, -0.82, 1.5, 0.12, 27, "#d8f3e6", "#0b2430");
+    button("Yes", 0.57, -0.82, () => p.predictPureWater(true), 0.42);
+    button("No", 1.03, -0.82, () => p.predictPureWater(false), 0.34);
+  } else
+    label(
+      `${p.answer === p.pureWaterAt48 ? "Correct" : "Look again"}: no pure-water 48 m pixel; narrow river mixes with land.`,
+      0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
+    );
+  navigation(-1.03);
 }
 function drawRainUI() {
   const r = rain;
@@ -792,7 +802,9 @@ function drawRainUI() {
       r.kind === "erosion"
         ? "Shape the land. Watch water reshape it."
         : "Shape the land. Follow the water.",
-      "LEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nWhile sculpting, lift to raise earth; lower to dig.\nEither GRIP: move / turn the model. BOTH grips: resize.",
+      r.kind === "erosion"
+        ? "Runoff cuts loose soil; slower water deposits sediment.\nLEFT TRIGGER: pour. RIGHT TRIGGER: sculpt while it flows.\nGRIP: move / turn. BOTH grips: resize the tray."
+        : "Runoff follows slope toward an outlet; ridges form divides.\nLEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nGRIP: move / turn. BOTH grips: resize the model.",
     ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
@@ -814,52 +826,23 @@ function drawRainUI() {
     );
   }
   if (r.stage === 1) {
-    button(
-      r.kind === "erosion" ? "Reset tray" : "Reset terrain",
-      -0.84,
-      -0.77,
-      () => {
-        stopRainInput();
-        r.restore();
-      },
-      0.52,
-    );
-    button(
-      r.kind === "erosion"
-        ? r.originalBed.visible
-          ? "Hide original"
-          : "Original bed"
-        : r.overlay
-          ? "Hide basins"
-          : "Show basins",
-      -0.28,
-      -0.77,
-      () => {
-        if (r.kind === "erosion") {
-          r.originalBed.visible = !r.originalBed.visible;
-          draw();
-        } else r.toggleOverlay();
-      },
-      0.52,
-    );
-    button(
-      r.kind === "erosion" || r.edited ? "Takeaways" : "Prediction",
-      0.28,
-      -0.77,
-      () => {
-        stopRainInput();
-        if (r.kind === "erosion" || r.edited) r.finish();
-        else r.challenge();
-      },
-      0.52,
-    );
-    button(
-      r.kind === "erosion" ? "Drainage" : "Erosion tray",
-      0.84,
-      -0.77,
-      () => startRain(r.kind === "erosion" ? "drainage" : "erosion", true),
-      0.52,
-    );
+    if (r.kind === "erosion") {
+      button("Reset", -0.96, -0.77, () => { stopRainInput(); r.restore(); }, 0.44);
+      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.48, -0.77,
+        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.44);
+      button(r.replayTime >= 0 ? "Live" : "Replay", 0, -0.77,
+        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.44);
+      button("Takeaways", 0.48, -0.77, () => { stopRainInput(); r.finish(); }, 0.44);
+      button("Drainage", 0.96, -0.77, () => startRain("drainage", true), 0.44);
+    } else {
+      button("Reset terrain", -0.84, -0.77,
+        () => { stopRainInput(); r.restore(); }, 0.52);
+      button(r.overlay ? "Hide basins" : "Show basins", -0.28, -0.77,
+        () => r.toggleOverlay(), 0.52);
+      button(r.edited ? "Takeaways" : "Prediction", 0.28, -0.77,
+        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.52);
+      button("Erosion tray", 0.84, -0.77, () => startRain("erosion", true), 0.52);
+    }
   }
   if (r.stage === 2) {
     button("Outlet A · left", -0.54, -0.77, () => r.choose("A"), 1.02);
@@ -894,7 +877,9 @@ function drawRainUI() {
   } else
     label(
       r.kind === "erosion"
-        ? "Dark: erosion · Pale: deposits · White grid: original bed · Accelerated"
+        ? r.replayTime >= 0
+          ? "Time-lapse: saved bed shapes · Water paused · Live returns to experiment"
+          : `Dark: cut · Pale: deposits · ${r.terrainChange.changed} cells changed · Replay after pouring`
         : r.overlay && r.edited
           ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
           : r.overlay
@@ -921,6 +906,7 @@ function next() {
       : null;
   step++;
   draw();
+  sound.cue(step === 5 ? "reveal" : "measure");
 }
 function planar() {
   const first = content.children.length;
@@ -936,7 +922,8 @@ function planar() {
       0x254651,
     );
   anchors.slice(0, count).forEach((a, i) => {
-    circle(a, ranges[i], palette[i]);
+    const ring = circle(a, ranges[i], palette[i]);
+    rangeAnimations.push({ object: ring, delay: i * 0.23 });
     point(a, palette[i], 0.035);
     label(String.fromCharCode(65 + i), a.x, a.y + 0.07, 0.14, 0.09, 55);
     if (step === 3) {
@@ -964,6 +951,7 @@ function planar() {
       const m = point(p, 0xffffff, 0.065);
       m.userData.action = () => {
         sound.click();
+        sound.cue(i === 0 ? "correct" : "blocked");
         prediction =
           i === 0
             ? "Your choice matches the third distance."
@@ -1043,7 +1031,7 @@ function spatial() {
   const center = bounds.getCenter(new THREE.Vector3());
   beacons.slice(0, step === 4 ? 3 : 4).forEach((a, i) => {
     const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(a.distanceTo(t), 28, 18),
+      new THREE.SphereGeometry(a.distanceTo(t), 48, 32),
       new THREE.MeshBasicMaterial({
         color: palette[i],
         wireframe: true,
@@ -1054,6 +1042,7 @@ function spatial() {
     );
     sphere.position.copy(a).sub(center);
     group.add(sphere);
+    rangeAnimations.push({ object: sphere, delay: i * 0.2 });
     const beacon = new THREE.Mesh(
       new THREE.SphereGeometry(0.038, 16, 12),
       new THREE.MeshBasicMaterial({ color: palette[i] }),
@@ -1179,8 +1168,33 @@ function draw() {
     }
   }
 }
+function updateRangeAnimations(dt) {
+  if (!rangeAnimations.length) return;
+  animationAge += dt;
+  for (const { object, delay } of rangeAnimations) {
+    const t = THREE.MathUtils.clamp((animationAge - delay) / 0.75, 0, 1);
+    const ease = 1 - (1 - t) ** 3;
+    object.scale.setScalar(Math.max(0.001, ease));
+    object.material.opacity = object.isMesh ? 0.25 * ease : ease;
+  }
+  if (animationAge > rangeAnimations.at(-1).delay + 0.8) rangeAnimations = [];
+}
+function updateUIFade(dt) {
+  if (uiFadeAge >= 0.45) return;
+  uiFadeAge = Math.min(0.45, uiFadeAge + dt);
+  const opacity = 1 - (1 - uiFadeAge / 0.45) ** 2;
+  for (const mesh of uiFadeMeshes) mesh.material.opacity = opacity;
+  if (uiFadeAge >= 0.45) uiFadeMeshes = [];
+}
 function drawScene() {
   clear();
+  const key = pixels ? `pixels:${pixels.finished}` :
+    viewshed ? `viewshed:${viewshed.view}:${viewshed.finished}` :
+    layers ? `layers:${layers.view}:${layers.finished}` :
+    scan ? `scan:${scan.room ? "room" : "model"}:${scan.stage}` :
+    rain ? `rain:${rain.kind}:${rain.stage}` : `position:${step}`;
+  if (key !== lastUIKey) uiFadeAge = 0;
+  lastUIKey = key;
   uiParent = pixels?.ui ?? viewshed?.ui ?? layers?.ui ?? content;
   if (pixels) {
     drawPixelsUI();
@@ -1237,6 +1251,7 @@ function drawScene() {
       () => {
         step = 0;
         draw();
+        sound.cue("measure");
       },
       1.8,
     );
@@ -1584,6 +1599,8 @@ for (const [id, mode, name] of [
 renderer.setAnimationLoop((time, frame) => {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.1) : 0;
   lastTime = time;
+  updateRangeAnimations(dt);
+  updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
   const previousWater = rain?.water.added ?? 0;
   if (renderer.xr.isPresenting && frame) {
@@ -1717,7 +1734,7 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
-  if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan();
+  if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
   if (audible && rain && rain.water.added > previousWater)
     waterSoundUntil = time + 1500;
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));

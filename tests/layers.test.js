@@ -29,6 +29,8 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(l.variants.flat.hydrology.visible, true);
   l.toggle("topography");
   assert.equal(l.variants.raised.world.visible, true);
+  l.update(0.8);
+  assert.equal(l.variants.raised.world.scale.y, 1);
   for (const key of LAYER_KEYS.slice(1))
     assert.equal(l.variants.raised[key].visible, true);
   assert.equal(l.variants.flat.world.visible, false);

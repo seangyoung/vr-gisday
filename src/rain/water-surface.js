@@ -14,7 +14,7 @@ export class WaterSurface {
       new THREE.MeshBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.7,
+        opacity: 0.42,
         side: THREE.DoubleSide,
         depthWrite: false,
       }),
@@ -46,9 +46,9 @@ export class WaterSurface {
         c = this.triangles[i + 2];
       // Draw only triangles touching water; shorelines are approximate at cell scale.
       if (
-        water.depth[a] <= 0.0007 &&
-        water.depth[b] <= 0.0007 &&
-        water.depth[c] <= 0.0007
+        Number(water.depth[a] > 0.0007) +
+        Number(water.depth[b] > 0.0007) +
+        Number(water.depth[c] > 0.0007) < 2
       )
         continue;
       geo.index.array[count++] = a;

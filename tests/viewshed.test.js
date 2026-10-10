@@ -5,6 +5,7 @@ import {
   TerrainSampler,
   calculateViewshed,
   lineOfSight,
+  traceSightline,
 } from "../src/viewshed/analysis.js";
 import { ViewshedExperience } from "../src/viewshed/experience.js";
 import { LANDSCAPE_EXTENT, landscapeHeight } from "../src/layers/experience.js";
@@ -13,6 +14,9 @@ test("a ridge blocks a low observer but a tower sees over it", () => {
   const ridge = (x) => (Math.abs(x - 4) < 0.7 ? 5 : 0);
   assert.equal(lineOfSight(ridge, { x: 0, z: 0, height: 2 }, { x: 10, z: 0 }, 0.25), false);
   assert.equal(lineOfSight(ridge, { x: 0, z: 0, height: 12 }, { x: 10, z: 0 }, 0.25), true);
+  const blocked = traceSightline(ridge, { x: 0, z: 0, height: 2 }, { x: 10, z: 0 }, 0.25);
+  assert.equal(blocked.visible, false);
+  assert.ok(blocked.end.x > 3 && blocked.end.x < 5);
   const low = calculateViewshed(ridge, { x: 0, z: 0, height: 2 }, { extent: 12, cells: 25, radius: 11, sampleStep: 0.25 });
   const high = calculateViewshed(ridge, { x: 0, z: 0, height: 12 }, { extent: 12, cells: 25, radius: 11, sampleStep: 0.25 });
   assert.ok(high.visible > low.visible);
@@ -36,8 +40,10 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   assert.ok(demo.analysis.sampled > 0);
   assert.ok(demo.visiblePercent >= 0 && demo.visiblePercent <= 100);
   const lowVisible = demo.analysis.visible;
+  assert.equal(demo.trace.visible, false);
   demo.setHeight(12);
   assert.ok(demo.analysis.visible >= lowVisible);
+  assert.equal(demo.trace.visible, true);
   demo.placeFromMap({ uv: new THREE.Vector2(0.6, 0.62) });
   assert.ok(Math.abs(demo.observer.x - LANDSCAPE_EXTENT * 0.2) < 1e-9);
   assert.ok(Math.abs(demo.observer.z + LANDSCAPE_EXTENT * 0.24) < 1e-9);

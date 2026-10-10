@@ -5,7 +5,9 @@ import {
   landscapeHeight,
 } from "../layers/experience.js";
 import { renderLayerMap } from "../layers/map.js";
-import { TerrainSampler, calculateViewshed } from "./analysis.js";
+import { TerrainSampler, calculateViewshed, traceSightline } from "./analysis.js";
+
+const TARGET = { x: 50, z: -100 };
 
 const visibleColor = new THREE.Color(0x55e5a9);
 const hiddenColor = new THREE.Color(0x9176bd);
@@ -68,15 +70,31 @@ function observationMarker() {
 }
 
 export class ViewshedExperience extends LayerExperience {
-  constructor(scene, onChange) {
+  constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
+    this.onEvent = onEvent;
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.view = "scene";
-    this.sampler = new TerrainSampler();
+    this.sampler = new TerrainSampler(LANDSCAPE_EXTENT, 320);
     this.observer = { x: 0, z: 0, height: 2 };
+    this.visualHeight = 2;
+    this.revealAge = 1;
     this.marker = observationMarker();
     this.variants.raised.world.add(this.marker);
+    this.targetRing = new THREE.Mesh(
+      new THREE.TorusGeometry(2.3, 0.18, 8, 48),
+      new THREE.MeshBasicMaterial({ color: 0x55d8f3, depthTest: false }),
+    );
+    this.targetRing.rotation.x = Math.PI / 2;
+    this.targetRing.position.set(TARGET.x, landscapeHeight(TARGET.x, TARGET.z) + 0.2, TARGET.z);
+    this.variants.raised.world.add(this.targetRing);
+    this.sightline = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineBasicMaterial({ color: visibleColor, transparent: true, opacity: 0.85, depthTest: false }),
+    );
+    this.sightline.frustumCulled = false;
+    this.variants.raised.world.add(this.sightline);
     this.analysis = null;
     this.overlay = null;
     this.refresh();
@@ -85,6 +103,7 @@ export class ViewshedExperience extends LayerExperience {
     this.analysis = calculateViewshed(
       (x, z) => this.sampler.sample(x, z),
       this.observer,
+      { cells: 161, radius: 125, sampleStep: 1.7 },
     );
     if (this.overlay) {
       this.overlay.removeFromParent();
@@ -92,24 +111,57 @@ export class ViewshedExperience extends LayerExperience {
       this.overlay.material.dispose();
     }
     this.overlay = coverageMesh(this.analysis);
+    this.overlay.material.opacity = 0;
+    this.revealAge = 0;
     this.variants.raised.world.add(this.overlay);
     const ground = landscapeHeight(this.observer.x, this.observer.z);
     this.marker.position.set(this.observer.x, ground, this.observer.z);
-    this.marker.userData.mast.scale.y = this.observer.height;
-    this.marker.userData.mast.position.y = this.observer.height / 2;
-    this.marker.userData.eye.position.y = this.observer.height;
+    this.setVisualHeight(this.visualHeight);
+    this.trace = traceSightline((x, z) => this.sampler.sample(x, z),
+      this.observer, TARGET, 1.7);
+    const positions = this.sightline.geometry.attributes.position;
+    positions.setXYZ(0, this.observer.x, ground + this.observer.height, this.observer.z);
+    positions.setXYZ(1, this.observer.x, ground + this.observer.height, this.observer.z);
+    positions.needsUpdate = true;
+    this.sightline.geometry.computeBoundingSphere();
+    this.sightline.material.color.set(this.trace.visible ? visibleColor : hiddenColor);
+  }
+  setVisualHeight(height) {
+    this.marker.userData.mast.scale.y = height;
+    this.marker.userData.mast.position.y = height / 2;
+    this.marker.userData.eye.position.y = height;
+  }
+  update(dt) {
+    super.update(dt);
+    this.revealAge = Math.min(1, this.revealAge + dt / 0.9);
+    if (this.overlay) this.overlay.material.opacity = 0.43 * this.revealAge;
+    if (this.sightline) {
+      const ease = 1 - (1 - this.revealAge) ** 2;
+      const startY = landscapeHeight(this.observer.x, this.observer.z) + this.observer.height;
+      const positions = this.sightline.geometry.attributes.position;
+      positions.setXYZ(1,
+        THREE.MathUtils.lerp(this.observer.x, this.trace.end.x, ease),
+        THREE.MathUtils.lerp(startY, this.trace.end.y, ease),
+        THREE.MathUtils.lerp(this.observer.z, this.trace.end.z, ease),
+      );
+      positions.needsUpdate = true;
+    }
+    this.visualHeight = THREE.MathUtils.damp(this.visualHeight, this.observer.height, 6, dt);
+    this.setVisualHeight(this.visualHeight);
   }
   setObserver(x, z) {
     if (this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
     this.observer.x = THREE.MathUtils.clamp(x, -LANDSCAPE_EXTENT + 2, LANDSCAPE_EXTENT - 2);
     this.observer.z = THREE.MathUtils.clamp(z, -LANDSCAPE_EXTENT + 2, LANDSCAPE_EXTENT - 2);
     this.refresh();
+    this.onEvent(this.trace.visible ? "correct" : "blocked");
     this.onChange();
   }
   setHeight(height) {
     if (this.finished || (height !== 2 && height !== 12)) return;
     this.observer.height = height;
     this.refresh();
+    this.onEvent(this.trace.visible ? "correct" : "blocked");
     this.onChange();
   }
   setView(view) {
@@ -142,6 +194,7 @@ export class ViewshedExperience extends LayerExperience {
     this.elapsed = 0;
     this.finished = false;
     this.observer = { x: 0, z: 0, height: 2 };
+    this.visualHeight = 2;
     this.refresh();
     this.onChange();
   }
@@ -151,6 +204,7 @@ export class ViewshedExperience extends LayerExperience {
   renderMap(ctx) {
     renderLayerMap(ctx, this.selected, { annotations: false });
     const size = ctx.canvas.width;
+    const ratio = size / 384;
     const { values, cells } = this.analysis;
     const pixel = size / cells;
     for (let row = 0; row < cells; row++)
@@ -163,19 +217,25 @@ export class ViewshedExperience extends LayerExperience {
     const x = ((this.observer.x + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
     const y = ((this.observer.z + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
     ctx.beginPath();
-    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.arc(x, y, 7 * ratio, 0, Math.PI * 2);
     ctx.fillStyle = "#ffcf62";
     ctx.fill();
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * ratio;
     ctx.strokeStyle = "#1b3037";
     ctx.stroke();
     ctx.fillStyle = "#17363dcc";
-    ctx.fillRect(0, size - 32, size, 32);
+    ctx.fillRect(0, size - 32 * ratio, size, 32 * ratio);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "18px system-ui, sans-serif";
-    ctx.fillText("Green visible · Purple hidden", 10, size - 10);
-    ctx.font = "bold 17px system-ui, sans-serif";
+    ctx.font = `${18 * ratio}px system-ui, sans-serif`;
+    ctx.fillText("Green visible · Purple hidden", 10 * ratio, size - 10 * ratio);
+    const targetX = ((TARGET.x + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
+    const targetZ = ((TARGET.z + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
+    ctx.beginPath();
+    ctx.arc(targetX, targetZ, 7 * ratio, 0, Math.PI * 2);
+    ctx.fillStyle = "#55d8f3";
+    ctx.fill();
+    ctx.font = `bold ${17 * ratio}px system-ui, sans-serif`;
     ctx.fillStyle = "#17363d";
-    ctx.fillText("MODEL N ↑", 10, 23);
+    ctx.fillText("MODEL N ↑", 10 * ratio, 23 * ratio);
   }
 }

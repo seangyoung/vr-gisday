@@ -59,6 +59,12 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.ok(demo.footprint.parent === demo.variants.raised.world);
   demo.setSize(48);
   assert.equal(demo.cell.size, 48);
+  assert.ok(demo.footprint.scale.x < 1);
+  demo.update(0.7);
+  assert.equal(demo.footprint.scale.x, 1);
+  assert.equal(demo.pureWaterAt48, false);
+  demo.predictPureWater(false);
+  assert.equal(demo.answer, false);
   demo.placeFromMap({ uv: new THREE.Vector2(0.25, 0.75) });
   assert.deepEqual(demo.probe, { x: -36, z: -36 });
   const ray = new THREE.Raycaster(
@@ -74,6 +80,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.equal(demo.finished, false);
   assert.equal(demo.size, 24);
   assert.deepEqual(demo.probe, { x: 0, z: -3 });
+  assert.equal(demo.answer, null);
   assert.ok(changes >= 4);
   demo.dispose();
   assert.equal(scene.children.length, 0);

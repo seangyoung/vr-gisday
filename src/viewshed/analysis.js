@@ -41,6 +41,24 @@ export function lineOfSight(heightAt, observer, target, sampleStep = 2.2) {
   return true;
 }
 
+export function traceSightline(heightAt, observer, target, sampleStep = 2.2) {
+  const dx = target.x - observer.x, dz = target.z - observer.z;
+  const distance = Math.hypot(dx, dz);
+  const eye = heightAt(observer.x, observer.z) + observer.height;
+  const targetY = heightAt(target.x, target.z) + 0.12;
+  if (distance < sampleStep)
+    return { visible: true, end: { x: target.x, y: targetY, z: target.z } };
+  const count = Math.ceil(distance / sampleStep);
+  for (let i = 1; i < count; i++) {
+    const t = i / count;
+    const x = observer.x + dx * t, z = observer.z + dz * t;
+    const ground = heightAt(x, z);
+    if (ground > eye + (targetY - eye) * t + 0.025)
+      return { visible: false, end: { x, y: ground + 0.12, z } };
+  }
+  return { visible: true, end: { x: target.x, y: targetY, z: target.z } };
+}
+
 export function calculateViewshed(
   heightAt,
   observer,

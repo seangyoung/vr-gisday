@@ -17,7 +17,7 @@ import {
 } from "./terrain.js";
 const COLORS = { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff };
 export class RainExperience {
-  constructor(scene, onChange, kind = "drainage") {
+  constructor(scene, onChange, kind = "drainage", onEvent = () => {}) {
     this.kind = kind;
     this.size = kind === "erosion" ? EROSION_SIZE : SIZE;
     this.spacing = 2 / (this.size - 1);
@@ -26,6 +26,8 @@ export class RainExperience {
     this.pourIndex = 0;
     this.meshTime = 0;
     this.onChange = onChange;
+    this.onEvent = onEvent;
+    this.overflowAnnounced = false;
     this.stage = 0;
     this.heights =
       this.kind === "erosion" ? createTray(this.size) : createHeights();
@@ -46,6 +48,11 @@ export class RainExperience {
     this.trails = [];
     this.emission = 0;
     this.time = 0;
+    this.statusTime = 0;
+    this.replayFrames = this.kind === "erosion" ? [this.heights.slice()] : [];
+    this.replayCaptureTime = 0;
+    this.replayTime = -1;
+    this.replayFrameIndex = -1;
     this.playback = 0;
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
@@ -98,7 +105,7 @@ export class RainExperience {
     this.group.add(this.terrain);
     if (this.kind === "erosion") {
       const lines = [];
-      for (let a = 0; a < this.size; a += 4)
+      for (let a = 0; a < this.size; a += 2)
         for (let b = 0; b < this.size - 1; b++)
           for (const pair of [
             [a * this.size + b, a * this.size + b + 1],
@@ -214,7 +221,7 @@ export class RainExperience {
     this.group.add(base);
     this.divide = this.line(
       Array.from({ length: this.size }, (_, r) => {
-        const p = cellPoint(r * this.size + 20, this.heights);
+        const p = cellPoint(r * this.size + Math.floor((this.size - 1) / 2), this.heights);
         return new THREE.Vector3(p.x, p.y + 0.012, p.z);
       }),
       0xffffff,
@@ -317,6 +324,18 @@ export class RainExperience {
     this.ponds.count = 0;
     this.ponds.frustumCulled = false;
     this.group.add(this.ponds);
+    if (this.kind !== "erosion") {
+      const edgeGeometry = new THREE.BufferGeometry();
+      edgeGeometry.setAttribute("position", new THREE.BufferAttribute(
+        new Float32Array(this.size * this.size * 4 * 2 * 3), 3,
+      ));
+      edgeGeometry.setDrawRange(0, 0);
+      this.shoreline = new THREE.LineSegments(edgeGeometry,
+        new THREE.LineBasicMaterial({ color: 0xb6f5ff, transparent: true, opacity: 0.8, depthWrite: false }),
+      );
+      this.shoreline.frustumCulled = false;
+      this.group.add(this.shoreline);
+    }
     if (this.kind === "erosion") {
       this.ponds.visible = false;
       this.waterSurface = new WaterSurface(this.terrain.geometry);
@@ -386,6 +405,19 @@ export class RainExperience {
   }
   updateWater(dt) {
     this.water.update(dt);
+    if (this.kind === "drainage" && this.edited && !this.overflowAnnounced) {
+      for (let edge = 0; edge < this.water.edges.length; edge++) {
+        const [a, b] = this.water.edges[edge];
+        const from = this.water.flux[edge] > 0 ? a : b;
+        const to = from === a ? b : a;
+        if (this.water.flux[edge] && this.basins[from] === "sink" &&
+            this.basins[to] !== "sink" && this.water.depth[from] > 0.001) {
+          this.overflowAnnounced = true;
+          this.onEvent("spill");
+          break;
+        }
+      }
+    }
     if (this.kind === "erosion") {
       this.meshTime += dt;
       if (this.meshTime < 0.1) return;
@@ -431,9 +463,37 @@ export class RainExperience {
     this.ponds.count = count;
     this.ponds.instanceMatrix.needsUpdate = true;
     if (this.ponds.instanceColor) this.ponds.instanceColor.needsUpdate = true;
+    if (this.shoreline) this.updateShoreline();
+  }
+  updateShoreline() {
+    const positions = this.shoreline.geometry.attributes.position;
+    const wet = (r, c) => r >= 0 && c >= 0 && r < this.size && c < this.size &&
+      this.water.depth[r * this.size + c] > 0.001;
+    let vertex = 0;
+    for (let r = 0; r < this.size; r++)
+      for (let c = 0; c < this.size; c++) {
+        if (!wet(r, c)) continue;
+        const id = r * this.size + c;
+        const p = cellPoint(id, this.heights);
+        const h = p.y + this.water.depth[id] + 0.006;
+        const x = p.x, z = p.z, half = this.spacing / 2;
+        const sides = [
+          [!wet(r - 1, c), x - half, z - half, x + half, z - half],
+          [!wet(r + 1, c), x - half, z + half, x + half, z + half],
+          [!wet(r, c - 1), x - half, z - half, x - half, z + half],
+          [!wet(r, c + 1), x + half, z - half, x + half, z + half],
+        ];
+        for (const [show, x0, z0, x1, z1] of sides) {
+          if (!show) continue;
+          positions.setXYZ(vertex++, x0, h, z0);
+          positions.setXYZ(vertex++, x1, h, z1);
+        }
+      }
+    this.shoreline.geometry.setDrawRange(0, vertex);
+    positions.needsUpdate = true;
   }
   beginTrigger(handedness, id, worldHit, worldHand) {
-    if (this.stage !== 1 || this.grab.hands.size) return null;
+    if (this.stage !== 1 || this.grab.hands.size || this.replayTime >= 0) return null;
     if (handedness === "left") {
       this.aim(worldHit);
       return "rain";
@@ -518,6 +578,7 @@ export class RainExperience {
     if (this.originalBed) this.originalBed.visible = false;
     if (this.waterSurface) this.waterSurface.mesh.visible = false;
     this.pouring = false;
+    this.overflowAnnounced = false;
     this.grab.cancel();
     this.stroke = null;
     this.heights =
@@ -526,6 +587,10 @@ export class RainExperience {
       this.kind === "erosion"
         ? new ErosionWater(this.heights)
         : new SurfaceWater(this.heights);
+    this.replayFrames = this.kind === "erosion" ? [this.heights.slice()] : [];
+    this.replayCaptureTime = 0;
+    this.replayTime = -1;
+    this.replayFrameIndex = -1;
     this.ponds.count = 0;
     // Refresh mesh and tree heights through the same edit path.
     this.mode = "sculpt";
@@ -580,7 +645,7 @@ export class RainExperience {
     this.group.add(obj);
     return obj;
   }
-  paint() {
+  paint(displayHeights = this.heights) {
     const attr = this.terrain.geometry.getAttribute("color");
     const low = new THREE.Color(this.kind === "erosion" ? 0x805331 : 0x396d4b),
       high = new THREE.Color(this.kind === "erosion" ? 0xe8c78b : 0xb8bd75);
@@ -589,12 +654,12 @@ export class RainExperience {
         ? new THREE.Color(COLORS[this.basins[id]]).multiplyScalar(0.65)
         : low
             .clone()
-            .lerp(high, Math.min(1, cellPoint(id, this.heights).y / 0.8));
+            .lerp(high, Math.min(1, cellPoint(id, displayHeights).y / 0.8));
       if (this.kind === "erosion") {
         const change =
           this.mode === "sculpt"
             ? 0
-            : this.heights[id] - this.water.initial[id];
+            : displayHeights[id] - this.water.initial[id];
         c.lerp(
           new THREE.Color(change < 0 ? 0x452819 : 0xffe6aa),
           Math.min(0.85, Math.abs(change) * 14),
@@ -642,6 +707,7 @@ export class RainExperience {
   }
   explore() {
     this.stage = 1;
+    this.onEvent("reveal");
     this.onChange();
   }
   challenge() {
@@ -666,9 +732,11 @@ export class RainExperience {
     this.divide.visible = true;
     this.paint();
     this.playback = 4;
+    this.onEvent(answer === this.destination ? "correct" : "blocked");
     this.onChange();
   }
   finish() {
+    this.endReplay();
     this.grab.cancel();
     this.pouring = false;
     this.endStroke();
@@ -681,6 +749,47 @@ export class RainExperience {
   }
   get destination() {
     return outletFor(CHALLENGE);
+  }
+  get terrainChange() {
+    if (this.kind !== "erosion") return null;
+    let cut = 0, deposit = 0, changed = 0;
+    for (let i = 0; i < this.heights.length; i++) {
+      const delta = this.heights[i] - this.water.initial[i];
+      if (delta < -0.002) cut = Math.max(cut, -delta);
+      if (delta > 0.002) deposit = Math.max(deposit, delta);
+      if (Math.abs(delta) > 0.002) changed++;
+    }
+    return { cut, deposit, changed };
+  }
+  showReplayFrame(frame) {
+    const positions = this.terrain.geometry.attributes.position;
+    for (let i = 0; i < frame.length; i++) positions.setY(i, frame[i]);
+    positions.needsUpdate = true;
+    this.terrain.geometry.computeVertexNormals();
+    this.terrain.geometry.computeBoundingSphere();
+    this.paint(frame);
+  }
+  startReplay() {
+    if (this.kind !== "erosion" || this.stage !== 1 || this.replayFrames.length < 2) return false;
+    this.endStroke();
+    this.pouring = false;
+    this.drops = [];
+    this.particles.count = 0;
+    this.replayTime = 0;
+    this.replayFrameIndex = -1;
+    this.waterSurface.mesh.visible = false;
+    this.originalBed.visible = false;
+    this.onEvent("reveal");
+    this.onChange();
+    return true;
+  }
+  endReplay() {
+    if (this.replayTime < 0) return;
+    this.replayTime = -1;
+    this.replayFrameIndex = -1;
+    this.showReplayFrame(this.heights);
+    if (this.waterSurface) this.waterSurface.update(this.heights, this.water);
+    this.onChange();
   }
   clearTrails() {
     for (const t of this.trails) {
@@ -731,6 +840,29 @@ export class RainExperience {
   }
   update(dt, raining = false) {
     this.time += dt;
+    if (this.replayTime >= 0) {
+      this.elapsed += dt;
+      if (this.elapsed >= 240) {
+        this.finish();
+        return;
+      }
+      this.replayTime += dt;
+      const index = Math.min(this.replayFrames.length - 1,
+        Math.floor((this.replayTime / 4) * this.replayFrames.length));
+      if (index !== this.replayFrameIndex) {
+        this.replayFrameIndex = index;
+        this.showReplayFrame(this.replayFrames[index]);
+      }
+      if (this.replayTime >= 4) this.endReplay();
+      return;
+    }
+    if (this.kind === "erosion" && this.stage === 1) {
+      this.statusTime += dt;
+      if (this.statusTime >= 2) {
+        this.statusTime = 0;
+        this.onChange();
+      }
+    }
     if (this.stage < 4) {
       this.elapsed += dt;
       if (this.elapsed >= 240) {
@@ -774,6 +906,13 @@ export class RainExperience {
       return true;
     });
     this.updateWater(dt);
+    if (this.kind === "erosion" && this.stage === 1) {
+      this.replayCaptureTime += dt;
+      if (this.replayCaptureTime >= 1.5 && this.replayFrames.length < 160) {
+        this.replayCaptureTime = 0;
+        if (this.water.eroded > 0) this.replayFrames.push(this.heights.slice());
+      }
+    }
     this.particles.count = count;
     this.particles.instanceMatrix.needsUpdate = true;
     this.marker.scale.setScalar(1 + 0.12 * Math.sin(this.time * 3));

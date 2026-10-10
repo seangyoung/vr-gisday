@@ -15,12 +15,12 @@ export const LAYER_NAMES = {
   population: "Population density",
 };
 export const LAYER_HINTS = {
-  topography: "Relief shows ridges, a valley, and the land beneath your feet.",
-  vegetation: "Woodland follows the land but leaves the river and highway open.",
-  hydrology: "The river descends through its valley, beneath the highway bridge.",
-  roads: "A four-lane highway crosses the river on a short bridge.",
+  topography: "DEM (elevation grid): reveals ridges and valleys; used to model slope.",
+  vegetation: "Land cover: mapped trees show habitat, shade, and cleared corridors.",
+  hydrology: "Hydrography: a downhill river follows its carved channel and watershed.",
+  roads: "Transport network: a four-lane highway bridges the river.",
   population:
-    "Population is summarized by district, not measured at each point.",
+    "Choropleth: fictional density is summarized by district, not each point.",
 };
 export const LANDSCAPE_EXTENT = 160;
 const extent = LANDSCAPE_EXTENT;
@@ -39,17 +39,21 @@ const topographicHeight = (x, z) => {
       0.14 * Math.sin(x * 0.21) * Math.cos(z * 0.18)) *
     THREE.MathUtils.smoothstep(fromRiver, 4, 23);
   const hills =
-    4.8 * Math.exp(-((x + 59) ** 2 + (z + 35) ** 2) / 1450) +
-    3.4 * Math.exp(-((x + 53) ** 2 + (z - 70) ** 2) / 1050) +
-    4.5 * Math.exp(-((x - 66) ** 2 + (z + 62) ** 2) / 1750) +
-    3.1 * Math.exp(-((x - 74) ** 2 + (z - 52) ** 2) / 1280) +
-    6.0 * Math.exp(-((x + 126) ** 2 + (z + 112) ** 2) / 2400) +
-    4.7 * Math.exp(-((x - 122) ** 2 + (z - 99) ** 2) / 2200);
+    8.0 * Math.exp(-((x + 59) ** 2 + (z + 35) ** 2) / 1450) +
+    6.0 * Math.exp(-((x + 53) ** 2 + (z - 70) ** 2) / 1050) +
+    8.2 * Math.exp(-((x - 66) ** 2 + (z + 62) ** 2) / 1750) +
+    6.5 * Math.exp(-((x - 74) ** 2 + (z - 52) ** 2) / 1280) +
+    11.0 * Math.exp(-((x + 126) ** 2 + (z + 112) ** 2) / 2400) +
+    9.0 * Math.exp(-((x - 122) ** 2 + (z - 99) ** 2) / 2200);
   const channel =
     0.2 * (1 - THREE.MathUtils.smoothstep(fromRiver, 0.6, 3));
+  const outerDistance = Math.max(Math.abs(x), Math.abs(z));
+  const outerRidges = THREE.MathUtils.smoothstep(outerDistance, 150, 260) *
+    (5 * Math.sin(x * 0.019 + z * 0.007) +
+      3.5 * Math.cos(z * 0.024 - x * 0.011));
   const raw =
     floor + flank + rolling +
-    hills * THREE.MathUtils.smoothstep(fromRiver, 2, 18) - channel;
+    hills * THREE.MathUtils.smoothstep(fromRiver, 2, 18) - channel + outerRidges;
   const clearing = 1 - THREE.MathUtils.smoothstep(Math.hypot(x, z), 2.5, 4.5);
   return THREE.MathUtils.lerp(raw, 0, clearing);
 };
@@ -99,7 +103,7 @@ function surfaceGeometry(raised, size = 400) {
   return geometry;
 }
 function outerTerrainGeometry(raised) {
-  const far = 380, segments = 64;
+  const rings = [extent, 230, 330, 480], segments = 96;
   const vertices = [], colors = [], indices = [];
   const add = (x, z) => {
     const y = landscapeHeight(x, z, raised);
@@ -112,14 +116,18 @@ function outerTerrainGeometry(raised) {
     const first = vertices.length / 3;
     for (let i = 0; i <= segments; i++) {
       const t = -1 + (2 * i) / segments;
-      if (side === 0) { add(t * extent, -extent); add(t * far, -far); }
-      if (side === 1) { add(t * extent, extent); add(t * far, far); }
-      if (side === 2) { add(-extent, t * extent); add(-far, t * far); }
-      if (side === 3) { add(extent, t * extent); add(far, t * far); }
-      if (i < segments) {
-        const a = first + i * 2;
-        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      for (const distance of rings) {
+        if (side === 0) add(t * distance, -distance);
+        if (side === 1) add(t * distance, distance);
+        if (side === 2) add(-distance, t * distance);
+        if (side === 3) add(distance, t * distance);
       }
+      if (i < segments)
+        for (let ring = 0; ring < rings.length - 1; ring++) {
+          const a = first + i * rings.length + ring;
+          indices.push(a, a + 1, a + rings.length,
+            a + 1, a + rings.length + 1, a + rings.length);
+        }
     }
   }
   const geometry = new THREE.BufferGeometry();
@@ -192,6 +200,45 @@ function makeTrees(group, raised) {
     );
   });
   group.add(trunk, broadleaf, pine);
+  const nearLeaf = deciduous.filter(({ x, z }) => Math.hypot(x, z) < 58);
+  const lobes = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(0.62, 1),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }),
+    nearLeaf.length * 3,
+  );
+  nearLeaf.forEach(({ x, z, scale }, i) => {
+    for (let lobe = 0; lobe < 3; lobe++) {
+      const angle = (lobe * Math.PI * 2) / 3 + seeded(i + 4500);
+      temp.position.set(
+        x + Math.cos(angle) * 0.65 * scale,
+        landscapeHeight(x, z, raised) + (2.3 + 0.2 * seeded(i + lobe + 4600)) * scale,
+        z + Math.sin(angle) * 0.65 * scale,
+      );
+      temp.scale.setScalar(scale);
+      temp.updateMatrix();
+      lobes.setMatrixAt(i * 3 + lobe, temp.matrix);
+      lobes.setColorAt(i * 3 + lobe, new THREE.Color().setHSL(
+        0.29 + seeded(i + 3100) * 0.09, 0.22, 0.28 + seeded(i + 3200) * 0.13,
+      ));
+    }
+  });
+  group.add(lobes);
+  const shrubs = new THREE.InstancedMesh(
+    new THREE.IcosahedronGeometry(0.35, 0),
+    new THREE.MeshStandardMaterial({ color: 0x597b55, roughness: 1 }),
+    480,
+  );
+  for (let i = 0; i < shrubs.count; i++) {
+    const x = (seeded(i + 28000) - 0.5) * 145;
+    const z = (seeded(i + 29000) - 0.5) * 145;
+    const scale = Math.hypot(x, z) < 8 || Math.abs(x - riverX(z)) < 5 ||
+      Math.abs(z - highwayZ(x)) < 9 ? 0 : 0.6 + seeded(i + 30000) * 1.3;
+    temp.position.set(x, landscapeHeight(x, z, raised) + 0.22 * scale, z);
+    temp.scale.setScalar(scale);
+    temp.updateMatrix();
+    shrubs.setMatrixAt(i, temp.matrix);
+  }
+  group.add(shrubs);
 }
 function ribbonAlongZ(raised, halfWidth, yAt, color, crossSegments = 1) {
   const vertices = [], indices = [];
@@ -402,24 +449,26 @@ function makePopulation(group, raised) {
 }
 
 export class LayerExperience {
-  constructor(scene, onChange) {
+  constructor(scene, onChange, onEvent = () => {}) {
     this.scene = scene;
     this.onChange = onChange;
+    this.onEvent = onEvent;
     this.previousBackground = scene.background;
     this.previousFog = scene.fog;
     if (scene.background !== null) {
       scene.background = new THREE.Color(0xa8c8ca);
-      scene.fog = new THREE.Fog(0xa8c8ca, 90, 300);
+      scene.fog = new THREE.Fog(0xa8c8ca, 150, 470);
     }
     this.selected = new Set();
     this.elapsed = 0;
     this.finished = false;
     this.lastLayer = null;
+    this.reveal = null;
     this.view = "layers";
     this.group = new THREE.Group();
     scene.add(this.group);
     this.clipboard = new THREE.Group();
-    this.clipboard.scale.setScalar(0.18);
+    this.clipboard.scale.setScalar(0.24);
     this.clipboard.visible = false;
     scene.add(this.clipboard);
     const board = new THREE.Mesh(
@@ -486,7 +535,7 @@ export class LayerExperience {
     if (preview) {
       camera.updateWorldMatrix(true, false);
       this.clipboard.position.copy(
-        camera.localToWorld(new THREE.Vector3(-0.47, -0.12, -1.05)),
+        camera.localToWorld(new THREE.Vector3(0, -0.12, -1.05)),
       );
     } else {
       leftGrip.updateWorldMatrix(true, false);
@@ -501,10 +550,20 @@ export class LayerExperience {
   }
   toggle(key) {
     if (!LAYER_KEYS.includes(key) || this.finished) return;
+    if (this.reveal) {
+      for (const variant of Object.values(this.variants))
+        if (this.reveal.key !== "topography") variant[this.reveal.key].scale.y = 1;
+      if (this.reveal.key === "topography") this.variants.raised.world.scale.y = 1;
+      this.reveal = null;
+    }
     if (this.selected.has(key)) this.selected.delete(key);
-    else this.selected.add(key);
+    else {
+      this.selected.add(key);
+      this.reveal = { key, elapsed: 0 };
+    }
     this.lastLayer = key;
     this.applyVisibility();
+    this.onEvent("layer");
     this.onChange();
   }
   setView(view) {
@@ -523,12 +582,26 @@ export class LayerExperience {
   reset() {
     this.selected.clear();
     this.lastLayer = null;
+    this.reveal = null;
+    for (const variant of Object.values(this.variants)) {
+      variant.world.scale.y = 1;
+      for (const key of LAYER_KEYS.slice(1)) variant[key].scale.y = 1;
+    }
     this.elapsed = 0;
     this.finished = false;
     this.applyVisibility();
     this.onChange();
   }
   update(dt) {
+    if (this.reveal) {
+      this.reveal.elapsed += dt;
+      const { key, elapsed } = this.reveal;
+      const amount = 0.02 + 0.98 * (1 - (1 - Math.min(1, elapsed / 0.8)) ** 3);
+      for (const variant of Object.values(this.variants))
+        if (key !== "topography") variant[key].scale.y = amount;
+      if (key === "topography") this.variants.raised.world.scale.y = amount;
+      if (elapsed >= 0.8) this.reveal = null;
+    }
     if (this.finished) return;
     this.elapsed += dt;
     if (this.elapsed >= 240) {

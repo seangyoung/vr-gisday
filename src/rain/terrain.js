@@ -1,6 +1,6 @@
 // Synthetic elevation surface, in arbitrary model units. D8 steepest descent:
 // diagonal neighbors use their longer horizontal distance when comparing slopes.
-export const SIZE = 41;
+export const SIZE = 65;
 export const SPACING = 2 / (SIZE - 1);
 export function elevation(x, z) {
   return (

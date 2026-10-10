@@ -7,6 +7,7 @@ export class LabSound {
     } catch {}
     this.active = true;
     this.lastScan = -Infinity;
+    this.lastCue = -Infinity;
   }
   unlock() {
     try {
@@ -93,12 +94,46 @@ export class LabSound {
     this.unlock();
     this.tone(620);
   }
-  scan() {
+  scan(distance = 1) {
     if (!this.context) return;
     const now = this.context.currentTime;
     if (now - this.lastScan < 0.14) return;
     this.lastScan = now;
-    this.tone(1050, 0.04, 0.075);
+    // Shorter returns sound slightly brighter, without claiming material sensing.
+    this.tone(880 + 340 / (1 + Math.max(0, distance)), 0.04, 0.075);
+  }
+  cue(kind) {
+    this.unlock();
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    if (now - this.lastCue < 0.12) return;
+    this.lastCue = now;
+    const notes = {
+      measure: [440, 660],
+      reveal: [520, 780],
+      correct: [620, 930],
+      blocked: [330, 260],
+      layer: [480, 720],
+      merge: [650, 430],
+      spill: [390, 540],
+    }[kind];
+    if (!notes) return;
+    this.tone(notes[0], 0.11, 0.085);
+    // Schedule the second note through the audio graph, not a wall-clock timer.
+    if (this.muted || !this.active || this.context.state !== "running") return;
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+    const start = now + 0.09;
+    oscillator.type = "sine";
+    oscillator.frequency.value = notes[1];
+    envelope.gain.setValueAtTime(0, start);
+    envelope.gain.linearRampToValueAtTime(0.075, start + 0.01);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+    oscillator.connect(envelope);
+    envelope.connect(this.master);
+    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+    oscillator.start(start);
+    oscillator.stop(start + 0.13);
   }
   setWater(on) {
     if (!this.water || this.waterOn === on) return;

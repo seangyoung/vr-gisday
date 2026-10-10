@@ -37,16 +37,24 @@ export function buildScanScene(id, mesh) {
       "vegetation",
     );
     mesh(
-      new THREE.SphereGeometry(0.31 * scale, 16, 10),
+      new THREE.SphereGeometry(0.29 * scale, 24, 16),
       [x, y + 0.69 * scale, z],
       "vegetation",
     );
+    for (const side of [-1, 1])
+      mesh(
+        new THREE.IcosahedronGeometry(0.13 * scale, 1),
+        [x + side * 0.17 * scale, y + 0.59 * scale, z + side * 0.08 * scale],
+        "vegetation",
+      );
   };
   box([2, 0.04, 1.6], [0, -0.02, 0], "ground");
   if (id === "ruins") {
     for (const x of [-0.48, 0.48]) box([0.14, 0.55, 0.7], [x, 0.275, 0]);
     box([1.1, 0.15, 0.18], [0, 0.61, 0.3]);
     box([1.1, 0.32, 0.12], [0, 0.16, -0.34]);
+    for (const [x, z, w] of [[-0.2, 0.55, 0.22], [0.28, -0.55, 0.17], [0.55, 0.44, 0.14]])
+      box([w, 0.07, w * 0.8], [x, 0.035, z]);
     tree(-0.65, 0.45);
     tree(0.65, -0.4);
   } else if (id === "bridge") {
@@ -55,6 +63,8 @@ export function buildScanScene(id, mesh) {
       box([0.13, 0.44, 0.52], [x * 0.65, 0.22, 0]);
     }
     box([1.8, 0.09, 0.5], [0, 0.465, 0]);
+    for (const x of [-0.6, -0.3, 0, 0.3, 0.6])
+      box([0.06, 0.035, 0.55], [x, 0.53, 0]);
     for (const z of [-0.24, 0.24]) {
       box([1.8, 0.04, 0.04], [0, 0.66, z]);
       for (const x of [-0.8, -0.4, 0, 0.4, 0.8])
@@ -81,6 +91,8 @@ export function buildScanScene(id, mesh) {
         [x, y + h, z - 0.25],
         "structure",
       );
+      for (const side of [-1, 1])
+        box([0.09, 0.1, 0.012], [x + side * 0.13, y + h * 0.58, z + 0.217]);
     }
     tree(-0.7, -0.45, 0, 0.85);
     tree(0.79, 0.53, 0, 0.55);
@@ -93,6 +105,8 @@ export function buildScanScene(id, mesh) {
       box([w, h, d], [0, y, -0.1], "ground");
     for (const x of [-0.22, 0.22])
       for (const z of [-0.24, 0.04]) box([0.045, 0.35, 0.045], [x, 0.655, z]);
+    for (const [w, y] of [[1.5, 0.16], [1.05, 0.32], [0.65, 0.48]])
+      box([w, 0.035, 0.035], [0, y, 0.49 - y * 0.35]);
     mesh(
       new THREE.ConeGeometry(0.4, 0.22, 4),
       [0, 0.94, -0.1],

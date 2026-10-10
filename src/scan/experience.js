@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
 import { buildScanScene, SCAN_SCENES } from "./scenes.js";
 const COLORS = { ground: 0x65cfd1, structure: 0xffd39b, vegetation: 0x99eb91 };
+const WHITE = new THREE.Color(0xffffff);
 export class ScanExperience {
   constructor(scene, onChange, sceneInfo = SCAN_SCENES[0]) {
     this.sceneInfo = sceneInfo;
@@ -58,13 +59,23 @@ export class ScanExperience {
     this.points = new THREE.Points(
       geometry,
       new THREE.PointsMaterial({
-        size: 0.012,
+        size: 0.016,
         vertexColors: true,
         sizeAttenuation: true,
       }),
     );
     this.points.frustumCulled = false;
     this.group.add(this.points);
+    this.scanRay = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
+      new THREE.LineBasicMaterial({ color: 0xb6f6ff, transparent: true, opacity: 0, depthWrite: false }),
+    );
+    this.scanRay.visible = false;
+    this.group.add(this.scanRay);
+    this.rayAge = 0;
+    this.lastRange = 1;
+    this.highlightAge = 0;
+    this.fadeClock = 0;
     this.ray = new THREE.Raycaster();
   }
   place(camera) {
@@ -91,6 +102,19 @@ export class ScanExperience {
     this.onChange();
   }
   update(dt) {
+    if (this.highlightAge > 0) {
+      this.highlightAge = Math.max(0, this.highlightAge - dt);
+      this.fadeClock += dt;
+      if (this.fadeClock >= 0.12 || this.highlightAge === 0) {
+        this.fadeClock = 0;
+        this.refreshPoints();
+      }
+    }
+    if (this.scanRay.visible) {
+      this.rayAge += dt;
+      this.scanRay.material.opacity = Math.max(0, 0.72 * (1 - this.rayAge / 0.22));
+      if (this.rayAge >= 0.22) this.scanRay.visible = false;
+    }
     if (this.stage < 2) {
       this.elapsed += dt;
       if (this.elapsed >= 240) this.finish();
@@ -107,6 +131,7 @@ export class ScanExperience {
     if (!hit) return false;
     const p = this.group.worldToLocal(hit.point.clone()),
       kind = hit.object.userData.kind;
+    this.lastRange = hit.distance;
     const key = [
       kind,
       Math.round(p.x / 0.013),
@@ -115,7 +140,8 @@ export class ScanExperience {
     ].join(":");
     if (this.keys.has(key)) return false;
     this.keys.add(key);
-    this.records.push({ p, kind });
+    this.records.push({ p, kind, capturedAt: this.elapsed });
+    this.highlightAge = 1.45;
     return true;
   }
   sweep(origin, direction, dt) {
@@ -130,6 +156,20 @@ export class ScanExperience {
     if (side.lengthSq() < 0.01) side.set(1, 0, 0);
     side.normalize();
     const up = new THREE.Vector3().crossVectors(side, direction).normalize();
+    this.ray.set(origin, direction);
+    const central = this.hit(this.ray);
+    if (central) {
+      const positions = this.scanRay.geometry.attributes.position;
+      const start = this.group.worldToLocal(origin.clone());
+      const end = this.group.worldToLocal(central.point.clone());
+      positions.setXYZ(0, start.x, start.y, start.z);
+      positions.setXYZ(1, end.x, end.y, end.z);
+      positions.needsUpdate = true;
+      this.scanRay.geometry.computeBoundingSphere();
+      this.scanRay.material.opacity = 0.72;
+      this.scanRay.visible = true;
+      this.rayAge = 0;
+    }
     for (let x = -2; x <= 2; x++)
       for (let y = -2; y <= 2; y++) {
         const d = direction
@@ -149,9 +189,10 @@ export class ScanExperience {
   refreshPoints() {
     const geo = this.points.geometry;
     let count = 0;
-    for (const { p, kind } of this.records) {
+    for (const { p, kind, capturedAt } of this.records) {
       if (this.hideVegetation && kind === "vegetation") continue;
       const c = new THREE.Color(COLORS[kind]);
+      c.lerp(WHITE, Math.max(0, 0.65 * (1 - (this.elapsed - capturedAt) / 1.4)));
       geo.attributes.position.setXYZ(count, p.x, p.y, p.z);
       geo.attributes.color.setXYZ(count, c.r, c.g, c.b);
       count++;
@@ -182,6 +223,8 @@ export class ScanExperience {
     this.keys.clear();
     this.milestone = 0;
     this.sampleTime = 0;
+    this.highlightAge = 0;
+    this.scanRay.visible = false;
     this.refreshPoints();
     this.onChange();
   }

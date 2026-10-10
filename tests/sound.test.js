@@ -82,3 +82,22 @@ test("audio starts lazily, scan cues are bounded, and mute/visibility silence al
     globalThis.AudioContext = old;
   }
 });
+
+test("event cues are bounded and remain silent while muted", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.unlock();
+    sound.cue("layer");
+    assert.equal(sound.context.tones, 2);
+    sound.cue("reveal");
+    assert.equal(sound.context.tones, 2);
+    sound.context.currentTime = 0.2;
+    sound.muted = true;
+    sound.cue("reveal");
+    assert.equal(sound.context.tones, 2);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});

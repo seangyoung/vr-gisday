@@ -17,6 +17,7 @@ const reliefCache = new Map();
 
 export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
   const size = ctx.canvas.width;
+  const ratio = size / 384;
   const coord = (value) => ((value + extent) / (2 * extent)) * size;
   const point = (x, z) => [coord(x), coord(z)];
   ctx.fillStyle = "#d8e1cf";
@@ -51,7 +52,7 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
 
   if (selected.has("population")) {
     const cell = size / 8;
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.2 * ratio;
     for (let row = 0; row < 8; row++)
       for (let col = 0; col < 8; col++) {
         const x = -extent + (col + 0.5) * (2 * extent / 8);
@@ -70,7 +71,7 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
     ctx.fillStyle = "#214b35";
     for (const { x, z } of TREE_POSITIONS) {
       const [px, py] = point(x, z);
-      ctx.fillRect(px, py, 1.8, 1.8);
+      ctx.fillRect(px, py, 1.8 * ratio, 1.8 * ratio);
     }
   }
 
@@ -82,10 +83,10 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
       else ctx.lineTo(px, py);
     }
     ctx.strokeStyle = "#307d9f";
-    ctx.lineWidth = 8;
+    ctx.lineWidth = 8 * ratio;
     ctx.stroke();
     ctx.strokeStyle = "#78c0cf";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3 * ratio;
     ctx.stroke();
   }
 
@@ -97,33 +98,33 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
       else ctx.lineTo(px, py);
     }
     ctx.strokeStyle = "#e9ece6";
-    ctx.lineWidth = 14;
+    ctx.lineWidth = 14 * ratio;
     ctx.stroke();
     ctx.strokeStyle = "#374247";
-    ctx.lineWidth = 10;
+    ctx.lineWidth = 10 * ratio;
     ctx.stroke();
     ctx.strokeStyle = "#e5bd58";
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.5 * ratio;
     ctx.stroke();
   }
 
   if (annotations) {
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 7, 0, Math.PI * 2);
+    ctx.arc(size / 2, size / 2, 7 * ratio, 0, Math.PI * 2);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 2.5 * ratio;
     ctx.strokeStyle = "#17363d";
     ctx.stroke();
-    ctx.font = "bold 20px system-ui, sans-serif";
+    ctx.font = `bold ${20 * ratio}px system-ui, sans-serif`;
     ctx.fillStyle = "#17363d";
-    ctx.fillText("YOU", size / 2 + 11, size / 2 - 11);
-    ctx.font = "bold 18px system-ui, sans-serif";
-    ctx.fillText("MODEL N ↑", 13, 26);
+    ctx.fillText("YOU", size / 2 + 11 * ratio, size / 2 - 11 * ratio);
+    ctx.font = `bold ${18 * ratio}px system-ui, sans-serif`;
+    ctx.fillText("MODEL N ↑", 13 * ratio, 26 * ratio);
     ctx.fillStyle = "#17363dcc";
-    ctx.fillRect(0, size - 28, size, 28);
+    ctx.fillRect(0, size - 28 * ratio, size, 28 * ratio);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "16px system-ui, sans-serif";
-    ctx.fillText("Same synthetic layers · overhead view", 12, size - 8);
+    ctx.font = `${16 * ratio}px system-ui, sans-serif`;
+    ctx.fillText("Same synthetic layers · overhead view", 12 * ratio, size - 8 * ratio);
   }
 }

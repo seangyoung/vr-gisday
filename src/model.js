@@ -49,7 +49,7 @@ export const stages = [
   },
   {
     title: "Four ranges. One common position.",
-    body: "The fourth beacon rules out the other white point.\nOne position now matches all four exact distances.\nGPS also needs to solve receiver clock error.",
+    body: "The fourth beacon rules out the other white point.\nOne position fits all four exact ranges. Real GNSS uses\nsignal travel time (pseudorange) and solves clock bias.",
     action: "Finish",
   },
 ];

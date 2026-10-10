@@ -134,7 +134,7 @@ export class ErosionWater extends SurfaceWater {
             this.heights[from] - this.heights[to] - this.spacing * 1.2;
           if (excess <= 0) continue;
           const amount = Math.min(
-            excess * 0.035,
+            excess * 0.075,
             Math.max(
               0,
               this.heights[from] +
