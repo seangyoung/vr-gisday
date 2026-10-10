@@ -92,6 +92,47 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(scene.children.length, 0);
 });
 
+test("left-stick walking follows the view, terrain, bounds, and clipboard location", () => {
+  const scene = new THREE.Scene();
+  const l = new LayerExperience(scene, () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  l.place(camera);
+  const map = new THREE.Mesh(new THREE.PlaneGeometry(1.17, 1.17));
+  l.registerVisitorMarker(map, LANDSCAPE_EXTENT);
+  assert.equal(l.visitorMarkers[0].marker.position.x, 0);
+  l.walk(0, -1, 0.1, camera);
+  assert.ok(Math.abs(l.group.position.z - 0.28) < 1e-9);
+  assert.ok(l.visitor.y < 0);
+  assert.ok(l.visitorMarkers[0].marker.position.y > 0);
+  l.turn(Math.PI / 2, camera);
+  const before = l.visitor.clone();
+  l.walk(1, 0, 0.1, camera);
+  assert.ok(l.visitor.distanceTo(before) > 0.25);
+  l.walk(1, 0, 100, camera);
+  assert.ok(Math.abs(l.visitor.x) <= LANDSCAPE_EXTENT - 4 + 1e-9);
+  assert.ok(Math.abs(l.visitor.y) <= LANDSCAPE_EXTENT - 4 + 1e-9);
+  l.place(camera);
+  assert.ok(l.visitor.length() < 1e-9);
+  assert.ok(l.visitorMarkers[0].marker.position.length() < 0.013);
+  l.toggle("topography");
+  l.update(0.8);
+  const hill = new THREE.Vector3(-60, 0, -35).applyAxisAngle(
+    new THREE.Vector3(0, 1, 0), l.group.rotation.y,
+  );
+  l.group.position.x = -hill.x;
+  l.group.position.z = -hill.z;
+  l.walk(0, 0, 0.1, camera);
+  assert.ok(Math.abs(l.visitor.x + 60) < 1e-9);
+  assert.ok(Math.abs(l.visitor.y + 35) < 1e-9);
+  assert.ok(Math.abs(l.group.position.y + landscapeHeight(-60, -35)) < 1e-9);
+  l.toggle("topography");
+  l.walk(0, 0, 0.1, camera);
+  assert.equal(l.group.position.y, 0);
+  l.dispose();
+  map.geometry.dispose();
+});
+
 test("the river runs downhill inside a carved channel and the highway bridges it", () => {
   const scene = new THREE.Scene();
   const oldSky = new THREE.Color(0x071820);

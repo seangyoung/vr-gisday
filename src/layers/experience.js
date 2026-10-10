@@ -463,6 +463,10 @@ export class LayerExperience {
     this.lastLayer = null;
     this.reveal = null;
     this.view = "map";
+    this.visitor = new THREE.Vector2();
+    this.visitorMarkers = [];
+    this.floorY = 0;
+    this.walkForward = new THREE.Vector3();
     this.group = new THREE.Group();
     scene.add(this.group);
     this.clipboard = new THREE.Group();
@@ -529,11 +533,14 @@ export class LayerExperience {
   place(camera) {
     const p = new THREE.Vector3();
     camera.getWorldPosition(p);
-    this.group.position.set(p.x, p.y - 1.6, p.z);
+    this.floorY = p.y - 1.6;
+    this.group.position.set(p.x, this.floorY, p.z);
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(
       camera.getWorldQuaternion(new THREE.Quaternion()),
     );
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z) - 0.25;
+    this.visitor.set(0, 0);
+    this.updateVisitorMarkers();
   }
   turn(angle, camera) {
     if (!angle) return;
@@ -543,6 +550,68 @@ export class LayerExperience {
     this.group.position.x = pivot.x + offset.x;
     this.group.position.z = pivot.z + offset.z;
     this.group.rotation.y += angle;
+  }
+  walk(stickX, stickY, dt, camera) {
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const local = this.group.worldToLocal(eye.clone());
+    const magnitude = Math.hypot(stickX, stickY);
+    if (Number.isFinite(magnitude) && magnitude > 0.18 && dt > 0) {
+      const strength = Math.min(1, (magnitude - 0.18) / 0.82);
+      camera.getWorldDirection(this.walkForward);
+      this.walkForward.y = 0;
+      this.walkForward.normalize();
+      const distance = 2.8 * strength * dt / magnitude;
+      const worldX = (-this.walkForward.z * stickX - this.walkForward.x * stickY) * distance;
+      const worldZ = (this.walkForward.x * stickX - this.walkForward.z * stickY) * distance;
+      const c = Math.cos(this.group.rotation.y);
+      const s = Math.sin(this.group.rotation.y);
+      const dx = c * worldX - s * worldZ;
+      const dz = s * worldX + c * worldZ;
+      const limit = LANDSCAPE_EXTENT - 4;
+      const nextX = THREE.MathUtils.clamp(local.x + dx, -limit, limit);
+      const nextZ = THREE.MathUtils.clamp(local.z + dz, -limit, limit);
+      const appliedX = nextX - local.x;
+      const appliedZ = nextZ - local.z;
+      this.group.position.x -= c * appliedX + s * appliedZ;
+      this.group.position.z -= -s * appliedX + c * appliedZ;
+      local.x = nextX;
+      local.z = nextZ;
+    }
+    this.visitor.set(local.x, local.z);
+    const relief = this.selected.has("topography")
+      ? landscapeHeight(local.x, local.z) * this.variants.raised.world.scale.y
+      : 0;
+    this.group.position.y = this.floorY - relief;
+    this.updateVisitorMarkers();
+  }
+  clearVisitorMarkers() {
+    this.visitorMarkers.length = 0;
+  }
+  registerVisitorMarker(map, mapExtent) {
+    const marker = new THREE.Group();
+    marker.position.z = 0.012;
+    for (const [radius, color, z] of [
+      [0.025, 0x17363d, 0],
+      [0.017, 0xffffff, 0.001],
+    ]) {
+      const circle = new THREE.Mesh(
+        new THREE.CircleGeometry(radius, 20),
+        new THREE.MeshBasicMaterial({ color, depthTest: false }),
+      );
+      circle.position.z = z;
+      marker.add(circle);
+    }
+    map.add(marker);
+    this.visitorMarkers.push({ marker, mapExtent, width: map.geometry.parameters.width });
+    this.updateVisitorMarkers();
+  }
+  updateVisitorMarkers() {
+    for (const { marker, mapExtent, width } of this.visitorMarkers) {
+      marker.visible = Math.abs(this.visitor.x) <= mapExtent &&
+        Math.abs(this.visitor.y) <= mapExtent;
+      marker.position.x = (this.visitor.x / mapExtent) * width / 2;
+      marker.position.y = -(this.visitor.y / mapExtent) * width / 2;
+    }
   }
   updateClipboard(leftGrip, camera, preview = false) {
     if (!leftGrip && !preview) {

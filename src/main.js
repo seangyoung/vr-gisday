@@ -24,10 +24,12 @@ import {
   LAYER_KEYS,
   LAYER_NAMES,
   LAYER_HINTS,
+  LANDSCAPE_EXTENT,
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { PixelExperience } from "./pixels/experience.js";
+import { PIXEL_EXTENT } from "./pixels/model.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { ControllerGuide } from "./controller-guide.js";
 const nextScanScene = createSceneRotation();
@@ -624,7 +626,7 @@ function drawLayersUI() {
 
     return;
   }
-  label("Toggle layers around you · right stick: 30° turns", 0, 0.68,
+  label("Left stick: move · right stick: turn 30°", 0, 0.68,
     2.3, 0.13, 28, "#b6d1d9", "#0b2430");
   {
     const canvas = document.createElement("canvas");
@@ -638,6 +640,7 @@ function drawLayersUI() {
     );
     map.position.set(-0.52, 0.01, 0.04);
     uiParent.add(map);
+    l.registerVisitorMarker(map, LANDSCAPE_EXTENT);
     LAYER_KEYS.forEach((key, i) => {
       const marked = l.selected.has(key) ? "[x]" : "[ ]";
       button(`${marked} ${LAYER_NAMES[key]}`, 0.65, 0.47 - i * 0.17, () => l.toggle(key), 1.02);
@@ -669,7 +672,7 @@ function drawViewshedUI() {
 
     return;
   }
-  label("Tap the map to move the observer · watch the landscape change",
+  label("Left stick: move · right stick: turn 30°",
     0, 0.68, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
   {
     const canvas = document.createElement("canvas");
@@ -686,13 +689,14 @@ function drawViewshedUI() {
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
+    v.registerVisitorMarker(map, LANDSCAPE_EXTENT);
     label("Move the gold observer.\nCan it see the blue target?", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
     button("Eye level · 2 m", 0.64, 0.18, () => v.setHeight(2), 1.04)
       .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Map and landscape agree · right stick: 30° turns", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Gold: observer · white: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
@@ -715,7 +719,7 @@ function drawPixelsUI() {
     return;
   }
   label(
-    "GSD = ground width of one pixel · right stick: 30° turns",
+    "GSD = pixel ground width · left stick: move · right: turn",
     0, 0.68, 2.3, 0.12, 30, "#b6d1d9", "#0b2430",
   );
   for (const [size, x] of [[2, -0.84], [8, -0.28], [24, 0.28], [48, 0.84]])
@@ -736,11 +740,12 @@ function drawPixelsUI() {
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
+    p.registerVisitorMarker(map, PIXEL_EXTENT);
   }
   const cell = p.cell;
   const percent = (index) => Math.round((cell.counts[index] / (p.size ** 2)) * 100);
   label(
-    `Selected ${p.size} m GSD · ${p.size ** 2} m²\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`,
+    `Selected ${p.size} m GSD · ${p.size ** 2} m² · White dot: you\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`,
     0, -0.675, 2.3, 0.14, 27, "#e6f4f5", "#0b2430",
   );
   if (p.answer === null) {
@@ -1228,6 +1233,7 @@ function updateUIFade(dt) {
   if (uiFadeAge >= 0.45) uiFadeMeshes = [];
 }
 function drawScene() {
+  (pixels ?? viewshed ?? layers)?.clearVisitorMarkers();
   clear();
   const key = pixels ? `pixels:${pixels.finished}` :
     viewshed ? `viewshed:${viewshed.view}:${viewshed.finished}` :
@@ -1699,6 +1705,10 @@ renderer.setAnimationLoop((time, frame) => {
               c.userData.xrInput?.handedness === "left" && grip.visible,
           )
         : null;
+      const leftPad = left?.c.userData.xrInput?.gamepad;
+      const leftX = leftPad?.mapping === "xr-standard" ? leftPad.axes[2] ?? 0 : 0;
+      const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
+      if (visible) landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
     }
     if (rain && renderer.xr.getSession().visibilityState === "visible") {

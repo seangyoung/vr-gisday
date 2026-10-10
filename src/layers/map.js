@@ -120,22 +120,13 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
   }
 
   if (annotations) {
-    ctx.beginPath();
-    ctx.arc(size / 2, size / 2, 7 * ratio, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = 2.5 * ratio;
-    ctx.strokeStyle = "#17363d";
-    ctx.stroke();
     ctx.font = `bold ${20 * ratio}px system-ui, sans-serif`;
     ctx.fillStyle = "#17363d";
-    ctx.fillText("YOU", size / 2 + 11 * ratio, size / 2 - 11 * ratio);
-    ctx.font = `bold ${18 * ratio}px system-ui, sans-serif`;
     ctx.fillText("MODEL N ↑", 13 * ratio, 26 * ratio);
     ctx.fillStyle = "#17363dcc";
     ctx.fillRect(0, size - 28 * ratio, size, 28 * ratio);
     ctx.fillStyle = "#ffffff";
     ctx.font = `${16 * ratio}px system-ui, sans-serif`;
-    ctx.fillText("Same synthetic layers · overhead view", 12 * ratio, size - 8 * ratio);
+    ctx.fillText("White dot: you · synthetic overhead view", 12 * ratio, size - 8 * ratio);
   }
 }
