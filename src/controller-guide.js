@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
-import { positionButtonLabel } from "./controller-label-layout.js";
+import { arrangeButtonLabels, positionButtonLabel } from "./controller-label-layout.js";
+import { updateGuideVisibility } from "./controller-guide-visibility.js";
 
 const modelFactory = new XRControllerModelFactory();
 modelFactory.setPath(`${import.meta.env.BASE_URL}controller-profiles`);
@@ -19,13 +20,12 @@ const leftButtons = [
 ];
 const rightButtons = [
   ["a", "A", "Sound", "b", 0.025],
-  ["b", "B", "Exit demo", "a", 0.025],
+  ["b", "B", "Exit", "a", 0.025],
 ];
 const eye = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const hand = new THREE.Vector3();
 const toHand = new THREE.Vector3();
-const otherButton = new THREE.Vector3();
 
 function makeLabel(key, action) {
   const canvas = document.createElement("canvas");
@@ -69,6 +69,7 @@ export class ControllerGuide {
     this.onMenu = false;
     this.exitLabel = "Exit demo";
     this.dwell = 0;
+    this.hold = 0;
     this.labels = [];
     this.labelKey = "";
     this.materialsPrepared = false;
@@ -79,6 +80,7 @@ export class ControllerGuide {
     if (handName === this.handedness) return;
     this.handedness = handName;
     this.dwell = 0;
+    this.hold = 0;
     this.materialsPrepared = false;
     this.clearLabels();
   }
@@ -134,6 +136,7 @@ export class ControllerGuide {
       const sprite = makeLabel(face, action);
       this.scene.add(sprite);
       this.labels.push({ node, neighbor: this.model.getObjectByName(anchorNames[neighborId]),
+        anchor: new THREE.Vector3(), neighborPosition: new THREE.Vector3(),
         sprite, spacing, ready: false });
     }
     this.labelKey = key;
@@ -149,6 +152,7 @@ export class ControllerGuide {
     this.setVisible(false);
     if (this.handedness === "none" || !tracked || !this.ensureLabels()) {
       this.dwell = 0;
+      this.hold = 0;
       return -Infinity;
     }
     camera.getWorldPosition(eye);
@@ -157,18 +161,18 @@ export class ControllerGuide {
     toHand.copy(hand).sub(eye);
     const distance = toHand.length();
     const gaze = forward.dot(toHand.normalize());
-    if (distance < 0.16 || distance > 0.8 || gaze < 0.94 || hand.y < eye.y - 0.38) {
-      this.dwell = 0;
-      return -Infinity;
-    }
-    this.dwell += dt;
-    if (this.dwell < 0.3) return -Infinity;
+    const visibility = updateGuideVisibility({ dwell: this.dwell, hold: this.hold },
+      tracked, distance, gaze, hand.y - eye.y, dt);
+    this.dwell = visibility.dwell;
+    this.hold = visibility.hold;
+    if (this.hold <= 0) return -Infinity;
     for (const label of this.labels) {
-      label.node.getWorldPosition(hand);
-      const neighbor = label.neighbor?.getWorldPosition(otherButton);
-      label.ready = positionButtonLabel(hand, neighbor, eye,
+      label.node.getWorldPosition(label.anchor);
+      const neighbor = label.neighbor?.getWorldPosition(label.neighborPosition);
+      label.ready = positionButtonLabel(label.anchor, neighbor, eye,
         label.spacing, label.sprite.position);
     }
+    arrangeButtonLabels(this.labels, camera);
     return gaze - distance * 0.05;
   }
 }

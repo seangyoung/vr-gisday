@@ -573,7 +573,7 @@ function drawRoomUI() {
   if (s.stage === 0) {
     if (s.status !== "unavailable")
       button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
-    label("Raise a controller and look at its buttons for shortcuts",
+    label("Raise either controller into view for button shortcuts",
       0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
@@ -694,7 +694,7 @@ function drawScanChooserUI() {
     scan.explore();
   });
   drawScanChoiceCard("room", 0.61, "Room scan · MR", "Scan nearby real surfaces", switchToRoomScan);
-  label("Raise a controller and look at its buttons for shortcuts",
+  label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawLayersUI() {
@@ -882,7 +882,7 @@ function drawRainChooserUI() {
     0, 0.69, 2.3, 0.2, 31, "#b6d1d9", "#0b2430");
   drawRainChoiceCard("drainage", -0.61, "Drainage sandbox", "Follow runoff and ponds");
   drawRainChoiceCard("erosion", 0.61, "Erosion tray", "Watch channels form");
-  label("Raise a controller and look at its buttons for shortcuts",
+  label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawRainUI() {
@@ -1328,7 +1328,7 @@ function controllerGuideContext(hand) {
   const onMenu = isMenu();
   const exitLabel = onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR"
-    : "Exit demo";
+    : "Exit";
   if (rain?.stage === 1) {
     return [hand === "left" ? "Rain" : "Sculpt", "Move/size", onMenu, exitLabel];
   }
@@ -1438,7 +1438,7 @@ function drawScene() {
       },
       1.8,
     );
-    label("Raise a controller and look at its buttons for shortcuts",
+    label("Raise either controller into view for button shortcuts",
       0, -1.04, 2.3, 0.13, 27, "#b6d1d9", "#0b2430");
 
     return;
@@ -1470,7 +1470,7 @@ function drawScene() {
     button("Stand Inside the Layers", 0, -0.27, startLayers, 1.75);
     button("Can You See It?", 0, -0.45, startViewshed, 1.75);
     button("How Big Is a Pixel?", 0, -0.63, startPixels, 1.75);
-    label("Raise a controller and look at its buttons for shortcuts",
+    label("Raise either controller into view for button shortcuts",
       0, -1.03, 2.3, 0.13, 29, "#b6d1d9", "#0b2430");
 
     return;
