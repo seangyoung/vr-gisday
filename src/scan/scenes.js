@@ -2,10 +2,62 @@ import * as THREE from "three";
 
 // Original procedural models; dimensions share the same handheld scan volume.
 export const SCAN_SCENES = [
-  { id: "ruins", name: "Woodland ruins" },
-  { id: "bridge", name: "Ravine bridge" },
-  { id: "village", name: "Hillside village" },
-  { id: "terraces", name: "Terraced lookout" },
+  {
+    id: "ruins", name: "Woodland ruins",
+    prompt: "Scan one wall, then turn the ruins around.\nWhich faces appear only from the other side?",
+    takeaway: {
+      title: "A gap in the cloud is not an empty space.",
+      body: "The walls blocked rays from reaching surfaces behind them.\nThat is occlusion: changing viewpoints can fill the gap.\nReal surveys align overlapping scans to build a fuller model.",
+    },
+  },
+  {
+    id: "bridge", name: "Ravine bridge",
+    prompt: "Scan across the deck, then look beneath it.\nCan you capture the supports from above?",
+    takeaway: {
+      title: "A bridge needs more than an overhead view.",
+      body: "The deck hides supports and its underside from above.\nLow, oblique scans reveal clearance and hidden structure.\nSurveyors combine views before measuring the full bridge.",
+    },
+  },
+  {
+    id: "village", name: "Hillside village",
+    prompt: "Sweep the rooftops, then move to the other side.\nWhich walls do the roofs and houses hide?",
+    takeaway: {
+      title: "Roofs can hide the streets below.",
+      body: "First-surface returns show roofs before covered walls.\nA roof-heavy cloud is not a complete building model.\nSide views add facades for mapping built features.",
+    },
+  },
+  {
+    id: "terraces", name: "Terraced lookout",
+    prompt: "Scan the stepped ground from above and from the side.\nWhere do you see edges and vertical faces?",
+    takeaway: {
+      title: "Height changes need well-placed samples.",
+      body: "The steps show up as changes in point elevation.\nSparse points near an edge can blur its true shape.\nTerrain models depend on point density and ground returns.",
+    },
+  },
+  {
+    id: "canopy", name: "Forest survey",
+    prompt: "Scan the trail through the trees.\nThen hide plants: does new ground appear below them?",
+    takeaway: {
+      title: "Filtering cannot reveal unseen ground.",
+      body: "Canopies intercept these first-surface rays.\nHiding green points removes trees, not the data gaps.\nA bare-earth model needs actual ground returns.",
+    },
+  },
+  {
+    id: "courtyard", name: "Covered courtyard",
+    prompt: "Scan the roof and outside walls first.\nTurn the model to find the open side and columns.",
+    takeaway: {
+      title: "An enclosed space needs access.",
+      body: "The roof and walls block rays into the courtyard.\nAn opening offers a new line of sight to its columns.\nMissing interior points do not prove the interior is empty.",
+    },
+  },
+  {
+    id: "tower", name: "Survey tower",
+    prompt: "Sweep the platform and its narrow supports.\nDo all the slender pieces get the same number of points?",
+    takeaway: {
+      title: "Small features can be undersampled.",
+      body: "Narrow supports catch fewer rays than broad surfaces.\nPoint density limits the detail a scan can resolve.\nCloser or denser sampling helps document thin features.",
+    },
+  },
 ];
 
 export function createSceneRotation(random = Math.random) {
@@ -114,5 +166,36 @@ export function buildScanScene(id, mesh) {
     ).rotation.y = Math.PI / 4;
     tree(-0.78, 0.5, 0, 0.65);
     tree(0.78, -0.45, 0, 0.65);
+  } else if (id === "canopy") {
+    // A visible boardwalk runs beneath overlapping crowns; removing canopy
+    // points should leave honest gaps in the first-surface ground sample.
+    for (const z of [-0.54, -0.18, 0.18, 0.54])
+      box([0.27, 0.05, 0.26], [0.02 + z * 0.18, 0.045, z]);
+    for (const x of [-0.48, 0.48])
+      for (const z of [-0.44, 0.4]) tree(x, z, 0, 0.72);
+    box([0.12, 0.34, 0.1], [-0.13, 0.17, 0.62]);
+  } else if (id === "courtyard") {
+    // Three walls and a partial roof leave one side open to oblique rays.
+    box([1.18, 0.62, 0.1], [0, 0.31, -0.46]);
+    for (const x of [-0.55, 0.55])
+      box([0.1, 0.62, 0.86], [x, 0.31, -0.08]);
+    box([1.18, 0.055, 0.52], [0, 0.68, -0.27]);
+    for (const x of [-0.34, 0.34])
+      box([0.075, 0.55, 0.075], [x, 0.275, 0.3]);
+    box([0.54, 0.08, 0.28], [0, 0.04, 0.14], "ground");
+    tree(0.76, 0.49, 0, 0.62);
+    tree(-0.78, -0.5, 0, 0.57);
+  } else if (id === "tower") {
+    for (const x of [-0.28, 0.28])
+      for (const z of [-0.24, 0.24])
+        box([0.055, 0.7, 0.055], [x, 0.35, z]);
+    box([0.72, 0.07, 0.66], [0, 0.735, 0]);
+    for (const z of [-0.29, 0.29])
+      box([0.73, 0.035, 0.035], [0, 0.91, z]);
+    for (const x of [-0.34, 0.34])
+      box([0.035, 0.035, 0.59], [x, 0.91, 0]);
+    box([0.045, 0.21, 0.045], [0, 0.89, 0]);
+    tree(-0.72, 0.4, 0, 0.65);
+    tree(0.73, -0.47, 0, 0.61);
   } else throw new Error(`Unknown scan scene: ${id}`);
 }

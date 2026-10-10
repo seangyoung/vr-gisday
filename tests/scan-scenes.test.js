@@ -4,6 +4,17 @@ import * as THREE from "three";
 import { SCAN_SCENES, createSceneRotation } from "../src/scan/scenes.js";
 import { ScanExperience } from "../src/scan/experience.js";
 
+test("each synthetic scene gives a distinct, concise observation and takeaway", () => {
+  assert.ok(SCAN_SCENES.length >= 7);
+  assert.equal(new Set(SCAN_SCENES.map((scene) => scene.id)).size, SCAN_SCENES.length);
+  assert.equal(new Set(SCAN_SCENES.map((scene) => scene.takeaway.title)).size, SCAN_SCENES.length);
+  for (const scene of SCAN_SCENES) {
+    assert.ok(scene.prompt.includes("\n"), `${scene.id}: prompt guides a second action`);
+    assert.equal(scene.takeaway.body.split("\n").length, 3, `${scene.id}: fits the takeaway card`);
+    assert.ok(scene.takeaway.body.length > 100, `${scene.id}: explains the observation`);
+  }
+});
+
 test("shuffled cycles visit every scene without adjacent repeats", () => {
   for (const random of [() => 0, () => 0.999, Math.random]) {
     const next = createSceneRotation(random);

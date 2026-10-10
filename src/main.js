@@ -619,12 +619,12 @@ function drawScanUI() {
   const copy = [
     null,
     [
-      "Which surfaces are still hidden?",
-      "Each scan ray records its first surface return.\nSweep one side, then turn the model to reveal hidden areas.\nCompare the cloud with the synthetic scene.",
+      `Explore: ${s.sceneInfo.name}`,
+      `Each ray records its first surface return.\n${s.sceneInfo.prompt}`,
     ],
     [
-      "Different viewpoints fill different gaps.",
-      "Occlusion means one surface blocks another from view.\nClassification labels measured points; it cannot invent hidden ground.\nReal lidar also needs georeferencing and error checks.",
+      s.sceneInfo.takeaway.title,
+      s.sceneInfo.takeaway.body,
     ],
   ];
   const [title, body] = copy[s.stage];
@@ -648,12 +648,13 @@ function drawScanUI() {
     0.52,
   );
   button(
-    "Clear scan",
+    s.stage === 2 ? "Re-scan" : "Clear scan",
     0.28,
     GUIDED_ACTION_Y,
     () => {
       stopRainInput();
-      s.clearScan();
+      if (s.stage === 2) startScan(s.sceneInfo, true);
+      else s.clearScan();
     },
     0.52,
   );
