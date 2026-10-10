@@ -30,7 +30,7 @@ const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Enter the lab, then choose an experience inside your headset.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking mixed reality…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, and fictional population districts.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR / passthrough · Six hands-on experiences</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -68,6 +68,8 @@ let layers = null;
 let viewshed = null;
 let pixels = null;
 let xrMode = null;
+let pendingRoomHandoff = false;
+let rightTurnReady = true;
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
@@ -76,6 +78,7 @@ let floatingModel = null,
   preservePose = null;
 let rangeAnimations = [];
 let animationAge = 0;
+let lastAnimatedRangeStep = null;
 let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
@@ -221,10 +224,14 @@ function navigation(y = -0.98) {
     0.44,
   );
   button(
-    "Menu",
+    xrMode === "immersive-ar" ? "VR menu" : "Menu",
     -0.92,
     y,
     () => {
+      if (xrMode === "immersive-ar") {
+        renderer.xr.getSession()?.end();
+        return;
+      }
       scan?.dispose();
       scan = null;
       layers?.dispose();
@@ -278,6 +285,7 @@ function start() {
   }
   preservePose = null;
   step = -2;
+  lastAnimatedRangeStep = null;
   elapsed = 0;
   noisy = false;
   prediction = "";
@@ -386,6 +394,24 @@ function startRoomScan() {
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
+async function switchToRoomScan() {
+  if (xrMode === "immersive-ar") {
+    startRoomScan();
+    return;
+  }
+  pendingRoomHandoff = true;
+  try {
+    const session = renderer.xr.getSession();
+    if (session) {
+      const ended = new Promise((resolve) => session.addEventListener("end", resolve, { once: true }));
+      await session.end();
+      await ended;
+    }
+    await enter("immersive-ar", true);
+  } catch (error) {
+    status.textContent = `Open the room scan with the mixed reality button: ${error.message}`;
+  }
+}
 function drawRoomUI() {
   const s = scan;
   const title =
@@ -398,7 +424,7 @@ function drawRoomUI() {
           : "Sweep across real surfaces";
   const body =
     s.stage === 0
-      ? "Uses browser estimates of real surfaces, with permission.\nEnter MIXED REALITY, then start and look around.\nA sparse surface scan; no camera images are recorded."
+      ? "Uses browser estimates of real surfaces, with permission.\nYou are in MIXED REALITY; start and look around.\nA sparse surface scan; no camera images are recorded."
       : s.stage === 2
         ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
         : s.frozen
@@ -419,8 +445,7 @@ function drawRoomUI() {
   );
   if (s.stage === 0) {
     if (s.status !== "unavailable")
-      button("Start room scan", -0.55, -0.77, () => s.explore(), 1.02);
-    button("Synthetic scene", 0.55, -0.77, startScan, 1.02);
+      button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
   } else {
     button(
       s.stage === 2 ? "Scan again" : s.frozen ? "Resume" : "Freeze",
@@ -446,7 +471,7 @@ function drawRoomUI() {
       },
       0.52,
     );
-    button("Synthetic", 0.84, -0.77, startScan, 0.52);
+    button("Back to VR", 0.84, -0.77, () => renderer.xr.getSession()?.end(), 0.52);
   }
   navigation();
 }
@@ -487,7 +512,7 @@ function drawScanUI() {
   );
   if (s.stage === 0) {
     button("Start scanning", -0.55, -0.77, () => s.explore(), 1.02);
-    button("Scan your room", 0.55, -0.77, startRoomScan, 1.02);
+    button("Scan your room in MR", 0.55, -0.77, switchToRoomScan, 1.02);
   } else {
     button(
       s.reveal ? "Cloud only" : "Compare surfaces",
@@ -551,7 +576,7 @@ function drawLayersUI() {
   );
   if (l.finished) {
     label(
-      "Each layer answers a different question.\nTogether they suggest relationships, not proof of cause.\nPopulation values here are fictional teaching data.",
+      "Each layer answers a different question.\nA floodplain is low land, not a flood prediction.\nPolitical boundaries are drawn by people; they are not physical walls.",
       0,
       0.48,
       2.35,
@@ -564,11 +589,9 @@ function drawLayersUI() {
     navigation(-1.02);
     return;
   }
-  button("Layers", -0.57, 0.69, () => l.setView("layers"), 0.98)
-    .material.color.set(l.view === "layers" ? 0xffffff : 0x91a6a4);
-  button("Map", 0.57, 0.69, () => l.setView("map"), 0.98)
-    .material.color.set(l.view === "map" ? 0xffffff : 0x91a6a4);
-  if (l.view === "map") {
+  label("Toggle layers around you · right stick: 30° turns", 0, 0.68,
+    2.3, 0.13, 28, "#b6d1d9", "#0b2430");
+  {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
     renderLayerMap(canvas.getContext("2d"), l.selected);
@@ -582,64 +605,19 @@ function drawLayersUI() {
     uiParent.add(map);
     LAYER_KEYS.forEach((key, i) => {
       const marked = l.selected.has(key) ? "[x]" : "[ ]";
-      button(`${marked} ${LAYER_NAMES[key]}`, 0.65, 0.47 - i * 0.2, () => l.toggle(key), 1.02);
+      button(`${marked} ${LAYER_NAMES[key]}`, 0.65, 0.47 - i * 0.17, () => l.toggle(key), 1.02);
     });
     label(l.lastLayer ? LAYER_HINTS[l.lastLayer] : "Select a map layer; watch it appear around you.",
       0, -0.69, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
     label(
-      l.selected.has("population")
-        ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
+      l.selected.has("floodplain")
+        ? "Blue: low river land · Not a modeled flood extent"
         : "Synthetic place · Map north is an arbitrary model direction",
       0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
     );
     navigation(-1.02);
     return;
   }
-  label(
-    "Raise your left hand. Point and trigger to add a layer.",
-    0,
-    0.51,
-    2.3,
-    0.12,
-    31,
-    "#b6d1d9",
-    "#0b2430",
-  );
-  LAYER_KEYS.forEach((key, i) => {
-    const marked = l.selected.has(key) ? "[x]" : "[ ]";
-    button(
-      `${marked} ${LAYER_NAMES[key]}`,
-      0,
-      0.29 - i * 0.18,
-      () => l.toggle(key),
-      1.85,
-    );
-  });
-  label(
-    l.lastLayer
-      ? LAYER_HINTS[l.lastLayer]
-      : "Begin with topography, or choose any layer first.",
-    0,
-    -0.66,
-    2.35,
-    0.21,
-    29,
-    "#e6f4f5",
-    "#0b2430",
-  );
-  label(
-    l.selected.has("population")
-      ? "Density: pale <500 · teal 500–2k · gold >2k people/km²"
-      : "Synthetic landscape · Population values are illustrative",
-    0,
-    -0.83,
-    2.3,
-    0.1,
-    25,
-    "#b6d1d9",
-    "#0b2430",
-  );
-  navigation(-1.02);
 }
 function drawViewshedUI() {
   const v = viewshed;
@@ -681,7 +659,7 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Map and landscape show the same visible ground.", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Map and landscape agree · right stick: 30° turns", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   } else {
     label(
       "Gold is the observer; blue is the target. The sightline\nstops at the blocking ridge. Green ground is visible.",
@@ -693,7 +671,7 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.56, -0.12, () => v.setHeight(12), 0.98)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0, -0.43, () => v.reset(), 1.05);
-    label("Try a radio lookout at both heights. What changes?", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
+    label("Try both heights · right stick: 30° turns", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
@@ -717,7 +695,7 @@ function drawPixelsUI() {
     return;
   }
   label(
-    "Ground sample distance (GSD) = ground width of one pixel.",
+    "GSD = ground width of one pixel · right stick: 30° turns",
     0, 0.68, 2.3, 0.12, 30, "#b6d1d9", "#0b2430",
   );
   for (const [size, x] of [[2, -0.84], [8, -0.28], [24, 0.28], [48, 0.84]])
@@ -911,6 +889,7 @@ function next() {
 function planar() {
   const first = content.children.length;
   const count = step === 0 ? 1 : step === 1 ? 2 : 3;
+  const fresh = lastAnimatedRangeStep === step ? -1 : step < 3 ? count - 1 : -1;
   for (let x = -0.9; x <= 0.91; x += 0.15)
     line(
       [new THREE.Vector3(x, -0.75, -0.03), new THREE.Vector3(x, 0.65, -0.03)],
@@ -923,7 +902,7 @@ function planar() {
     );
   anchors.slice(0, count).forEach((a, i) => {
     const ring = circle(a, ranges[i], palette[i]);
-    rangeAnimations.push({ object: ring, delay: i * 0.23 });
+    if (i === fresh) rangeAnimations.push({ object: ring, delay: 0 });
     point(a, palette[i], 0.035);
     label(String.fromCharCode(65 + i), a.x, a.y + 0.07, 0.14, 0.09, 55);
     if (step === 3) {
@@ -997,6 +976,7 @@ function planar() {
       1.2,
     );
   }
+  lastAnimatedRangeStep = step;
 }
 function resetModelView() {
   if (!floatingModel) return;
@@ -1042,7 +1022,8 @@ function spatial() {
     );
     sphere.position.copy(a).sub(center);
     group.add(sphere);
-    rangeAnimations.push({ object: sphere, delay: i * 0.2 });
+    if (lastAnimatedRangeStep !== step && (step === 4 || i === 3))
+      rangeAnimations.push({ object: sphere, delay: step === 4 ? i * 0.2 : 0 });
     const beacon = new THREE.Mesh(
       new THREE.SphereGeometry(0.038, 16, 12),
       new THREE.MeshBasicMaterial({ color: palette[i] }),
@@ -1066,6 +1047,7 @@ function spatial() {
     );
     group.add(spoke);
   });
+  lastAnimatedRangeStep = step;
   [t, ...(step === 4 ? [new THREE.Vector3(t.x, t.y, -t.z)] : [])].forEach(
     (p) => {
       const dot = new THREE.Mesh(
@@ -1503,7 +1485,8 @@ function intersect(c) {
       (pixels && !pixels.clipboard.visible)) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
-async function enter(mode) {
+async function enter(mode, roomScan = mode === "immersive-ar") {
+  if (mode === "immersive-vr") pendingRoomHandoff = false;
   sound.setActive(true);
   sound.unlock();
   let session;
@@ -1545,16 +1528,21 @@ async function enter(mode) {
         stopRainInput();
       }
     });
-    draw();
+    if (roomScan) startRoomScan();
+    else draw();
     pendingPlacement = true;
+    pendingRoomHandoff = false;
     status.textContent = "";
   } catch (e) {
     if (session) await session.end().catch(() => {});
-    status.textContent = `Could not enter ${mode === "immersive-ar" ? "mixed reality" : "VR"}: ${e.message}. You can try again.`;
+    status.textContent = pendingRoomHandoff
+      ? "VR ended. Select Open room scan in MR to continue; the browser requires a fresh tap to enter mixed reality."
+      : `Could not enter ${mode === "immersive-ar" ? "mixed reality" : "VR"}: ${e.message}. You can try again.`;
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
   sound.setActive(false);
+  rightTurnReady = true;
   layers?.dispose();
   layers = null;
   viewshed?.dispose();
@@ -1569,12 +1557,18 @@ renderer.xr.addEventListener("sessionend", () => {
   grab?.cancel();
   stopRainInput();
   document.body.classList.remove("xr-active");
-  status.textContent =
-    "Session ended. Choose VR or mixed reality to start again.";
+  const arButton = document.getElementById("ar");
+  if (pendingRoomHandoff) {
+    if (!arButton.disabled) arButton.textContent = "Open room scan in MR";
+    status.textContent = "VR ended. Select Open room scan in MR to continue.";
+  } else {
+    if (!arButton.disabled) arButton.textContent = "Open room scan in MR";
+    status.textContent = "Session ended. Choose VR or room scan in mixed reality.";
+  }
 });
 for (const [id, mode, name] of [
   ["vr", "immersive-vr", "Enter VR"],
-  ["ar", "immersive-ar", "Enter mixed reality"],
+  ["ar", "immersive-ar", "Open room scan in MR"],
 ]) {
   const b = document.getElementById(id);
   b.onclick = () => enter(mode);
@@ -1625,6 +1619,16 @@ renderer.setAnimationLoop((time, frame) => {
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
       if (visible) landscapeDemo.update(dt);
+      const right = visible
+        ? controllers.find(({ c }) => c.userData.xrInput?.handedness === "right")
+        : null;
+      const gamepad = right?.c.userData.xrInput?.gamepad;
+      const axis = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
+      if (Math.abs(axis) < 0.3) rightTurnReady = true;
+      else if (rightTurnReady && Math.abs(axis) > 0.7) {
+        landscapeDemo.turn(-Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
+        rightTurnReady = false;
+      }
       const left = visible
         ? controllers.find(
             ({ c, grip }) =>
@@ -1700,7 +1704,7 @@ renderer.setAnimationLoop((time, frame) => {
     for (const { c, beam, handle, id } of controllers) {
       const hit = intersect(c);
       const model = modelHit(c) || rainHit(c) || scanHit(c);
-      const ground = (viewshed ?? pixels)?.hitTerrain(raycaster);
+      const ground = hit ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&

@@ -5,22 +5,24 @@ export const LAYER_KEYS = [
   "vegetation",
   "hydrology",
   "roads",
-  "population",
+  "floodplain",
+  "boundaries",
 ];
 export const LAYER_NAMES = {
   topography: "Topography",
   vegetation: "Vegetation",
   hydrology: "Hydrology",
   roads: "Roads",
-  population: "Population density",
+  floodplain: "Floodplain",
+  boundaries: "Political boundaries",
 };
 export const LAYER_HINTS = {
   topography: "DEM (elevation grid): reveals ridges and valleys; used to model slope.",
   vegetation: "Land cover: mapped trees show habitat, shade, and cleared corridors.",
   hydrology: "Hydrography: a downhill river follows its carved channel and watershed.",
   roads: "Transport network: a four-lane highway bridges the river.",
-  population:
-    "Choropleth: fictional density is summarized by district, not each point.",
+  floodplain: "Floodplain: low ground beside the river; an illustrative terrain zone, not a flood forecast.",
+  boundaries: "Jurisdictions: fictional district lines are drawn by people, not barriers on the ground.",
 };
 export const LANDSCAPE_EXTENT = 160;
 const extent = LANDSCAPE_EXTENT;
@@ -59,12 +61,11 @@ const topographicHeight = (x, z) => {
 };
 export const landscapeHeight = (x, z, raised = true) =>
   raised ? topographicHeight(x, z) : 0;
-export function densityAt(x, z) {
-  const center = Math.hypot(x + 12, z * 0.8);
-  if (center < 37 || (x < -25 && z > 22 && z < 70)) return "high";
-  if (center < 72 && x < riverX(z) + 18) return "medium";
-  return "low";
-}
+export const boundaryX = (z) => -12 + 9 * Math.sin(z * 0.013);
+export const boundaryZ = (x) => -38 + 7 * Math.sin(x * 0.016);
+export const floodplainAt = (x, z) =>
+  Math.abs(x - riverX(z)) < 18 &&
+  landscapeHeight(x, z) - riverWaterHeight(z) < 1.15;
 
 function surfaceGeometry(raised, size = 400) {
   const vertices = [],
@@ -394,58 +395,55 @@ function makeRoads(group, raised) {
     }
   }
 }
-function makePopulation(group, raised) {
-  const colors = { low: 0xbcd0e2, medium: 0x43c9c5, high: 0xffbd65 };
-  const size = (extent * 2) / 8,
-    pieces = 8;
-  for (let row = 0; row < 8; row++)
-    for (let col = 0; col < 8; col++) {
-      const x0 = -extent + col * size,
-        z0 = -extent + row * size;
-      const centerX = x0 + size / 2,
-        centerZ = z0 + size / 2;
-      const vertices = [],
-        indices = [];
-      for (let r = 0; r <= pieces; r++)
-        for (let c = 0; c <= pieces; c++) {
-          const x = x0 + (c * size) / pieces,
-            z = z0 + (r * size) / pieces;
-          vertices.push(x, landscapeHeight(x, z, raised) + 0.045, z);
-        }
-      for (let r = 0; r < pieces; r++)
-        for (let c = 0; c < pieces; c++) {
-          const a = r * (pieces + 1) + c;
-          indices.push(
-            a,
-            a + pieces + 1,
-            a + 1,
-            a + 1,
-            a + pieces + 1,
-            a + pieces + 2,
-          );
-        }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute(
-        "position",
-        new THREE.Float32BufferAttribute(vertices, 3),
-      );
-      geometry.setIndex(indices);
-      geometry.computeVertexNormals();
-      group.add(
-        new THREE.Mesh(
-          geometry,
-          new THREE.MeshBasicMaterial({
-            color: colors[densityAt(centerX, centerZ)],
-            transparent: true,
-            opacity: 0.16,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-            polygonOffset: true,
-            polygonOffsetFactor: -1,
-          }),
-        ),
-      );
+function makeFloodplain(group, raised) {
+  const vertices = [], indices = [];
+  const step = 2, width = 18;
+  for (let z = -extent; z < extent; z += step)
+    for (let offset = -width; offset < width; offset += step) {
+      const centerX = riverX(z + step / 2) + offset + step / 2;
+      if (!floodplainAt(centerX, z + step / 2)) continue;
+      const first = vertices.length / 3;
+      for (const [x, zz] of [
+        [riverX(z) + offset, z], [riverX(z) + offset + step, z],
+        [riverX(z + step) + offset, z + step],
+        [riverX(z + step) + offset + step, z + step],
+      ]) vertices.push(x, landscapeHeight(x, zz, raised) + 0.11, zz);
+      indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
     }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+    color: 0x62d5ea, transparent: true, opacity: 0.34,
+    side: THREE.DoubleSide, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2,
+  })));
+}
+function makeBoundaries(group, raised) {
+  for (const [path, vertical] of [
+    [(t) => [boundaryX(t), t], true],
+    [(t) => [t, boundaryZ(t)], false],
+  ]) {
+    const vertices = [], indices = [];
+    for (let t = -extent; t < extent - 3; t += 7) {
+      const first = vertices.length / 3;
+      for (const value of [t, t + 4]) {
+        const [x, z] = path(value);
+        for (const sign of [-1, 1]) {
+          const px = x + (vertical ? 0.32 * sign : 0);
+          const pz = z + (vertical ? 0 : 0.32 * sign);
+          vertices.push(px, landscapeHeight(px, pz, raised) + 0.23, pz);
+        }
+      }
+      indices.push(first, first + 2, first + 1, first + 1, first + 2, first + 3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    group.add(new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      color: 0xf2c5ff, side: THREE.DoubleSide, depthWrite: false,
+    })));
+  }
 }
 
 export class LayerExperience {
@@ -464,7 +462,7 @@ export class LayerExperience {
     this.finished = false;
     this.lastLayer = null;
     this.reveal = null;
-    this.view = "layers";
+    this.view = "map";
     this.group = new THREE.Group();
     scene.add(this.group);
     this.clipboard = new THREE.Group();
@@ -502,6 +500,15 @@ export class LayerExperience {
       const ground = new THREE.Mesh(surfaceGeometry(raised), groundMaterial);
       world.add(ground, new THREE.Mesh(outerTerrainGeometry(raised), groundMaterial));
       this.ground[name] = ground;
+      if (raised) {
+        // Controller targeting does not need the 400-cell visual terrain.
+        this.pickGround = new THREE.Mesh(
+          surfaceGeometry(true, 96),
+          new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
+        );
+        this.pickGround.visible = false;
+        world.add(this.pickGround);
+      }
       for (const key of LAYER_KEYS.filter((k) => k !== "topography")) {
         const layer = new THREE.Group();
         world.add(layer);
@@ -509,7 +516,8 @@ export class LayerExperience {
         if (key === "vegetation") makeTrees(layer, raised);
         if (key === "hydrology") makeHydrology(layer, raised);
         if (key === "roads") makeRoads(layer, raised);
-        if (key === "population") makePopulation(layer, raised);
+        if (key === "floodplain") makeFloodplain(layer, raised);
+        if (key === "boundaries") makeBoundaries(layer, raised);
       }
     }
     this.group.add(new THREE.HemisphereLight(0xe6f7ff, 0x344849, 2));
@@ -527,6 +535,15 @@ export class LayerExperience {
     );
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z) - 0.25;
   }
+  turn(angle, camera) {
+    if (!angle) return;
+    const pivot = camera.getWorldPosition(new THREE.Vector3());
+    const offset = this.group.position.clone().sub(pivot);
+    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+    this.group.position.x = pivot.x + offset.x;
+    this.group.position.z = pivot.z + offset.z;
+    this.group.rotation.y += angle;
+  }
   updateClipboard(leftGrip, camera, preview = false) {
     if (!leftGrip && !preview) {
       this.clipboard.visible = false;
@@ -535,15 +552,21 @@ export class LayerExperience {
     if (preview) {
       camera.updateWorldMatrix(true, false);
       this.clipboard.position.copy(
-        camera.localToWorld(new THREE.Vector3(0, -0.12, -1.05)),
+        camera.localToWorld(new THREE.Vector3(0, -0.2, -1.3)),
       );
     } else {
       leftGrip.updateWorldMatrix(true, false);
       this.clipboard.position.copy(
-        leftGrip.localToWorld(new THREE.Vector3(-0.045, 0.19, -0.12)),
+        leftGrip.localToWorld(new THREE.Vector3(-0.08, 0.02, -0.18)),
       );
     }
     camera.getWorldPosition(this._viewPosition ??= new THREE.Vector3());
+    const away = this.clipboard.position.clone().sub(this._viewPosition);
+    if (away.lengthSq() < 0.85 ** 2)
+      this.clipboard.position.copy(this._viewPosition).addScaledVector(
+        away.lengthSq() > 0.0001 ? away.normalize() : new THREE.Vector3(0, -0.3, -1).normalize(),
+        0.85,
+      );
     this.clipboard.lookAt(this._viewPosition);
     this.clipboard.visible = true;
     this.clipboard.updateWorldMatrix(true, true);
@@ -564,11 +587,6 @@ export class LayerExperience {
     this.lastLayer = key;
     this.applyVisibility();
     this.onEvent("layer");
-    this.onChange();
-  }
-  setView(view) {
-    if (view !== "layers" && view !== "map") return;
-    this.view = view;
     this.onChange();
   }
   applyVisibility() {

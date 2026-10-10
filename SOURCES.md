@@ -35,6 +35,8 @@ All demo geometry is original procedural content. The sampler illustrates first-
 ## Real-room sampling
 
 - W3C WebXR Hit Test Module: https://www.w3.org/TR/webxr-hit-test-1/ — session feature requests, controller-relative hit-test sources, default plane entity type, result poses, and cancellation.
+- W3C WebXR Device API: https://www.w3.org/TR/webxr/ — immersive VR and AR are exclusive sessions; a fresh immersive request may require a new user activation after ending VR.
+- Immersive Web Working Group, WebXR Gamepads Module: https://immersive-web.github.io/webxr-gamepads-module/ — the right thumbstick horizontal input is `xr-standard` axis 2.
 - Meta IWSDK Environment Raycast guide: https://iwsdk.dev/guides/14-environment-raycast.html — controller-based real-surface hit testing and runtime support checks.
 
 This prototype uses browser hit-test estimates directly, not raw depth or camera reconstruction. Actual headset support and data quality remain unverified until tested on the user's Quest 3S.

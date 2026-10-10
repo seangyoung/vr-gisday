@@ -35,7 +35,8 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   let changes = 0;
   const demo = new ViewshedExperience(scene, () => changes++);
   assert.equal(demo.selected.has("topography"), true);
-  assert.equal(demo.selected.has("population"), false);
+  assert.equal(demo.selected.has("boundaries"), false);
+  assert.ok(demo.pickGround.geometry.attributes.position.count < demo.ground.raised.geometry.attributes.position.count / 10);
   assert.equal(demo.ground.raised.geometry.attributes.position.count, 401 ** 2);
   assert.ok(demo.analysis.sampled > 0);
   assert.ok(demo.visiblePercent >= 0 && demo.visiblePercent <= 100);

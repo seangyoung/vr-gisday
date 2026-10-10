@@ -158,11 +158,11 @@ export class PixelExperience extends LayerExperience {
     return true;
   }
   hitTerrain(raycaster) {
-    this.group.updateWorldMatrix(true, true);
-    this.clipboard.updateWorldMatrix(true, true);
+    this.pickGround.updateWorldMatrix(true, false);
+    this.clipboard.children[0].updateWorldMatrix(true, false);
     if (this.clipboard.visible && raycaster.intersectObject(this.clipboard.children[0], false).length)
       return null;
-    return raycaster.intersectObject(this.ground.raised, false)[0] ?? null;
+    return raycaster.intersectObject(this.pickGround, false)[0] ?? null;
   }
   placeFromRay(raycaster) {
     const hit = this.hitTerrain(raycaster);

@@ -54,7 +54,8 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   const demo = new PixelExperience(scene, () => changes++);
   assert.equal(demo.size, 24);
   assert.equal(demo.selected.has("topography"), true);
-  assert.equal(demo.selected.has("population"), false);
+  assert.equal(demo.selected.has("floodplain"), false);
+  assert.ok(demo.pickGround.geometry.attributes.position.count < demo.ground.raised.geometry.attributes.position.count / 10);
   assert.equal(demo.ground.raised.geometry.attributes.position.count, 401 ** 2);
   assert.ok(demo.footprint.parent === demo.variants.raised.world);
   demo.setSize(48);

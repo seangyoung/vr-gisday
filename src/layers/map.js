@@ -1,18 +1,15 @@
 import {
   LANDSCAPE_EXTENT,
   TREE_POSITIONS,
-  densityAt,
+  boundaryX,
+  boundaryZ,
+  floodplainAt,
   highwayZ,
   landscapeHeight,
   riverX,
 } from "./experience.js";
 
 const extent = LANDSCAPE_EXTENT;
-const colors = {
-  low: "#c3d6e5",
-  medium: "#4ebbb5",
-  high: "#e8af62",
-};
 const reliefCache = new Map();
 
 export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
@@ -50,19 +47,14 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
     ctx.putImageData(image, 0, 0);
   }
 
-  if (selected.has("population")) {
-    const cell = size / 8;
-    ctx.lineWidth = 1.2 * ratio;
-    for (let row = 0; row < 8; row++)
-      for (let col = 0; col < 8; col++) {
-        const x = -extent + (col + 0.5) * (2 * extent / 8);
-        const z = -extent + (row + 0.5) * (2 * extent / 8);
-        ctx.globalAlpha = 0.36;
-        ctx.fillStyle = colors[densityAt(x, z)];
-        ctx.fillRect(col * cell, row * cell, cell, cell);
-        ctx.globalAlpha = 0.38;
-        ctx.strokeStyle = "#314e55";
-        ctx.strokeRect(col * cell, row * cell, cell, cell);
+  if (selected.has("floodplain")) {
+    const step = 1.6, pixel = step * size / (2 * extent);
+    ctx.fillStyle = "#65d0e6";
+    ctx.globalAlpha = 0.65;
+    for (let z = -extent; z < extent; z += step)
+      for (let offset = -18; offset < 18; offset += step) {
+        const x = riverX(z) + offset;
+        if (floodplainAt(x, z)) ctx.fillRect(coord(x), coord(z), pixel + 1, pixel + 1);
       }
     ctx.globalAlpha = 1;
   }
@@ -106,6 +98,25 @@ export function renderLayerMap(ctx, selected, { annotations = true } = {}) {
     ctx.strokeStyle = "#e5bd58";
     ctx.lineWidth = 1.5 * ratio;
     ctx.stroke();
+  }
+
+  if (selected.has("boundaries")) {
+    ctx.setLineDash([6 * ratio, 4 * ratio]);
+    ctx.lineWidth = 2.8 * ratio;
+    ctx.strokeStyle = "#512062";
+    for (const path of [
+      (t) => point(boundaryX(t), t),
+      (t) => point(t, boundaryZ(t)),
+    ]) {
+      ctx.beginPath();
+      for (let t = -extent; t <= extent; t += 2) {
+        const [px, py] = path(t);
+        if (t === -extent) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 
   if (annotations) {

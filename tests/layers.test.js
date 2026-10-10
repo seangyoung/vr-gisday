@@ -11,7 +11,9 @@ import {
   riverWaterHeight,
   highwayZ,
   highwayDeckHeight,
-  densityAt,
+  floodplainAt,
+  boundaryX,
+  boundaryZ,
 } from "../src/layers/experience.js";
 
 test("a visitor starts in an empty flat landscape and can compose any layer order", () => {
@@ -23,9 +25,9 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(l.variants.raised.world.visible, false);
   for (const key of LAYER_KEYS.slice(1))
     assert.equal(l.variants.flat[key].visible, false);
-  for (const key of ["hydrology", "roads", "vegetation", "population"])
+  for (const key of ["hydrology", "roads", "vegetation", "floodplain", "boundaries"])
     l.toggle(key);
-  assert.equal(l.selected.size, 4);
+  assert.equal(l.selected.size, 5);
   assert.equal(l.variants.flat.hydrology.visible, true);
   l.toggle("topography");
   assert.equal(l.variants.raised.world.visible, true);
@@ -36,7 +38,7 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(l.variants.flat.world.visible, false);
   l.toggle("hydrology");
   assert.equal(l.variants.raised.hydrology.visible, false);
-  assert.equal(l.selected.size, 4);
+  assert.equal(l.selected.size, 5);
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(2, 1.7, -3);
   l.place(camera);
@@ -54,6 +56,15 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   const front = new THREE.Vector3(0, 0, 1).applyQuaternion(l.clipboard.quaternion);
   const towardViewer = camera.position.clone().sub(l.clipboard.position).normalize();
   assert.ok(front.dot(towardViewer) > 0.99);
+  leftGrip.position.copy(camera.position);
+  l.updateClipboard(leftGrip, camera);
+  assert.ok(l.clipboard.position.distanceTo(camera.position) >= 0.85 - 1e-9);
+  camera.position.x += 3;
+  const beforeTurn = l.group.position.clone();
+  const beforeAngle = l.group.rotation.y;
+  l.turn(Math.PI / 6, camera);
+  assert.ok(Math.abs(l.group.rotation.y - beforeAngle - Math.PI / 6) < 1e-9);
+  assert.ok(Math.abs(l.group.position.distanceTo(camera.position) - beforeTurn.distanceTo(camera.position)) < 1e-9);
   l.updateClipboard(null, camera);
   assert.equal(l.clipboard.visible, false);
   l.updateClipboard(null, camera, true);
@@ -62,14 +73,11 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(LANDSCAPE_EXTENT, 160);
   assert.ok(landscapeHeight(-60, -35) > landscapeHeight(riverX(-35), -35));
   assert.ok(TREE_POSITIONS.length > 1000);
-  assert.equal(l.view, "layers");
-  l.setView("map");
   assert.equal(l.view, "map");
-  l.setView("layers");
-  assert.deepEqual(
-    new Set([densityAt(0, 0), densityAt(-80, 0), densityAt(100, 100)]),
-    new Set(["high", "medium", "low"]),
-  );
+  assert.equal(floodplainAt(riverX(50) + 6, 50), true);
+  assert.equal(floodplainAt(-80, 50), false);
+  assert.ok(boundaryX(0) < 0);
+  assert.ok(boundaryZ(0) < 0);
   l.update(240);
   assert.equal(l.finished, true);
   l.toggle("roads");
