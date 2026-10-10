@@ -75,7 +75,7 @@ export class ViewshedExperience extends LayerExperience {
     this.onEvent = onEvent;
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
-    this.view = "scene";
+    this.view = "map";
     this.sampler = new TerrainSampler(LANDSCAPE_EXTENT, 320);
     this.observer = { x: 0, z: 0, height: 2 };
     this.visualHeight = 2;
@@ -162,11 +162,6 @@ export class ViewshedExperience extends LayerExperience {
     this.observer.height = height;
     this.refresh();
     this.onEvent(this.trace.visible ? "correct" : "blocked");
-    this.onChange();
-  }
-  setView(view) {
-    if (view !== "scene" && view !== "map") return;
-    this.view = view;
     this.onChange();
   }
   placeFromMap(hit) {

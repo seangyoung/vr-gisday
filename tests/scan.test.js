@@ -51,6 +51,9 @@ test("new viewpoints add surfaces and point coordinates remain model-relative af
 });
 test("scan limit, miss handling, intro gate and four-minute wrap-up", () => {
   const s = new ScanExperience(new THREE.Scene(), () => {});
+  s.update(300);
+  assert.equal(s.stage, 0);
+  assert.equal(s.elapsed, 0);
   assert.equal(
     s.record(new THREE.Vector3(0, 1, 3), new THREE.Vector3(0, 0, -1)),
     false,

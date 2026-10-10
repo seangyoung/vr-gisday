@@ -15,6 +15,7 @@ const sound = new LabSound();
 import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
+import { scanThumbnail } from "./scan/gallery.js";
 import { RainExperience } from "./rain/experience.js";
 import { rainThumbnail } from "./rain/gallery.js";
 import { ModelGrab } from "./manipulation.js";
@@ -322,7 +323,7 @@ function startRain(kind = "drainage", explore = false) {
     draw();
   }
 }
-function startScan(sceneInfo) {
+function startScan(sceneInfo, explore = false) {
   if (!SCAN_SCENES.includes(sceneInfo)) sceneInfo = nextScanScene();
   stopRainInput();
   rain?.dispose();
@@ -336,7 +337,11 @@ function startScan(sceneInfo) {
   scan?.dispose();
   scan = new ScanExperience(scene, draw, sceneInfo);
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
-  draw();
+  if (explore) scan.explore();
+  else {
+    scan.group.visible = false;
+    draw();
+  }
 }
 function startLayers() {
   stopRainInput();
@@ -485,11 +490,12 @@ function drawScanUI() {
     drawRoomUI();
     return;
   }
+  if (s.stage === 0) {
+    drawScanChooserUI();
+    return;
+  }
   const copy = [
-    [
-      "Scan the Hidden World",
-      "A range return becomes one measured 3D point.\nMany returns form a point cloud; the first surface blocks others.\nThis is synthetic, not a lidar scan of your room.",
-    ],
+    null,
     [
       "Which surfaces are still hidden?",
       "HOLD TRIGGER to sweep. Each bright ray stops at a first return.\nGRIP to turn / move; BOTH grips to resize. Scan another side.\nA missing patch may be occluded. Compare with the solid scene.",
@@ -514,56 +520,82 @@ function drawScanUI() {
     "#e6f4f5",
     "#0b2430",
   );
-  if (s.stage === 0) {
-    button("Start scanning", -0.55, -0.77, () => s.explore(), 1.02);
-    button("Scan your room in MR", 0.55, -0.77, switchToRoomScan, 1.02);
-  } else {
-    button(
-      s.reveal ? "Cloud only" : "Compare surfaces",
-      -0.84,
-      -0.77,
-      () => s.toggleReveal(),
-      0.52,
-    );
-    button(
-      s.hideVegetation ? "All points" : "Hide plants",
-      -0.28,
-      -0.77,
-      () => s.toggleVegetation(),
-      0.52,
-    );
-    button(
-      "Clear scan",
-      0.28,
-      -0.77,
-      () => {
-        stopRainInput();
-        s.clearScan();
-      },
-      0.52,
-    );
-    button(
-      s.stage === 2 ? "Next scene" : "Takeaways",
-      0.84,
-      -0.77,
-      () => {
-        stopRainInput();
-        if (s.stage === 2) startScan();
-        else s.finish();
-      },
-      0.52,
-    );
-    label(
-      `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
-      0,
-      -0.64,
-      2.3,
-      0.09,
-      24,
-      "#b6d1d9",
-      "#0b2430",
-    );
-  }
+  button(
+    s.reveal ? "Cloud only" : "Compare surfaces",
+    -0.84,
+    -0.77,
+    () => s.toggleReveal(),
+    0.52,
+  );
+  button(
+    s.hideVegetation ? "All points" : "Hide plants",
+    -0.28,
+    -0.77,
+    () => s.toggleVegetation(),
+    0.52,
+  );
+  button(
+    "Clear scan",
+    0.28,
+    -0.77,
+    () => {
+      stopRainInput();
+      s.clearScan();
+    },
+    0.52,
+  );
+  button(
+    s.stage === 2 ? "Next scene" : "Takeaways",
+    0.84,
+    -0.77,
+    () => {
+      stopRainInput();
+      if (s.stage === 2) startScan(undefined, true);
+      else s.finish();
+    },
+    0.52,
+  );
+  label(
+    `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
+    0,
+    -0.64,
+    2.3,
+    0.09,
+    24,
+    "#b6d1d9",
+    "#0b2430",
+  );
+  navigation();
+}
+function drawScanChoiceCard(kind, x, title, subtitle, action) {
+  const card = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.1, 1.22),
+    new THREE.MeshBasicMaterial({ color: kind === "room" ? 0x294046 : 0x193e47,
+      side: THREE.DoubleSide }),
+  );
+  card.position.set(x, -0.08, 0.01);
+  card.userData.action = () => {
+    sound.click();
+    action();
+  };
+  card.userData.label = title;
+  buttons.push(card);
+  uiParent.add(card);
+  const thumbnail = scanThumbnail(kind);
+  thumbnail.position.set(x, 0.1, 0.16);
+  uiParent.add(thumbnail);
+  label(title, x, -0.38, 1.04, 0.12, 37, "#ffffff").position.z = 0.37;
+  label(subtitle, x, -0.51, 1.04, 0.11, 25, "#c7e6e5").position.z = 0.37;
+}
+function drawScanChooserUI() {
+  label("Scan the Hidden World", 0, 0.96, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
+  label("Choose a point-cloud experience. A range return becomes one 3D point.",
+    0, 0.69, 2.3, 0.2, 30, "#b6d1d9", "#0b2430");
+  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "Explore hidden surfaces", () => {
+    scan.group.visible = true;
+    scan.explore();
+  });
+  drawScanChoiceCard("room", 0.61, "Room scan · MR", "Scan nearby real surfaces", switchToRoomScan);
   navigation();
 }
 function drawLayersUI() {
@@ -638,11 +670,9 @@ function drawViewshedUI() {
     navigation(-1.02);
     return;
   }
-  button("Landscape", -0.57, 0.69, () => v.setView("scene"), 0.98)
-    .material.color.set(v.view === "scene" ? 0xffffff : 0x91a6a4);
-  button("Map", 0.57, 0.69, () => v.setView("map"), 0.98)
-    .material.color.set(v.view === "map" ? 0xffffff : 0x91a6a4);
-  if (v.view === "map") {
+  label("Tap the map to move the observer · watch the landscape change",
+    0, 0.68, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
+  {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
     v.renderMap(canvas.getContext("2d"));
@@ -664,18 +694,6 @@ function drawViewshedUI() {
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
     label("Map and landscape agree · right stick: 30° turns", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
-  } else {
-    label(
-      "Gold is the observer; blue is the target. The sightline\nstops at the blocking ridge. Green ground is visible.",
-      0, 0.44, 2.3, 0.26, 32, "#e6f4f5", "#0b2430",
-    );
-    label("Point at the ground and press trigger to move the observer.", 0, 0.17, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
-    button("Eye level · 2 m", -0.56, -0.12, () => v.setHeight(2), 0.98)
-      .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
-    button("Tower · 12 m", 0.56, -0.12, () => v.setHeight(12), 0.98)
-      .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
-    button("Reset point", 0, -0.43, () => v.reset(), 1.05);
-    label("Try both heights · right stick: 30° turns", 0, -0.68, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
@@ -1407,7 +1425,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.scanning = false;
   });
   c.addEventListener("squeezestart", () => {
-    if (scan && grip.visible) {
+    if (scan && (scan.room || scan.stage === 1) && grip.visible) {
       if (scan.room && !scan.frozen) return;
       grip.updateWorldMatrix(true, false);
       if (scan.grab.hands.size || (!intersect(c) && scanHit(c))) {
@@ -1465,7 +1483,7 @@ for (let i = 0; i < 2; i++) {
   controllers.push({ c, grip, beam, handle, id: i });
 }
 function scanHit(c) {
-  if (!scan) return null;
+  if (!scan || (!scan.room && scan.stage === 0)) return null;
   intersect(c);
   return scan.hit(raycaster);
 }

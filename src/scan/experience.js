@@ -115,7 +115,7 @@ export class ScanExperience {
       this.scanRay.material.opacity = Math.max(0, 0.72 * (1 - this.rayAge / 0.22));
       if (this.rayAge >= 0.22) this.scanRay.visible = false;
     }
-    if (this.stage < 2) {
+    if (this.stage === 1) {
       this.elapsed += dt;
       if (this.elapsed >= 240) this.finish();
     }
