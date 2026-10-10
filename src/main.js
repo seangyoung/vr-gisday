@@ -276,6 +276,10 @@ function drawSoundMenu() {
   control("Close", 0, -0.34, 0.34, closeSoundMenu);
   soundPanel.traverse((object) => {
     if (!object.material) return;
+    // Keep every menu surface in the transparent render pass so the solid
+    // backing draws after the scene, before the controls and labels.
+    object.material.transparent = true;
+    object.material.opacity = 1;
     object.material.depthTest = false;
     object.material.depthWrite = false;
     object.renderOrder = object === background ? 89 : 90;
