@@ -707,7 +707,7 @@ export class RainExperience {
     if (dir.lengthSq() < 0.01) dir.set(0, 0, -1);
     dir.normalize();
     this.group.position.copy(pos).addScaledVector(dir, 1.4);
-    this.group.position.y -= 0.28;
+    this.group.position.y += 0.02;
     this.group.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
     this.group.scale.setScalar(0.43);
   }

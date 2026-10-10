@@ -180,7 +180,11 @@ function label(
   uiParent.add(mesh);
   return mesh;
 }
-function lessonCard(title, body, y = -0.94) {
+// Keep guided content within a comfortable downward glance from eye level.
+const GUIDED_CARD_Y = -0.57;
+const GUIDED_INFO_Y = -0.95;
+const GUIDED_ACTION_Y = -1.16;
+function lessonCard(title, body, y = GUIDED_CARD_Y) {
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
   canvas.height = 250;
@@ -569,7 +573,7 @@ function drawRoomUI() {
     label(`${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
       0, -0.64, 2.3, 0.09, 24, "#b6d1d9", "#0b2430");
   } else label(`${s.message}\n${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
-    0, -1.37, 2.3, 0.17, 25, "#d8eae8", "#0b2430");
+    0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430");
   if (s.stage === 0) {
     if (s.status !== "unavailable")
       button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
@@ -579,7 +583,7 @@ function drawRoomUI() {
     button(
       s.stage === 2 ? "Scan again" : s.frozen ? "Resume" : "Freeze",
       -0.6,
-      -1.61,
+      GUIDED_ACTION_Y,
       () => {
         stopRainInput();
         if (s.stage === 2) startRoomScan();
@@ -588,11 +592,11 @@ function drawRoomUI() {
       },
       0.56,
     );
-    button("Color", 0, -1.61, () => s.toggleColor(), 0.56);
+    button("Color", 0, GUIDED_ACTION_Y, () => s.toggleColor(), 0.56);
     button(
       s.status === "error" || s.status === "waiting" ? "Retry" : "Clear",
       0.6,
-      -1.61,
+      GUIDED_ACTION_Y,
       () => {
         stopRainInput();
         if (s.status === "error" || s.status === "waiting") s.retry();
@@ -627,26 +631,26 @@ function drawScanUI() {
   lessonCard(title, body);
   label(
     `${s.hideVegetation ? "Vegetation hidden · Missing ground stays missing" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
-    0, -1.37, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
+    0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
   );
   button(
     s.reveal ? "Cloud only" : "Compare surfaces",
     -0.84,
-    -1.61,
+    GUIDED_ACTION_Y,
     () => s.toggleReveal(),
     0.52,
   );
   button(
     s.hideVegetation ? "All points" : "Hide plants",
     -0.28,
-    -1.61,
+    GUIDED_ACTION_Y,
     () => s.toggleVegetation(),
     0.52,
   );
   button(
     "Clear scan",
     0.28,
-    -1.61,
+    GUIDED_ACTION_Y,
     () => {
       stopRainInput();
       s.clearScan();
@@ -656,7 +660,7 @@ function drawScanUI() {
   button(
     s.stage === 2 ? "Next scene" : "Takeaways",
     0.84,
-    -1.61,
+    GUIDED_ACTION_Y,
     () => {
       stopRainInput();
       if (s.stage === 2) startScan(undefined, true);
@@ -931,36 +935,36 @@ function drawRainUI() {
   lessonCard(title, body);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
-      button("Reset", -0.78, -1.59, () => { stopRainInput(); r.restore(); }, 0.48);
-      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, -1.59,
+      button("Reset", -0.78, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.48);
+      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, GUIDED_ACTION_Y,
         () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.48);
-      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, -1.59,
+      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, GUIDED_ACTION_Y,
         () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.48);
-      button("Takeaways", 0.78, -1.59, () => { stopRainInput(); r.finish(); }, 0.48);
+      button("Takeaways", 0.78, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.48);
     } else {
-      button("Reset terrain", -0.59, -1.59,
+      button("Reset terrain", -0.59, GUIDED_ACTION_Y,
         () => { stopRainInput(); r.restore(); }, 0.66);
-      button(r.overlay ? "Hide basins" : "Show basins", 0.08, -1.59,
+      button(r.overlay ? "Hide basins" : "Show basins", 0.08, GUIDED_ACTION_Y,
         () => r.toggleOverlay(), 0.59);
-      button(r.edited ? "Takeaways" : "Prediction", 0.68, -1.59,
+      button(r.edited ? "Takeaways" : "Prediction", 0.68, GUIDED_ACTION_Y,
         () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.55);
     }
   }
   if (r.stage === 2) {
-    button("Left outlet", -0.54, -1.59, () => r.choose("A"), 1.02);
-    button("Right outlet", 0.58, -1.59, () => r.choose("B"), 1.02);
+    button("Left outlet", -0.54, GUIDED_ACTION_Y, () => r.choose("A"), 1.02);
+    button("Right outlet", 0.58, GUIDED_ACTION_Y, () => r.choose("B"), 1.02);
   }
   if (r.stage === 3) {
     button(
       "Rain here again",
       -0.54,
-      -1.59,
+      GUIDED_ACTION_Y,
       () => {
         r.playback = 4;
       },
       1.02,
     );
-    button("Takeaways", 0.58, -1.59, () => r.finish(), 1.02);
+    button("Takeaways", 0.58, GUIDED_ACTION_Y, () => r.finish(), 1.02);
   }
   if (r.stage === 4) {
     label(
@@ -968,14 +972,14 @@ function drawRainUI() {
         ? "Simplified water + loose sediment. No soil types, roots,\nreal-world erosion rates, or changing tray tilt."
         : "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
       0,
-      -1.32,
+      GUIDED_INFO_Y,
       2.3,
       0.16,
       28,
       "#e6f4f5",
       "#0b2430",
     );
-    button("Make rain again", 0, -1.59, () => startRain(r.kind, true), 1.65);
+    button("Make rain again", 0, GUIDED_ACTION_Y, () => startRain(r.kind, true), 1.65);
   } else
     label(
       r.kind === "erosion"
@@ -988,7 +992,7 @@ function drawRainUI() {
             ? "A: blue / round outlet    ·    B: gold / square outlet"
             : "Surface-flow model · Synthetic terrain · No flood prediction",
       0,
-      -1.32,
+      GUIDED_INFO_Y,
       2.3,
       0.12,
       28,
@@ -1076,7 +1080,7 @@ function planar() {
   for (const item of items) diagram.add(item);
   content.add(diagram);
   diagram.scale.setScalar(0.72);
-  diagram.position.y = 0.08;
+  diagram.position.y = 0.38;
   if (step === 3) {
     const pts = candidates(3, noisy ? 0.1 : 0.025);
     const geom = new THREE.BufferGeometry().setFromPoints(
@@ -1091,7 +1095,7 @@ function planar() {
     button(
       noisy ? "Tolerance: ±0.10 → smaller" : "Tolerance: ±0.025 → larger",
       -0.64,
-      -1.54,
+      GUIDED_ACTION_Y,
       () => {
         noisy = !noisy;
         draw();
@@ -1112,7 +1116,7 @@ function resetModelView() {
   forward.normalize();
   cam.getWorldPosition(floatingModel.position);
   floatingModel.position.addScaledVector(forward, 1.3);
-  floatingModel.position.y -= 0.1;
+  floatingModel.position.y += 0.2;
   floatingModel.quaternion.setFromEuler(
     new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.72, 0, "YXZ"),
   );
@@ -1501,16 +1505,16 @@ function drawScene() {
   if (isSpatial()) {
     spatial();
     lessonCard(s.title, s.body);
-    button(s.action, 0, -1.54, next, 1.65);
+    button(s.action, 0, GUIDED_ACTION_Y, next, 1.65);
 
     return;
   }
   lessonCard(s.title, s.body);
   planar();
   if (step === 2 && prediction)
-    label(prediction, 0, -1.37, 2.3, 0.1, 28, "#a6f5d9", "#0b2430");
+    label(prediction, 0, GUIDED_INFO_Y, 2.3, 0.1, 28, "#a6f5d9", "#0b2430");
   if (s.action)
-    button(s.action, step === 3 ? 0.64 : 0, -1.54, next, step === 3 ? 1.18 : 1.65);
+    button(s.action, step === 3 ? 0.64 : 0, GUIDED_ACTION_Y, next, step === 3 ? 1.18 : 1.65);
 }
 function place() {
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
@@ -1522,7 +1526,7 @@ function place() {
   if (dir.lengthSq() < 0.01) dir.set(0, 0, -1);
   dir.normalize();
   root.position.copy(pos).addScaledVector(dir, 2.25);
-  root.position.y = pos.y - 0.23;
+  root.position.y = pos.y - 0.08;
   root.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
   pendingPlacement = false;
   if (floatingModel) resetModelView();
