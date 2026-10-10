@@ -36,8 +36,9 @@ class Context {
   createGain() {
     return new Node();
   }
-  createBuffer() {
-    return { getChannelData: () => new Float32Array(200) };
+  createBuffer(_channels, length) {
+    const samples = new Float32Array(length);
+    return { getChannelData: () => samples };
   }
   createBufferSource() {
     return new Node();
@@ -97,6 +98,30 @@ test("event cues are bounded and remain silent while muted", () => {
     sound.muted = true;
     sound.cue("reveal");
     assert.equal(sound.context.tones, 2);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
+test("menu music follows menu state and the same mute control as effects", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.setMenuMusic(true);
+    sound.unlock();
+    assert.equal(sound.menu.gain.value, 0.1);
+    assert.equal(sound.menuSource.loop, true);
+    assert.ok(sound.menuSource.buffer.getChannelData(0).some((sample) => sample !== 0));
+    sound.toggle();
+    assert.equal(sound.master.gain.value, 0);
+    sound.toggle();
+    assert.ok(sound.master.gain.value > 0);
+    sound.setMenuMusic(false);
+    assert.equal(sound.menu.gain.value, 0);
+    sound.setMenuMusic(true);
+    sound.setActive(false);
+    assert.equal(sound.master.gain.value, 0);
   } finally {
     globalThis.AudioContext = old;
   }

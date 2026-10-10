@@ -89,6 +89,7 @@ let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
 const isSpatial = () => step === 4 || step === 5;
+const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
   rangeAnimations = [];
@@ -247,10 +248,7 @@ function point(p, color, r = 0.026, z = 0.045) {
   return m;
 }
 function openMenu() {
-  if (xrMode === "immersive-ar") {
-    renderer.xr.getSession()?.end();
-    return;
-  }
+  stopRainInput();
   scan?.dispose();
   scan = null;
   layers?.dispose();
@@ -261,7 +259,7 @@ function openMenu() {
   pixels = null;
   rain?.dispose();
   rain = null;
-  stopRainInput();
+  preservePose = null;
   step = -1;
   draw();
 }
@@ -271,12 +269,14 @@ function resetView() {
 }
 function runControllerShortcut(action) {
   if (action === "exit") {
-    renderer.xr.getSession()?.end();
+    sound.click();
+    if (isMenu()) renderer.xr.getSession()?.end();
+    else openMenu();
     return;
   }
+  if (action === "restart" && isMenu()) return;
   sound.click();
-  if (action === "menu") openMenu();
-  else if (action === "restart") start();
+  if (action === "restart") start();
   else if (action === "reset") resetView();
   else if (action === "sound") {
     sound.toggle();
@@ -1090,6 +1090,7 @@ function spatial() {
 }
 function draw() {
   drawScene();
+  sound.setMenuMusic(isMenu() && renderer.xr.isPresenting);
   for (const { guide } of controllers)
     guide.setContext(...controllerGuideContext(guide.handedness));
   if (devPreview) {
@@ -1171,9 +1172,9 @@ function draw() {
       panel.append(b);
     }
     for (const [name, action] of [
-      ["Left stick · Menu", "menu"], ["X · Restart", "restart"],
+      ...(!isMenu() ? [["X · Restart", "restart"]] : []),
       ["Y · Reset view", "reset"], ["A · Sound", "sound"],
-      ["B · Exit XR", "exit"],
+      [isMenu() ? "B · Exit XR" : "B · Exit demo", "exit"],
     ]) {
       const b = document.createElement("button");
       b.textContent = name;
@@ -1183,13 +1184,17 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
+  const onMenu = isMenu();
+  const exitLabel = onMenu
+    ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR"
+    : "Exit demo";
   if (rain?.stage === 1) {
-    return [hand === "left" ? "Rain" : "Sculpt", "Move/size"];
+    return [hand === "left" ? "Rain" : "Sculpt", "Move/size", onMenu, exitLabel];
   }
   if (scan?.stage === 1)
-    return ["Scan", scan.room && !scan.frozen ? null : "Move/size"];
-  if (isSpatial()) return ["Select", "Move/size"];
-  return [null, null];
+    return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
+  if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
+  return [null, null, onMenu, exitLabel];
 }
 function updateControllerGuides(cam, tracked, dt) {
   let closest = null;
@@ -1297,6 +1302,16 @@ function drawScene() {
     return;
   }
   if (step === -1) {
+    if (xrMode === "immersive-ar") {
+      label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
+      label("Mixed reality", 0, 0.5, 2, 0.2, 58);
+      label("Explore a point cloud of your surroundings.\nB exits mixed reality from this menu.",
+        0, 0.12, 2.1, 0.28, 36);
+      button("Scan your room", 0, -0.25, startRoomScan, 1.75);
+      label("A toggles sound · Point and press the trigger",
+        0, -0.62, 2.1, 0.13, 29, "#b6d1d9", "#0b2430");
+      return;
+    }
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
     label("Choose an experience", 0, 0.54, 2, 0.2, 58);
     button("Find Yourself Without GPS", 0, 0.27, start, 1.75);
@@ -1580,6 +1595,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
+  sound.setMenuMusic(false);
   sound.setActive(false);
   controllerShortcuts.reset();
   rightTurnReady = true;

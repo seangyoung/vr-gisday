@@ -1,5 +1,11 @@
 # Prototype validation — 2026-10-02
 
+## 2026-10-10 — Controller labels, Exit flow, and menu music
+
+- Controller badges are smaller and sit close to their corresponding modeled buttons. Removed leader lines and the left-stick Menu mapping; X is hidden and inactive on the experience menu. B is labeled Exit demo during an activity and Exit VR/MR on the menu.
+- B returns a VR demo to the six-experience menu. In room scan, B clears that session's scan and returns to a small MR menu; B again ends MR. An original synthesized lounge loop plays only on the immersive menus and fades when a demo starts. A's stored mute preference also controls this music.
+- All 59 tests and the production build pass. Browser preview checked controller badges on both hands, B returning from Find Yourself and Make It Rain, and no errors in a fresh preview tab. Quest testing is still needed for button alignment, Exit behavior in both session modes, and music loudness/comfort.
+
 ## Passed locally
 
 - `npm test`: 3 mathematical tests (2D ambiguity, 3D ambiguity, nested tolerance sets).

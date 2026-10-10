@@ -1,5 +1,5 @@
 // Quest Touch exposes X/Y on the left and A/B on the right at indices 4/5.
-// The left thumbstick click is index 3. The platform Menu key is not exposed.
+// The platform Menu key is not exposed to WebXR.
 export class ControllerShortcuts {
   constructor() {
     this.reset();
@@ -18,12 +18,11 @@ export class ControllerShortcuts {
         this.previous[hand] = null;
         continue;
       }
-      const pressed = [3, 4, 5].map((index) => !!gamepad.buttons[index]?.pressed);
+      const pressed = [4, 5].map((index) => !!gamepad.buttons[index]?.pressed);
       const before = this.previous[hand];
       if (before) {
-        if (hand === "left" && pressed[0] && !before[0]) events.push("menu");
-        if (pressed[1] && !before[1]) events.push(hand === "left" ? "restart" : "sound");
-        if (pressed[2] && !before[2]) events.push(hand === "left" ? "reset" : "exit");
+        if (pressed[0] && !before[0]) events.push(hand === "left" ? "restart" : "sound");
+        if (pressed[1] && !before[1]) events.push(hand === "left" ? "reset" : "exit");
       }
       this.previous[hand] = pressed;
     }

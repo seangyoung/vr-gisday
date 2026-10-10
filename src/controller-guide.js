@@ -5,7 +5,6 @@ const modelFactory = new XRControllerModelFactory();
 modelFactory.setPath(`${import.meta.env.BASE_URL}controller-profiles`);
 
 const anchorNames = {
-  stick: "xr_standard_thumbstick_pressed_value",
   x: "x_button_pressed_value",
   y: "y_button_pressed_value",
   a: "a_button_pressed_value",
@@ -14,13 +13,12 @@ const anchorNames = {
   grip: "xr_standard_squeeze_pressed_value",
 };
 const leftButtons = [
-  ["stick", "STICK", "Menu", -0.065, -0.048],
-  ["x", "X", "Restart", -0.08, 0.028],
-  ["y", "Y", "Reset", 0.08, 0.028],
+  ["x", "X", "Restart", -0.033, 0.012],
+  ["y", "Y", "Reset", 0.033, 0.012],
 ];
 const rightButtons = [
-  ["a", "A", "Sound", -0.075, 0.028],
-  ["b", "B", "Exit", 0.075, 0.028],
+  ["a", "A", "Sound", -0.033, 0.012],
+  ["b", "B", "Exit demo", 0.033, 0.012],
 ];
 const eye = new THREE.Vector3();
 const forward = new THREE.Vector3();
@@ -55,7 +53,7 @@ function makeLabel(key, action) {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
     map: texture, transparent: true, depthTest: false, depthWrite: false,
   }));
-  sprite.scale.set(key === "STICK" ? 0.105 : 0.085, 0.025, 1);
+  sprite.scale.set(key === "TRIG" || key === "GRIP" ? 0.068 : 0.057, 0.018, 1);
   sprite.renderOrder = 42;
   sprite.visible = false;
   return sprite;
@@ -70,6 +68,8 @@ export class ControllerGuide {
     this.handedness = "none";
     this.trigger = null;
     this.gripAction = null;
+    this.onMenu = false;
+    this.exitLabel = "Exit demo";
     this.dwell = 0;
     this.labels = [];
     this.labelKey = "";
@@ -85,20 +85,21 @@ export class ControllerGuide {
     this.clearLabels();
   }
 
-  setContext(trigger, gripAction = null) {
-    if (trigger === this.trigger && gripAction === this.gripAction) return;
+  setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo") {
+    if (trigger === this.trigger && gripAction === this.gripAction &&
+        onMenu === this.onMenu && exitLabel === this.exitLabel) return;
     this.trigger = trigger;
     this.gripAction = gripAction;
+    this.onMenu = onMenu;
+    this.exitLabel = exitLabel;
     this.clearLabels();
   }
 
   clearLabels() {
-    for (const { sprite, leader } of this.labels) {
-      this.scene.remove(sprite, leader);
+    for (const { sprite } of this.labels) {
+      this.scene.remove(sprite);
       sprite.material.map.dispose();
       sprite.material.dispose();
-      leader.geometry.dispose();
-      leader.material.dispose();
     }
     this.labels = [];
     this.labelKey = "";
@@ -117,35 +118,31 @@ export class ControllerGuide {
       });
       this.materialsPrepared = true;
     }
-    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}`;
+    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}`;
     if (this.labelKey === key) return this.labels.length > 0;
     this.clearLabels();
-    const buttons = this.handedness === "left" ? leftButtons : rightButtons;
+    const buttons = this.handedness === "left"
+      ? leftButtons.filter(([id]) => !this.onMenu || id !== "x")
+      : rightButtons.map((spec) => spec[0] === "b"
+        ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec);
     const specs = [
       ...buttons,
-      ...(this.trigger ? [["trigger", "TRIG", this.trigger, 0.07, -0.045]] : []),
-      ...(this.gripAction ? [["grip", "GRIP", this.gripAction, -0.065, -0.075]] : []),
+      ...(this.trigger ? [["trigger", "TRIG", this.trigger, 0.026, -0.02]] : []),
+      ...(this.gripAction ? [["grip", "GRIP", this.gripAction, -0.026, -0.03]] : []),
     ];
     for (const [id, face, action, dx, dy] of specs) {
       const node = this.model.getObjectByName(anchorNames[id]);
       if (!node) continue;
       const sprite = makeLabel(face, action);
-      const leader = new THREE.Line(
-        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-        new THREE.LineBasicMaterial({ color: 0xa6f5d9, depthTest: false }),
-      );
-      leader.renderOrder = 41;
-      leader.visible = false;
-      this.scene.add(sprite, leader);
-      this.labels.push({ node, sprite, leader, dx, dy });
+      this.scene.add(sprite);
+      this.labels.push({ node, sprite, dx, dy });
     }
     this.labelKey = key;
     return this.labels.length > 0;
   }
 
   setVisible(value) {
-    for (const { sprite, leader } of this.labels)
-      sprite.visible = leader.visible = value;
+    for (const { sprite } of this.labels) sprite.visible = value;
   }
 
   update(camera, tracked, dt) {
@@ -169,15 +166,11 @@ export class ControllerGuide {
     camera.getWorldQuaternion(cameraRotation);
     cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation);
     cameraUp.set(0, 1, 0).applyQuaternion(cameraRotation);
-    for (const { node, sprite, leader, dx, dy } of this.labels) {
+    for (const { node, sprite, dx, dy } of this.labels) {
       node.getWorldPosition(hand);
       towardEye.copy(eye).sub(hand).normalize();
-      sprite.position.copy(hand).addScaledVector(towardEye, 0.04)
+      sprite.position.copy(hand).addScaledVector(towardEye, 0.024)
         .addScaledVector(cameraRight, dx).addScaledVector(cameraUp, dy);
-      const positions = leader.geometry.attributes.position;
-      positions.setXYZ(0, hand.x, hand.y, hand.z);
-      positions.setXYZ(1, sprite.position.x, sprite.position.y, sprite.position.z);
-      positions.needsUpdate = true;
     }
     return gaze - distance * 0.05;
   }
