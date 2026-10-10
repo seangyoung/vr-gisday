@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
 
+// A modest horizontal fan widens each sweep without inventing surface points.
+// Extra WebXR sources are optional: the center ray remains usable on its own.
+const FAN_OFFSETS = [-0.075, 0.075];
+
 // Only platform-provided surface positions enter this cloud; no synthetic fallback.
 export class RoomScan {
   constructor(scene, onChange, session, mode) {
@@ -11,6 +15,7 @@ export class RoomScan {
     this.elapsed = 0;
     this.records = [];
     this.keys = new Set();
+    this.uploadedCount = 0;
     this.capacity = 18000;
     this.sources = new Map();
     this.dead = false;
@@ -51,7 +56,7 @@ export class RoomScan {
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     this.group.add(this.pick);
-    this.reticles = [0, 1].map(() => {
+    this.reticles = [0, 1].map(() => [0, ...FAN_OFFSETS].map(() => {
       const m = new THREE.Mesh(
         new THREE.SphereGeometry(0.012, 10, 8),
         new THREE.MeshBasicMaterial({ color: 0xa6f5d9 }),
@@ -59,7 +64,7 @@ export class RoomScan {
       m.visible = false;
       scene.add(m);
       return m;
-    });
+    }));
   }
   explore() {
     if (this.status === "unavailable") return;
@@ -68,7 +73,7 @@ export class RoomScan {
   }
   async ensureSource(input) {
     if (!input || this.sources.has(input) || this.dead) return;
-    const entry = { source: null, error: false };
+    const entry = { sources: [null, ...FAN_OFFSETS.map(() => null)], error: false };
     this.sources.set(input, entry);
     try {
       // Default WebXR surface hit type; the runtime controls sensing/reconstruction.
@@ -81,11 +86,29 @@ export class RoomScan {
         } catch {}
         return;
       }
-      entry.source = source;
+      entry.sources[0] = source;
       this.status = "waiting";
       this.message =
         "Surface testing active. Point at nearby walls, floor, or furniture.";
       this.onChange();
+      if (typeof globalThis.XRRay !== "function") return;
+      await Promise.all(FAN_OFFSETS.map(async (offset, index) => {
+        try {
+          const offsetRay = new globalThis.XRRay(
+            { x: 0, y: 0, z: 0 },
+            { x: offset, y: 0, z: -1 },
+          );
+          const side = await this.session.requestHitTestSource({
+            space: input.targetRaySpace,
+            offsetRay,
+          });
+          if (this.dead || entry.error || this.sources.get(input) !== entry)
+            side.cancel();
+          else entry.sources[index + 1] = side;
+        } catch {
+          // A runtime may limit hit-test sources or offset rays. Keep the center.
+        }
+      }));
     } catch (error) {
       if (this.dead) return;
       entry.error = true;
@@ -96,14 +119,16 @@ export class RoomScan {
   }
   releaseInput(input) {
     const entry = this.sources.get(input);
-    try {
-      entry?.source?.cancel();
-    } catch {}
+    for (const source of entry?.sources ?? [])
+      try {
+        source?.cancel();
+      } catch {}
     this.sources.delete(input);
   }
   cancelSources() {
     for (const input of [...this.sources.keys()]) this.releaseInput(input);
-    for (const m of this.reticles) m.visible = false;
+    for (const row of this.reticles)
+      for (const m of row) m.visible = false;
   }
   retry() {
     this.cancelSources();
@@ -137,8 +162,8 @@ export class RoomScan {
     let changed = false,
       hasHit = false;
     for (const { c, id } of controllers) {
-      const reticle = this.reticles[id];
-      reticle.visible = false;
+      const reticles = this.reticles[id];
+      for (const reticle of reticles) reticle.visible = false;
       if (!c.visible || isOverUI(c)) {
         if (!c.visible) c.userData.scanning = false;
         continue;
@@ -146,45 +171,58 @@ export class RoomScan {
       const input = c.userData.xrInput;
       if (!input) continue;
       void this.ensureSource(input);
-      const source = this.sources.get(input)?.source;
-      if (!source) continue;
-      try {
-        const result = frame.getHitTestResults(source)[0];
-        const pose = result?.getPose(referenceSpace);
-        if (!pose) continue;
-        const p = pose.transform.position,
-          origin = c.getWorldPosition(new THREE.Vector3());
-        if (![p.x, p.y, p.z].every(Number.isFinite)) continue;
-        const range = origin.distanceTo(new THREE.Vector3(p.x, p.y, p.z));
-        if (range < 0.2 || range > 8) continue;
-        reticle.position.set(p.x, p.y, p.z);
-        reticle.visible = true;
-        hasHit = true;
-        if (c.userData.scanning) changed = this.record(p, origin) || changed;
-      } catch {
-        const entry = this.sources.get(input);
+      const entry = this.sources.get(input);
+      if (!entry) continue;
+      const origin = c.getWorldPosition(new THREE.Vector3());
+      for (const [beam, source] of entry.sources.entries()) {
+        if (!source) continue;
         try {
-          entry?.source?.cancel();
-        } catch {}
-        if (entry) {
-          entry.source = null;
+          const result = frame.getHitTestResults(source)[0];
+          const pose = result?.getPose(referenceSpace);
+          if (!pose) continue;
+          const p = pose.transform.position;
+          if (![p.x, p.y, p.z].every(Number.isFinite)) continue;
+          const range = origin.distanceTo(new THREE.Vector3(p.x, p.y, p.z));
+          if (range < 0.2 || range > 8) continue;
+          reticles[beam].position.set(p.x, p.y, p.z);
+          reticles[beam].visible = true;
+          hasHit = true;
+          if (c.userData.scanning) changed = this.record(p, origin) || changed;
+        } catch {
+          try {
+            source.cancel();
+          } catch {}
+          entry.sources[beam] = null;
+          if (beam !== 0) continue;
           entry.error = true;
+          for (const side of entry.sources)
+            try {
+              side?.cancel();
+            } catch {}
+          entry.sources.fill(null);
+          this.status = "error";
+          this.message =
+            "Surface tracking stopped. Release the trigger and choose Retry.";
+          this.onChange();
+          break;
         }
-        this.status = "error";
-        this.message =
-          "Surface tracking stopped. Release the trigger and choose Retry.";
       }
     }
     if (changed) this.refreshPoints();
     this.noticeTime += dt;
     if (this.noticeTime >= 1) {
       this.noticeTime = 0;
+      if (this.status === "error") return;
       if (hasHit) {
         this.status = "receiving";
+        const wide = [...this.sources.values()].some((entry) =>
+          entry.sources.slice(1).some(Boolean));
         this.message =
           this.records.length >= this.capacity
             ? "Point limit reached. Freeze or clear the scan."
-            : "Real surface detected. Hold trigger and sweep slowly.";
+            : wide
+              ? "Real surface detected. Hold trigger and sweep the short ray fan."
+              : "Real surface detected. Hold trigger and sweep slowly.";
       } else if (this.status !== "error") {
         this.status = "waiting";
         this.message =
@@ -193,26 +231,30 @@ export class RoomScan {
       this.onChange();
     }
   }
-  refreshPoints() {
+  refreshPoints(full = false) {
     const geo = this.points.geometry;
-    this.records.forEach(({ p, distance }, i) => {
+    if (full) this.uploadedCount = 0;
+    const color = new THREE.Color();
+    for (let i = this.uploadedCount; i < this.records.length; i++) {
+      const { p, distance } = this.records[i];
       const local = this.frozen ? p.clone().sub(this.center) : p;
       geo.attributes.position.setXYZ(i, local.x, local.y, local.z);
       const value = this.colorMode === "height" ? (p.y + 1) / 3 : distance / 8;
-      const color = new THREE.Color().setHSL(
+      color.setHSL(
         0.65 - THREE.MathUtils.clamp(value, 0, 1) * 0.55,
         0.85,
         0.65,
       );
       geo.attributes.color.setXYZ(i, color.r, color.g, color.b);
-    });
+    }
+    this.uploadedCount = this.records.length;
     geo.attributes.position.needsUpdate = true;
     geo.attributes.color.needsUpdate = true;
     geo.setDrawRange(0, this.records.length);
   }
   toggleColor() {
     this.colorMode = this.colorMode === "height" ? "range" : "height";
-    this.refreshPoints();
+    this.refreshPoints(true);
     this.onChange();
   }
   freeze(camera = this.lastCamera) {
@@ -233,7 +275,7 @@ export class RoomScan {
       Math.max(size.y, 0.1),
       Math.max(size.z, 0.1),
     );
-    this.refreshPoints();
+    this.refreshPoints(true);
     if (camera) this.place(camera);
     this.onChange();
   }
@@ -243,7 +285,7 @@ export class RoomScan {
     this.group.position.set(0, 0, 0);
     this.group.rotation.set(0, 0, 0);
     this.group.scale.setScalar(1);
-    this.refreshPoints();
+    this.refreshPoints(true);
     this.status = "ready";
     this.message = "Resuming live sampling.";
     this.onChange();
@@ -293,11 +335,12 @@ export class RoomScan {
     this.cancelSources();
     this.grab.cancel();
     this.group.removeFromParent();
-    for (const m of this.reticles) {
-      m.removeFromParent();
-      m.geometry.dispose();
-      m.material.dispose();
-    }
+    for (const row of this.reticles)
+      for (const m of row) {
+        m.removeFromParent();
+        m.geometry.dispose();
+        m.material.dispose();
+      }
     this.group.traverse((n) => {
       n.geometry?.dispose();
       n.material?.dispose();

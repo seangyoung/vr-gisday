@@ -563,7 +563,7 @@ function drawRoomUI() {
         ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
         : s.frozen
           ? "Move the frozen point cloud to inspect gaps.\nResume returns points to their real-world positions.\nKeep passthrough visible as you explore."
-          : "Aim at real surfaces and sweep slowly.\nA green dot marks an actual surface return.\nFreeze to inspect the point cloud you collected.";
+          : "Aim at real surfaces and sweep.\nUp to three green dots mark actual surface returns.\nFreeze to inspect the point cloud you collected.";
   if (intro) {
     label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
     label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");

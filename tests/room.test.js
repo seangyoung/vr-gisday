@@ -108,7 +108,7 @@ test("only hit-test poses with held trigger are recorded and sources cancel at w
   const controllers = [{ c, id: 0 }];
   r.updateFrame(frame, {}, controllers, 0.05, camera, () => false);
   assert.equal(r.records.length, 0);
-  assert.equal(r.reticles[0].visible, true);
+  assert.equal(r.reticles[0][0].visible, true);
   c.userData.scanning = true;
   r.updateFrame(frame, {}, controllers, 0.05, camera, () => false);
   assert.equal(r.records.length, 1);
@@ -117,6 +117,77 @@ test("only hit-test poses with held trigger are recorded and sources cancel at w
   assert.equal(r.frozen, true);
   assert.equal(cancelled, 1);
   r.dispose();
+});
+test("a controller sweep records three independent surface hits when offset rays work", async () => {
+  const originalRay = globalThis.XRRay;
+  globalThis.XRRay = class {
+    constructor(origin, direction) {
+      this.origin = origin;
+      this.direction = direction;
+    }
+  };
+  let cancelled = 0;
+  const input = { targetRaySpace: {} };
+  const r = make({
+    requestHitTestSource: async ({ offsetRay }) => ({
+      offset: offsetRay?.direction.x ?? 0,
+      cancel() { cancelled++; },
+    }),
+  });
+  try {
+    await r.ensureSource(input);
+    const c = new THREE.Group();
+    c.userData.xrInput = input;
+    c.userData.scanning = true;
+    const frame = {
+      getHitTestResults: (source) => [
+        { getPose: () => ({ transform: { position: {
+          x: source.offset * 2, y: 0.5, z: -2,
+        } } }) },
+      ],
+    };
+    const controllers = [{ c, id: 0 }];
+    r.updateFrame(frame, {}, controllers, 0.05, new THREE.PerspectiveCamera(), () => false);
+    assert.equal(r.records.length, 3);
+    assert.deepEqual(r.records.map(({ p }) => p.x).sort((a, b) => a - b), [-0.15, 0, 0.15]);
+    assert.ok(r.reticles[0].every((reticle) => reticle.visible));
+    r.updateFrame(frame, {}, controllers, 0.05, new THREE.PerspectiveCamera(), () => false);
+    assert.equal(r.records.length, 3, "repeated poses stay deduplicated");
+    r.freeze();
+    assert.equal(cancelled, 3);
+  } finally {
+    r.dispose();
+    globalThis.XRRay = originalRay;
+  }
+});
+test("rejected side rays leave the center scan usable", async () => {
+  const originalRay = globalThis.XRRay;
+  globalThis.XRRay = class {
+    constructor(origin, direction) { this.direction = direction; }
+  };
+  const input = { targetRaySpace: {} };
+  const r = make({
+    requestHitTestSource: async ({ offsetRay }) => {
+      if (offsetRay) throw new Error("source limit");
+      return { cancel() {} };
+    },
+  });
+  try {
+    await r.ensureSource(input);
+    const c = new THREE.Group();
+    c.userData.xrInput = input;
+    c.userData.scanning = true;
+    r.updateFrame({
+      getHitTestResults: () => [
+        { getPose: () => ({ transform: { position: { x: 0, y: 0.5, z: -2 } } }) },
+      ],
+    }, {}, [{ c, id: 0 }], 0.05, new THREE.PerspectiveCamera(), () => false);
+    assert.equal(r.records.length, 1);
+    assert.notEqual(r.status, "error");
+  } finally {
+    r.dispose();
+    globalThis.XRRay = originalRay;
+  }
 });
 test("VR or missing API reports unavailable and cannot start recording", () => {
   const r = new RoomScan(new THREE.Scene(), () => {}, null, "immersive-vr");
