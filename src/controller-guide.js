@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
+import { positionButtonLabel } from "./controller-label-layout.js";
 
 const modelFactory = new XRControllerModelFactory();
 modelFactory.setPath(`${import.meta.env.BASE_URL}controller-profiles`);
@@ -13,21 +14,18 @@ const anchorNames = {
   grip: "xr_standard_squeeze_pressed_value",
 };
 const leftButtons = [
-  ["x", "X", "Restart", -0.033, 0.012],
-  ["y", "Y", "Reset", 0.033, 0.012],
+  ["x", "X", "Restart", "y", 0.025],
+  ["y", "Y", "Reset", "x", 0.025],
 ];
 const rightButtons = [
-  ["a", "A", "Sound", -0.033, 0.012],
-  ["b", "B", "Exit demo", 0.033, 0.012],
+  ["a", "A", "Sound", "b", 0.025],
+  ["b", "B", "Exit demo", "a", 0.025],
 ];
 const eye = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const hand = new THREE.Vector3();
 const toHand = new THREE.Vector3();
-const cameraRight = new THREE.Vector3();
-const cameraUp = new THREE.Vector3();
-const towardEye = new THREE.Vector3();
-const cameraRotation = new THREE.Quaternion();
+const otherButton = new THREE.Vector3();
 
 function makeLabel(key, action) {
   const canvas = document.createElement("canvas");
@@ -127,22 +125,24 @@ export class ControllerGuide {
         ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec);
     const specs = [
       ...buttons,
-      ...(this.trigger ? [["trigger", "TRIG", this.trigger, 0.026, -0.02]] : []),
-      ...(this.gripAction ? [["grip", "GRIP", this.gripAction, -0.026, -0.03]] : []),
+      ...(this.trigger ? [["trigger", "TRIG", this.trigger, "grip", 0.032]] : []),
+      ...(this.gripAction ? [["grip", "GRIP", this.gripAction, "trigger", 0.032]] : []),
     ];
-    for (const [id, face, action, dx, dy] of specs) {
+    for (const [id, face, action, neighborId, spacing] of specs) {
       const node = this.model.getObjectByName(anchorNames[id]);
       if (!node) continue;
       const sprite = makeLabel(face, action);
       this.scene.add(sprite);
-      this.labels.push({ node, sprite, dx, dy });
+      this.labels.push({ node, neighbor: this.model.getObjectByName(anchorNames[neighborId]),
+        sprite, spacing, ready: false });
     }
     this.labelKey = key;
     return this.labels.length > 0;
   }
 
   setVisible(value) {
-    for (const { sprite } of this.labels) sprite.visible = value;
+    for (const label of this.labels)
+      label.sprite.visible = value && label.ready;
   }
 
   update(camera, tracked, dt) {
@@ -163,14 +163,11 @@ export class ControllerGuide {
     }
     this.dwell += dt;
     if (this.dwell < 0.3) return -Infinity;
-    camera.getWorldQuaternion(cameraRotation);
-    cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation);
-    cameraUp.set(0, 1, 0).applyQuaternion(cameraRotation);
-    for (const { node, sprite, dx, dy } of this.labels) {
-      node.getWorldPosition(hand);
-      towardEye.copy(eye).sub(hand).normalize();
-      sprite.position.copy(hand).addScaledVector(towardEye, 0.024)
-        .addScaledVector(cameraRight, dx).addScaledVector(cameraUp, dy);
+    for (const label of this.labels) {
+      label.node.getWorldPosition(hand);
+      const neighbor = label.neighbor?.getWorldPosition(otherButton);
+      label.ready = positionButtonLabel(hand, neighbor, eye,
+        label.spacing, label.sprite.position);
     }
     return gaze - distance * 0.05;
   }

@@ -1,5 +1,10 @@
 # Prototype validation — 2026-10-02
 
+## 2026-10-10 — Button-label pairing refinement
+
+- Replaced viewer-relative sideways badge offsets with offsets derived from each controller model's paired button positions. A/B, X/Y, and trigger/grip labels stay on the outside of their own pair as the controller rotates; nearly edge-on pairs hide because their assignment would be visually ambiguous.
+- Added projected-screen-distance tests for both labels through several wrist rotations, plus an edge-on case. Browser preview reviewed both controller models and active rain controls. Quest headset confirmation is still needed for real wrist poses and stereo readability.
+
 ## 2026-10-10 — Controller labels, Exit flow, and menu music
 
 - Controller badges are smaller and sit close to their corresponding modeled buttons. Removed leader lines and the left-stick Menu mapping; X is hidden and inactive on the experience menu. B is labeled Exit demo during an activity and Exit VR/MR on the menu.
