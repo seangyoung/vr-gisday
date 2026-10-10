@@ -28,8 +28,10 @@ Quest Touch shortcuts replace the persistent navigation row: **X** restarts the 
 2. Two circles intersect at two selectable predictions.
 3. A third range identifies one candidate; feedback explains either choice.
 4. Toggle range tolerance; white dots satisfy all three bands.
-5. In 3D, three coplanar beacons admit two points. Denser range shells expand in sequence. The model floats independently of the text and controls. Point at it or reach nearby and hold a controller side grip to move/rotate the entire assembly. Add the other grip and spread/squeeze to resize uniformly (scale 0.28–0.85; default 0.35). Release to leave it in place.
-6. Only the fourth shell expands when its noncoplanar beacon is added; earlier shells stay in place. This resolves the example while preserving your model position, rotation, and scale. Finish with takeaways.
+5. In 3D, one beacon's distance creates a spherical shell of possible positions. The model floats independently of the text and controls. Point at it or reach nearby and hold a controller side grip to move/rotate the entire assembly. Add the other grip and spread/squeeze to resize uniformly (scale 0.28–0.85; default 0.35). Release to leave it in place.
+6. Add a second shell. A bright circle highlights the positions where both exact distances agree; it fades in after the new shell expands.
+7. Add a third shell. It cuts that circle at two white candidate points. Only the new shell expands; the earlier shells stay in place.
+8. Add a fourth noncoplanar shell. Only the new shell expands, resolving the example while preserving your model position, rotation, and scale. Finish with takeaways.
 
 The guided portion transitions to takeaways after 240 seconds of visible XR frame time. It can be completed sooner; paused/hidden sessions do not consume that time. Controller shortcuts for Restart, Reset View, Sound, and Exit demo remain available throughout. In 3D, Y/Reset View restores the default model pose and controls in front of the viewer. The assembly has a shared center; individual beacons cannot be moved independently because that would invalidate the measured-distance relationships. Tracking loss, hidden sessions, reset, or stage changes release active grips.
 
@@ -130,7 +132,7 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 - Left/right controller rays select menu buttons and both candidate points.
 - All text is readable and geometry remains stable in stereo.
 - Seated entry and Y/Reset View place content comfortably.
-- Uncertainty toggle works. One grip translates/rotates all shells together; two grips resize within limits. Check no jumps when adding/releasing the second grip, Reset View after moving the model away, and grip release on tracking loss/sleep.
+- Uncertainty toggle works. In 3D, shells appear one at a time, the two-shell intersection circle is visible from different angles, and the third shell leaves two points. One grip translates/rotates all shells together; two grips resize within limits. Check no jumps when adding/releasing the second grip, Reset View after moving the model away, and grip release on tracking loss/sleep.
 - X/Restart, Y/Reset View, A/Sound, and B/Exit demo work from every stage and takeaways; B on the menu exits XR. The flat Menu button leaves WebXR through Quest Browser. Check compact controller-label legibility and placement when looking at each hand.
 - Four-minute wrap-up, headset sleep/resume, and fresh-session reset work.
 - Repeat several visitors and check comfort and frame rate.

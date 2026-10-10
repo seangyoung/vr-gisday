@@ -43,9 +43,19 @@ export const stages = [
     action: "Take it into 3D",
   },
   {
-    title: "In 3D, circles become shells.",
-    body: "In space, every point on a shell is equally far from its beacon.\nThe two white points fit all three distances.\nGrab and turn the model to see both possibilities.",
-    action: "Add the fourth beacon",
+    title: "One distance makes a shell.",
+    body: "In 3D, points at the same distance from one known beacon\nform a spherical shell. Direction is still unknown.\nGrab and turn the model to look all around it.",
+    action: "Add a second beacon",
+  },
+  {
+    title: "Two shells meet in a circle.",
+    body: "Both distances must agree. The bright circle is where\nthe shells intersect; every point on it fits both ranges.\nTurn the model to see the circle in space.",
+    action: "Add a third beacon",
+  },
+  {
+    title: "Three shells leave two points.",
+    body: "The third shell crosses that circle at two white points.\nBoth positions fit all three exact distances.\nOne more well-placed beacon can resolve the ambiguity.",
+    action: "Add a fourth beacon",
   },
   {
     title: "Four ranges. One common position.",
@@ -62,3 +72,26 @@ export const beacons3D = [
 export const target3D = { x: 0.06, y: 0.07, z: 0.26 };
 export const alternative3D = { ...target3D, z: -target3D.z };
 export const distance3D = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+export function shellIntersection(a, b, radiusA, radiusB) {
+  const separation = distance3D(a, b);
+  if (
+    separation <= 0 ||
+    separation > radiusA + radiusB ||
+    separation < Math.abs(radiusA - radiusB)
+  ) return null;
+  const normal = {
+    x: (b.x - a.x) / separation,
+    y: (b.y - a.y) / separation,
+    z: (b.z - a.z) / separation,
+  };
+  const along = (radiusA ** 2 - radiusB ** 2 + separation ** 2) / (2 * separation);
+  return {
+    center: {
+      x: a.x + normal.x * along,
+      y: a.y + normal.y * along,
+      z: a.z + normal.z * along,
+    },
+    normal,
+    radius: Math.sqrt(Math.max(0, radiusA ** 2 - along ** 2)),
+  };
+}

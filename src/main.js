@@ -8,6 +8,7 @@ import {
   stages,
   beacons3D,
   target3D,
+  shellIntersection,
 } from "./model.js";
 import "./style.css";
 import { LabSound } from "./sound.js";
@@ -90,7 +91,7 @@ let lastAnimatedRangeStep = null;
 let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
-const isSpatial = () => step === 4 || step === 5;
+const isSpatial = () => step >= 4 && step < stages.length;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
@@ -900,7 +901,7 @@ function drawRainUI() {
 }
 function next() {
   preservePose =
-    step === 4 && floatingModel
+    isSpatial() && floatingModel && step < stages.length - 1
       ? {
           position: floatingModel.position.clone(),
           quaternion: floatingModel.quaternion.clone(),
@@ -909,7 +910,7 @@ function next() {
       : null;
   step++;
   draw();
-  sound.cue(step === 5 ? "reveal" : "measure");
+  sound.cue(isSpatial() ? "reveal" : "measure");
 }
 function planar() {
   const first = content.children.length;
@@ -1016,7 +1017,7 @@ function resetModelView() {
   floatingModel.position.addScaledVector(forward, 1.3);
   floatingModel.position.y -= 0.1;
   floatingModel.quaternion.setFromEuler(
-    new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.35, 0, "YXZ"),
+    new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.72, 0, "YXZ"),
   );
   floatingModel.scale.setScalar(0.35);
 }
@@ -1034,7 +1035,9 @@ function spatial() {
     bounds.expandByPoint(a.clone().addScalar(-r));
   });
   const center = bounds.getCenter(new THREE.Vector3());
-  beacons.slice(0, step === 4 ? 3 : 4).forEach((a, i) => {
+  const count = step - 3;
+  const fresh = lastAnimatedRangeStep === step ? -1 : count - 1;
+  beacons.slice(0, count).forEach((a, i) => {
     const sphere = new THREE.Mesh(
       new THREE.SphereGeometry(a.distanceTo(t), 48, 32),
       new THREE.MeshBasicMaterial({
@@ -1047,8 +1050,11 @@ function spatial() {
     );
     sphere.position.copy(a).sub(center);
     group.add(sphere);
-    if (lastAnimatedRangeStep !== step && (step === 4 || i === 3))
-      rangeAnimations.push({ object: sphere, delay: step === 4 ? i * 0.2 : 0 });
+    if (i === fresh) {
+      sphere.scale.setScalar(0.001);
+      sphere.material.opacity = 0;
+      rangeAnimations.push({ object: sphere, delay: 0, opacity: 0.25 });
+    }
     const beacon = new THREE.Mesh(
       new THREE.SphereGeometry(0.038, 16, 12),
       new THREE.MeshBasicMaterial({ color: palette[i] }),
@@ -1072,14 +1078,47 @@ function spatial() {
     );
     group.add(spoke);
   });
+  if (count === 2 || count === 3) {
+    const intersection = shellIntersection(
+      beacons[0], beacons[1], beacons[0].distanceTo(t), beacons[1].distanceTo(t),
+    );
+    if (intersection) {
+      for (const [tube, color, opacity] of [
+        [0.022, 0xffdc7b, 0.18],
+        [0.007, 0xfff2bc, 0.95],
+      ]) {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(intersection.radius, tube, 8, 128),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity,
+            depthTest: false, depthWrite: false }),
+        );
+        ring.position.set(
+          intersection.center.x, intersection.center.y, intersection.center.z,
+        ).sub(center);
+        ring.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1),
+          new THREE.Vector3(
+            intersection.normal.x, intersection.normal.y, intersection.normal.z,
+          ),
+        );
+        ring.renderOrder = 5;
+        group.add(ring);
+        if (fresh === 1) {
+          ring.material.opacity = 0;
+          rangeAnimations.push({ object: ring, delay: 0.6, opacity, fadeOnly: true });
+        }
+      }
+    }
+  }
   lastAnimatedRangeStep = step;
-  [t, ...(step === 4 ? [new THREE.Vector3(t.x, t.y, -t.z)] : [])].forEach(
+  (count === 3 ? [t, new THREE.Vector3(t.x, t.y, -t.z)] : count === 4 ? [t] : []).forEach(
     (p) => {
       const dot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.028, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0xffffff }),
+        new THREE.SphereGeometry(0.05, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false }),
       );
       dot.position.copy(p).sub(center);
+      dot.renderOrder = 10;
       group.add(dot);
     },
   );
@@ -1217,11 +1256,11 @@ function updateControllerGuides(cam, tracked, dt) {
 function updateRangeAnimations(dt) {
   if (!rangeAnimations.length) return;
   animationAge += dt;
-  for (const { object, delay } of rangeAnimations) {
+  for (const { object, delay, opacity, fadeOnly } of rangeAnimations) {
     const t = THREE.MathUtils.clamp((animationAge - delay) / 0.75, 0, 1);
     const ease = 1 - (1 - t) ** 3;
-    object.scale.setScalar(Math.max(0.001, ease));
-    object.material.opacity = object.isMesh ? 0.25 * ease : ease;
+    if (!fadeOnly) object.scale.setScalar(Math.max(0.001, ease));
+    object.material.opacity = (opacity ?? (object.isMesh ? 0.25 : 1)) * ease;
   }
   if (animationAge > rangeAnimations.at(-1).delay + 0.8) rangeAnimations = [];
 }
