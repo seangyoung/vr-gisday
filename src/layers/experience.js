@@ -587,15 +587,20 @@ export class LayerExperience {
   clearVisitorMarkers() {
     this.visitorMarkers.length = 0;
   }
-  registerVisitorMarker(map, mapExtent) {
+  registerVisitorMarker(map, mapExtent, ring = false) {
     const marker = new THREE.Group();
     marker.position.z = 0.012;
-    for (const [radius, color, z] of [
-      [0.025, 0x17363d, 0],
-      [0.017, 0xffffff, 0.001],
+    for (const [inner, outer, color, z] of ring ? [
+      [0.025, 0.038, 0x17363d, 0],
+      [0.028, 0.035, 0xffffff, 0.001],
+    ] : [
+      [0, 0.025, 0x17363d, 0],
+      [0, 0.017, 0xffffff, 0.001],
     ]) {
       const circle = new THREE.Mesh(
-        new THREE.CircleGeometry(radius, 20),
+        ring
+          ? new THREE.RingGeometry(inner, outer, 24)
+          : new THREE.CircleGeometry(outer, 20),
         new THREE.MeshBasicMaterial({ color, depthTest: false }),
       );
       circle.position.z = z;

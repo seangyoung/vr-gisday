@@ -689,14 +689,14 @@ function drawViewshedUI() {
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
-    v.registerVisitorMarker(map, LANDSCAPE_EXTENT);
+    v.registerVisitorMarker(map, LANDSCAPE_EXTENT, true);
     label("Move the gold observer.\nCan it see the blue target?", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
     button("Eye level · 2 m", 0.64, 0.18, () => v.setHeight(2), 1.04)
       .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Gold: observer · white: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Gold: observer · white ring: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
