@@ -28,9 +28,12 @@ import {
 import { renderLayerMap } from "./layers/map.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { PixelExperience } from "./pixels/experience.js";
+import { ControllerShortcuts } from "./controller-shortcuts.js";
+import { ControllerGuide } from "./controller-guide.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
+const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
 app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself Without GPS</h2><p>Use distances to find possible locations. Grab a floating model and discover why one measurement is never the whole story.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
@@ -43,7 +46,7 @@ renderer.xr.setReferenceSpaceType("local");
 document.body.append(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(
-  65,
+  devPreview ? 90 : 65,
   innerWidth / innerHeight,
   0.03,
   700,
@@ -72,6 +75,7 @@ let pixels = null;
 let xrMode = null;
 let pendingRoomHandoff = false;
 let rightTurnReady = true;
+const controllerShortcuts = new ControllerShortcuts();
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
@@ -167,6 +171,34 @@ function label(
   uiParent.add(mesh);
   return mesh;
 }
+function lessonCard(title, body, y = -0.94) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 250;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b2430";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#e6f4f5";
+  ctx.font = "600 59px system-ui, sans-serif";
+  ctx.fillText(title, 600, 48, 1140);
+  ctx.font = "500 43px system-ui, sans-serif";
+  body.split("\n").forEach((line, index, lines) =>
+    ctx.fillText(line, 600, 170 + (index - (lines.length - 1) / 2) * 50, 1140),
+  );
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const card = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.4, 0.5),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: uiFadeAge < 0.45,
+      opacity: uiFadeAge < 0.45 ? uiFadeAge / 0.45 : 1, side: THREE.DoubleSide }),
+  );
+  if (uiFadeAge < 0.45) uiFadeMeshes.push(card);
+  card.position.set(0, y, 0.02);
+  uiParent.add(card);
+  return card;
+}
 function button(text, x, y, action, w = 0.75) {
   const m = label(text, x, y, w, 0.16, 48, "#08241e", "#a6f5d9");
   m.position.z = 0.08;
@@ -214,54 +246,42 @@ function point(p, color, r = 0.026, z = 0.045) {
   content.add(m);
   return m;
 }
-function navigation(y = -0.98) {
-  button(
-    sound.muted ? "Sound: off" : "Sound: on",
-    0.46,
-    y,
-    () => {
-      sound.toggle();
-      draw();
-    },
-    0.44,
-  );
-  button(
-    xrMode === "immersive-ar" ? "VR menu" : "Menu",
-    -0.92,
-    y,
-    () => {
-      if (xrMode === "immersive-ar") {
-        renderer.xr.getSession()?.end();
-        return;
-      }
-      scan?.dispose();
-      scan = null;
-      layers?.dispose();
-      layers = null;
-      viewshed?.dispose();
-      viewshed = null;
-      pixels?.dispose();
-      pixels = null;
-      rain?.dispose();
-      rain = null;
-      stopRainInput();
-      step = -1;
-      draw();
-    },
-    0.44,
-  );
-  button("Restart", -0.46, y, () => start(), 0.44);
-  button(
-    rain || scan || layers || viewshed || pixels || isSpatial() ? "Reset View" : "Recenter",
-    0,
-    y,
-    () => {
-      if (devPreview) place();
-      else pendingPlacement = true;
-    },
-    0.44,
-  );
-  button("Exit XR", 0.92, y, () => renderer.xr.getSession()?.end(), 0.44);
+function openMenu() {
+  if (xrMode === "immersive-ar") {
+    renderer.xr.getSession()?.end();
+    return;
+  }
+  scan?.dispose();
+  scan = null;
+  layers?.dispose();
+  layers = null;
+  viewshed?.dispose();
+  viewshed = null;
+  pixels?.dispose();
+  pixels = null;
+  rain?.dispose();
+  rain = null;
+  stopRainInput();
+  step = -1;
+  draw();
+}
+function resetView() {
+  if (devPreview) place();
+  else pendingPlacement = true;
+}
+function runControllerShortcut(action) {
+  if (action === "exit") {
+    renderer.xr.getSession()?.end();
+    return;
+  }
+  sound.click();
+  if (action === "menu") openMenu();
+  else if (action === "restart") start();
+  else if (action === "reset") resetView();
+  else if (action === "sound") {
+    sound.toggle();
+    draw();
+  }
 }
 function start() {
   if (pixels) {
@@ -423,6 +443,7 @@ async function switchToRoomScan() {
 }
 function drawRoomUI() {
   const s = scan;
+  const intro = s.stage === 0;
   const title =
     s.stage === 0
       ? "Scan your room · Quest 3S"
@@ -437,52 +458,49 @@ function drawRoomUI() {
       : s.stage === 2
         ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
         : s.frozen
-          ? "GRIP to move / turn; BOTH grips to resize this copy.\nResume returns every point to its real-world position.\nKeep passthrough visible as you explore."
-          : "Aim at a real surface. A green dot means a return.\nHOLD TRIGGER and sweep slowly to accumulate points.\nFreeze to inspect a movable miniature of your scan.";
-  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
-  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
-  label(s.message, 0, -0.5, 2.3, 0.18, 28, "#e6f4f5", "#0b2430");
-  label(
-    `${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
-    0,
-    -0.64,
-    2.3,
-    0.09,
-    24,
-    "#b6d1d9",
-    "#0b2430",
-  );
+          ? "Move the frozen point cloud to inspect gaps.\nResume returns points to their real-world positions.\nKeep passthrough visible as you explore."
+          : "Aim at real surfaces and sweep slowly.\nA green dot marks an actual surface return.\nFreeze to inspect the point cloud you collected.";
+  if (intro) {
+    label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
+    label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  } else lessonCard(title, body);
+  if (intro) {
+    label(s.message, 0, -0.5, 2.3, 0.14, 27, "#e6f4f5", "#0b2430");
+    label(`${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+      0, -0.64, 2.3, 0.09, 24, "#b6d1d9", "#0b2430");
+  } else label(`${s.message}\n${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+    0, -1.37, 2.3, 0.17, 25, "#d8eae8", "#0b2430");
   if (s.stage === 0) {
     if (s.status !== "unavailable")
       button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
+    label("Look at either controller for navigation shortcuts",
+      0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
       s.stage === 2 ? "Scan again" : s.frozen ? "Resume" : "Freeze",
-      -0.84,
-      -0.77,
+      -0.6,
+      -1.61,
       () => {
         stopRainInput();
         if (s.stage === 2) startRoomScan();
         else if (s.frozen) s.resume();
         else s.freeze();
       },
-      0.52,
+      0.56,
     );
-    button("Color", -0.28, -0.77, () => s.toggleColor(), 0.52);
+    button("Color", 0, -1.61, () => s.toggleColor(), 0.56);
     button(
       s.status === "error" || s.status === "waiting" ? "Retry" : "Clear",
-      0.28,
-      -0.77,
+      0.6,
+      -1.61,
       () => {
         stopRainInput();
         if (s.status === "error" || s.status === "waiting") s.retry();
         else s.clearScan();
       },
-      0.52,
+      0.56,
     );
-    button("Back to VR", 0.84, -0.77, () => renderer.xr.getSession()?.end(), 0.52);
   }
-  navigation();
 }
 function drawScanUI() {
   const s = scan;
@@ -498,7 +516,7 @@ function drawScanUI() {
     null,
     [
       "Which surfaces are still hidden?",
-      "HOLD TRIGGER to sweep. Each bright ray stops at a first return.\nGRIP to turn / move; BOTH grips to resize. Scan another side.\nA missing patch may be occluded. Compare with the solid scene.",
+      "Each scan ray records its first surface return.\nSweep one side, then turn the model to reveal hidden areas.\nCompare the cloud with the synthetic scene.",
     ],
     [
       "Different viewpoints fill different gaps.",
@@ -506,38 +524,29 @@ function drawScanUI() {
     ],
   ];
   const [title, body] = copy[s.stage];
-  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
-  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  lessonCard(title, body);
   label(
-    s.hideVegetation
-      ? "Vegetation hidden · Missing ground stays missing"
-      : "Cyan: ground · Gold: structure · Green: vegetation",
-    0,
-    -0.52,
-    2.3,
-    0.12,
-    28,
-    "#e6f4f5",
-    "#0b2430",
+    `${s.hideVegetation ? "Vegetation hidden · Missing ground stays missing" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
+    0, -1.37, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
   );
   button(
     s.reveal ? "Cloud only" : "Compare surfaces",
     -0.84,
-    -0.77,
+    -1.61,
     () => s.toggleReveal(),
     0.52,
   );
   button(
     s.hideVegetation ? "All points" : "Hide plants",
     -0.28,
-    -0.77,
+    -1.61,
     () => s.toggleVegetation(),
     0.52,
   );
   button(
     "Clear scan",
     0.28,
-    -0.77,
+    -1.61,
     () => {
       stopRainInput();
       s.clearScan();
@@ -547,7 +556,7 @@ function drawScanUI() {
   button(
     s.stage === 2 ? "Next scene" : "Takeaways",
     0.84,
-    -0.77,
+    -1.61,
     () => {
       stopRainInput();
       if (s.stage === 2) startScan(undefined, true);
@@ -555,17 +564,6 @@ function drawScanUI() {
     },
     0.52,
   );
-  label(
-    `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
-    0,
-    -0.64,
-    2.3,
-    0.09,
-    24,
-    "#b6d1d9",
-    "#0b2430",
-  );
-  navigation();
 }
 function drawScanChoiceCard(kind, x, title, subtitle, action) {
   const card = new THREE.Mesh(
@@ -596,7 +594,8 @@ function drawScanChooserUI() {
     scan.explore();
   });
   drawScanChoiceCard("room", 0.61, "Room scan · MR", "Scan nearby real surfaces", switchToRoomScan);
-  navigation();
+  label("Look at either controller for navigation shortcuts",
+    0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawLayersUI() {
   const l = layers;
@@ -622,7 +621,7 @@ function drawLayersUI() {
       "#0b2430",
     );
     button("Build another view", 0, -0.62, () => l.reset(), 1.5);
-    navigation(-1.02);
+
     return;
   }
   label("Toggle layers around you · right stick: 30° turns", 0, 0.68,
@@ -651,7 +650,7 @@ function drawLayersUI() {
         : "Synthetic place · Map north is an arbitrary model direction",
       0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
     );
-    navigation(-1.02);
+
     return;
   }
 }
@@ -667,7 +666,7 @@ function drawViewshedUI() {
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Try another viewpoint", 0, -0.62, () => v.reset(), 1.5);
-    navigation(-1.02);
+
     return;
   }
   label("Tap the map to move the observer · watch the landscape change",
@@ -699,7 +698,6 @@ function drawViewshedUI() {
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
-  navigation(-1.02);
 }
 function drawPixelsUI() {
   const p = pixels;
@@ -713,7 +711,7 @@ function drawPixelsUI() {
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Compare again", 0, -0.62, () => p.reset(), 1.5);
-    navigation(-1.02);
+
     return;
   }
   label(
@@ -754,7 +752,6 @@ function drawPixelsUI() {
       `${p.answer === p.pureWaterAt48 ? "Correct" : "Look again"}: no pure-water 48 m pixel; narrow river mixes with land.`,
       0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
     );
-  navigation(-1.03);
 }
 function drawRainChoiceCard(kind, x, title, subtitle) {
   const card = new THREE.Mesh(
@@ -782,7 +779,8 @@ function drawRainChooserUI() {
     0, 0.69, 2.3, 0.2, 31, "#b6d1d9", "#0b2430");
   drawRainChoiceCard("drainage", -0.61, "Drainage sandbox", "Follow runoff and ponds");
   drawRainChoiceCard("erosion", 0.61, "Erosion tray", "Watch channels form");
-  navigation();
+  label("Look at either controller for navigation shortcuts",
+    0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawRainUI() {
   const r = rain;
@@ -797,12 +795,12 @@ function drawRainUI() {
         ? "Shape the land. Watch water reshape it."
         : "Shape the land. Follow the water.",
       r.kind === "erosion"
-        ? "Runoff cuts loose soil; slower water deposits sediment.\nLEFT TRIGGER: pour. RIGHT TRIGGER: sculpt while it flows.\nGRIP: move / turn. BOTH grips: resize the tray."
-        : "Runoff follows slope toward an outlet; ridges form divides.\nLEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nGRIP: move / turn. BOTH grips: resize the model.",
+        ? "Runoff cuts loose soil; slower water deposits sediment.\nShape a slope and watch channels form."
+        : "Runoff follows slope toward an outlet; ridges form divides.\nRain the slopes, sculpt the land, and watch paths change.",
     ],
     [
       "Predict the path",
-      "Rain will fall at the gold ring near the ridge.\nWhich outlet will this water reach?\nChoose A or B, then watch the path.",
+      "Rain will fall at the gold ring near the ridge.\nWhich outlet will this water reach?\nPoint at an outlet choice below and press trigger.",
     ],
     [
       r.answer === r.destination
@@ -827,40 +825,39 @@ function drawRainUI() {
     ];
   }
   const [title, body] = copy[r.stage];
-  label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
-  label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  lessonCard(title, body);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
-      button("Reset", -0.78, -0.77, () => { stopRainInput(); r.restore(); }, 0.48);
-      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, -0.77,
+      button("Reset", -0.78, -1.59, () => { stopRainInput(); r.restore(); }, 0.48);
+      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, -1.59,
         () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.48);
-      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, -0.77,
+      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, -1.59,
         () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.48);
-      button("Takeaways", 0.78, -0.77, () => { stopRainInput(); r.finish(); }, 0.48);
+      button("Takeaways", 0.78, -1.59, () => { stopRainInput(); r.finish(); }, 0.48);
     } else {
-      button("Reset terrain", -0.59, -0.77,
+      button("Reset terrain", -0.59, -1.59,
         () => { stopRainInput(); r.restore(); }, 0.66);
-      button(r.overlay ? "Hide basins" : "Show basins", 0.08, -0.77,
+      button(r.overlay ? "Hide basins" : "Show basins", 0.08, -1.59,
         () => r.toggleOverlay(), 0.59);
-      button(r.edited ? "Takeaways" : "Prediction", 0.68, -0.77,
+      button(r.edited ? "Takeaways" : "Prediction", 0.68, -1.59,
         () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.55);
     }
   }
   if (r.stage === 2) {
-    button("Outlet A · left", -0.54, -0.77, () => r.choose("A"), 1.02);
-    button("Outlet B · right", 0.58, -0.77, () => r.choose("B"), 1.02);
+    button("Left outlet", -0.54, -1.59, () => r.choose("A"), 1.02);
+    button("Right outlet", 0.58, -1.59, () => r.choose("B"), 1.02);
   }
   if (r.stage === 3) {
     button(
       "Rain here again",
       -0.54,
-      -0.77,
+      -1.59,
       () => {
         r.playback = 4;
       },
       1.02,
     );
-    button("Takeaways", 0.58, -0.77, () => r.finish(), 1.02);
+    button("Takeaways", 0.58, -1.59, () => r.finish(), 1.02);
   }
   if (r.stage === 4) {
     label(
@@ -868,14 +865,14 @@ function drawRainUI() {
         ? "Simplified water + loose sediment. No soil types, roots,\nreal-world erosion rates, or changing tray tilt."
         : "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
       0,
-      -0.62,
+      -1.32,
       2.3,
       0.16,
       28,
       "#e6f4f5",
       "#0b2430",
     );
-    button("Make rain again", 0, -0.77, () => startRain(r.kind, true), 1.65);
+    button("Make rain again", 0, -1.59, () => startRain(r.kind, true), 1.65);
   } else
     label(
       r.kind === "erosion"
@@ -888,14 +885,13 @@ function drawRainUI() {
             ? "A: blue / round outlet    ·    B: gold / square outlet"
             : "Surface-flow model · Synthetic terrain · No flood prediction",
       0,
-      -0.55,
+      -1.32,
       2.3,
       0.12,
       28,
       "#e6f4f5",
       "#0b2430",
     );
-  navigation();
 }
 function next() {
   preservePose =
@@ -976,8 +972,8 @@ function planar() {
   const items = content.children.slice(first);
   for (const item of items) diagram.add(item);
   content.add(diagram);
-  diagram.scale.setScalar(0.58);
-  diagram.position.y = -0.07;
+  diagram.scale.setScalar(0.72);
+  diagram.position.y = 0.08;
   if (step === 3) {
     const pts = candidates(3, noisy ? 0.1 : 0.025);
     const geom = new THREE.BufferGeometry().setFromPoints(
@@ -991,8 +987,8 @@ function planar() {
     );
     button(
       noisy ? "Tolerance: ±0.10 → smaller" : "Tolerance: ±0.025 → larger",
-      0,
-      -0.61,
+      -0.64,
+      -1.54,
       () => {
         noisy = !noisy;
         draw();
@@ -1094,6 +1090,8 @@ function spatial() {
 }
 function draw() {
   drawScene();
+  for (const { guide } of controllers)
+    guide.setCopy(controllerGuideCopy(guide.handedness));
   if (devPreview) {
     let panel = document.querySelector("#dev-controls");
     if (!panel) {
@@ -1172,7 +1170,51 @@ function draw() {
       b.onclick = mesh.userData.action;
       panel.append(b);
     }
+    for (const [name, action] of [
+      ["X · Menu", "menu"], ["Y · Restart", "restart"],
+      ["A · Reset view", "reset"], ["B · Sound", "sound"],
+    ]) {
+      const b = document.createElement("button");
+      b.textContent = name;
+      b.onclick = () => runControllerShortcut(action);
+      panel.append(b);
+    }
   }
+}
+function controllerGuideCopy(hand) {
+  if (hand !== "left" && hand !== "right") return "";
+  const lines = hand === "left"
+    ? ["LEFT CONTROLLER", "X  Menu", "Y  Restart", "Hold stick  Exit XR"]
+    : ["RIGHT CONTROLLER", "A  Reset view", `B  Sound ${sound.muted ? "on" : "off"}`];
+  if (rain?.stage === 1) {
+    lines.push(hand === "left" ? "Trigger  Rain / pour" : "Trigger  Sculpt");
+    lines.push("Grip  Move / resize");
+  } else if (scan?.stage === 1) {
+    lines.push("Trigger  Sweep scan");
+    lines.push(scan.room && !scan.frozen ? "Grip  Freeze first" : "Grip  Move / resize");
+  } else if (layers || viewshed || pixels) {
+    lines.push(hand === "left" ? "Raise hand  Clipboard" : "Stick L/R  Turn 30°");
+    lines.push("Trigger  Select");
+  } else if (isSpatial()) {
+    lines.push("Grip  Move / resize");
+    lines.push("Trigger  Select");
+  } else {
+    lines.push("Trigger  Select");
+  }
+  return lines.join("\n");
+}
+function updateControllerGuides(cam, tracked) {
+  let closest = null;
+  let best = -Infinity;
+  for (const { guide, grip } of controllers) {
+    const score = guide.update(cam, tracked && grip.visible);
+    if (score > best) {
+      best = score;
+      closest = guide;
+    }
+  }
+  for (const { guide } of controllers)
+    if (guide !== closest) guide.panel.visible = false;
 }
 function updateRangeAnimations(dt) {
   if (!rangeAnimations.length) return;
@@ -1261,7 +1303,9 @@ function drawScene() {
       },
       1.8,
     );
-    navigation();
+    label("Look at either controller for Menu, Restart, Reset, Sound, and Exit XR",
+      0, -1.04, 2.3, 0.13, 27, "#b6d1d9", "#0b2430");
+
     return;
   }
   if (step === -1) {
@@ -1281,7 +1325,9 @@ function drawScene() {
     button("Stand Inside the Layers", 0, -0.27, startLayers, 1.75);
     button("Can You See It?", 0, -0.45, startViewshed, 1.75);
     button("How Big Is a Pixel?", 0, -0.63, startPixels, 1.75);
-    navigation(-0.98);
+    label("Look at either controller for navigation shortcuts",
+      0, -1.03, 2.3, 0.13, 29, "#b6d1d9", "#0b2430");
+
     return;
   }
   if (step >= stages.length) {
@@ -1303,44 +1349,23 @@ function drawScene() {
       33,
     );
     button("Explore again", 0, -0.64, start, 1.2);
-    navigation();
+
     return;
   }
   const s = stages[step];
   if (isSpatial()) {
     spatial();
-    label(s.title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
-    label(s.body, 0, 0.79, 2.4, 0.29, 33, "#e6f4f5", "#0b2430");
-    label(
-      "Hold a SIDE GRIP to move / turn the whole model.\nHold BOTH grips and spread / squeeze to resize.",
-      0,
-      -0.59,
-      2.3,
-      0.22,
-      33,
-      "#e6f4f5",
-      "#0b2430",
-    );
-    button(s.action, 0, -0.79, next, 1.65);
-    navigation();
+    lessonCard(s.title, s.body);
+    button(s.action, 0, -1.54, next, 1.65);
+
     return;
   }
-  label(
-    `${String(step + 1).padStart(2, "0")} / 06    ·    FIND YOURSELF WITHOUT GPS`,
-    0,
-    1.04,
-    2.1,
-    0.1,
-    31,
-    "#a6f5d9",
-  );
-  label(s.title, 0, 0.88, 2.15, 0.17, 48);
-  label(s.body, 0, 0.66, 2.15, 0.28, 32);
+  lessonCard(s.title, s.body);
   planar();
   if (step === 2 && prediction)
-    label(prediction, 0, -0.62, 2, 0.1, 29, "#a6f5d9");
-  if (s.action) button(s.action, 0, -0.79, next, 1.65);
-  navigation();
+    label(prediction, 0, -1.37, 2.3, 0.1, 28, "#a6f5d9", "#0b2430");
+  if (s.action)
+    button(s.action, step === 3 ? 0.64 : 0, -1.54, next, step === 3 ? 1.18 : 1.65);
 }
 function place() {
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
@@ -1368,6 +1393,7 @@ for (let i = 0; i < 2; i++) {
   scene.add(c);
   const grip = renderer.xr.getControllerGrip(i);
   scene.add(grip);
+  const guide = new ControllerGuide(scene, grip);
   const handle = new THREE.Mesh(
     new THREE.SphereGeometry(0.018, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0xa6f5d9 }),
@@ -1384,6 +1410,8 @@ for (let i = 0; i < 2; i++) {
   c.add(beam);
   c.addEventListener("connected", (event) => {
     c.userData.xrInput = event.data;
+    guide.setHandedness(event.data.handedness);
+    guide.setCopy(controllerGuideCopy(guide.handedness));
   });
   c.addEventListener("selectstart", () => {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
@@ -1473,6 +1501,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("disconnected", () => {
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
+    guide.setHandedness("none");
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -1480,7 +1509,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.raining = false;
     c.userData.scanning = false;
   });
-  controllers.push({ c, grip, beam, handle, id: i });
+  controllers.push({ c, grip, beam, handle, guide, id: i });
 }
 function scanHit(c) {
   if (!scan || (!scan.room && scan.stage === 0)) return null;
@@ -1511,6 +1540,9 @@ function intersect(c) {
 }
 async function enter(mode, roomScan = mode === "immersive-ar") {
   if (mode === "immersive-vr") pendingRoomHandoff = false;
+  controllerShortcuts.reset();
+  if (previewGuide)
+    for (const { grip } of controllers) grip.matrixAutoUpdate = false;
   sound.setActive(true);
   sound.unlock();
   let session;
@@ -1566,6 +1598,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
 }
 renderer.xr.addEventListener("sessionend", () => {
   sound.setActive(false);
+  controllerShortcuts.reset();
   rightTurnReady = true;
   layers?.dispose();
   layers = null;
@@ -1623,6 +1656,14 @@ renderer.setAnimationLoop((time, frame) => {
   const previousWater = rain?.water.added ?? 0;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
+    const visibleSession = renderer.xr.getSession().visibilityState === "visible";
+    if (visibleSession) {
+      const actions = controllerShortcuts.update(
+        controllers.map(({ c }) => c.userData.xrInput).filter(Boolean), dt,
+      );
+      if (actions.length) runControllerShortcut(actions[0]);
+    } else controllerShortcuts.reset();
+    updateControllerGuides(renderer.xr.getCamera(), visibleSession);
     if (
       !rain &&
       !scan &&
@@ -1758,6 +1799,14 @@ renderer.setAnimationLoop((time, frame) => {
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
+  if (previewGuide && !renderer.xr.isPresenting)
+    for (const { grip, id } of controllers) {
+      grip.visible = true;
+      grip.position.set(id === 0 ? -0.25 : 0.25, -0.18, -0.55);
+      grip.updateWorldMatrix(true, false);
+    }
+  if (previewGuide && !renderer.xr.isPresenting)
+    updateControllerGuides(camera, true);
   const audible =
     !document.hidden &&
     (devPreview ||
@@ -1813,6 +1862,14 @@ if (
     );
   else draw();
   place();
+  if (previewGuide)
+    for (const { grip, guide, id } of controllers) {
+      grip.matrixAutoUpdate = true;
+      grip.visible = true;
+      grip.position.set(id === 0 ? -0.25 : 0.25, -0.18, -0.45);
+      guide.setHandedness(id === 0 ? "left" : "right");
+      guide.setCopy(controllerGuideCopy(guide.handedness));
+    }
   renderer.domElement.addEventListener("pointerdown", (e) => {
     raycaster.setFromCamera(
       new THREE.Vector2(
