@@ -1175,7 +1175,7 @@ function spatial() {
     );
     group.add(spoke);
   });
-  if (count === 2 || count === 3) {
+  if (count === 2) {
     const intersection = shellIntersection(
       beacons[0], beacons[1], beacons[0].distanceTo(t), beacons[1].distanceTo(t),
     );
