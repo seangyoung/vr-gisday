@@ -126,3 +126,60 @@ test("menu music follows menu state and the same mute control as effects", () =>
     globalThis.AudioContext = old;
   }
 });
+
+test("landscape ambience follows visible layers and sound-menu category controls", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.setLandscape(true, 0.8, 1);
+    sound.unlock();
+    assert.equal(sound.forestSource.loop, true);
+    assert.ok(sound.forestSource.buffer.getChannelData(0).some((sample) => sample !== 0));
+    assert.ok(sound.wind.gain.value > 0);
+    assert.ok(sound.forest.gain.value > 0);
+    assert.ok(sound.river.gain.value > 0);
+    sound.setLandscape(true, 0, 0);
+    assert.equal(sound.forest.gain.value, 0);
+    assert.equal(sound.river.gain.value, 0);
+    assert.ok(sound.wind.gain.value > 0);
+    sound.setCategory("ambience", false);
+    assert.equal(sound.wind.gain.value, 0);
+    sound.setCategory("effects", false);
+    sound.click();
+    assert.equal(sound.context.tones, 0);
+    sound.setVolume(0.5);
+    assert.equal(sound.master.gain.value, 0.11);
+    sound.setCategory("music", false);
+    sound.setMenuMusic(true);
+    assert.equal(sound.menu.gain.value, 0);
+    sound.setLandscape(false);
+    assert.equal(sound.wind.gain.value, 0);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
+test("sound menu preferences survive a new sound session", () => {
+  const previous = globalThis.localStorage;
+  const values = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  try {
+    const sound = new LabSound();
+    sound.setVolume(0.5);
+    sound.setCategory("ambience", false);
+    sound.setCategory("music", false);
+    sound.toggle();
+    const reopened = new LabSound();
+    assert.equal(reopened.volume, 0.5);
+    assert.equal(reopened.ambienceEnabled, false);
+    assert.equal(reopened.musicEnabled, false);
+    assert.equal(reopened.muted, true);
+  } finally {
+    if (previous === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previous;
+  }
+});

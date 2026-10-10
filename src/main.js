@@ -26,6 +26,7 @@ import {
   LAYER_NAMES,
   LAYER_HINTS,
   LANDSCAPE_EXTENT,
+  riverX,
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
@@ -59,6 +60,8 @@ const root = new THREE.Group();
 scene.add(root);
 const content = new THREE.Group();
 root.add(content);
+const soundPanel = new THREE.Group();
+scene.add(soundPanel);
 let uiParent = content;
 const raycaster = new THREE.Raycaster();
 raycaster.params.Line.threshold = 0.025;
@@ -91,6 +94,8 @@ let lastAnimatedRangeStep = null;
 let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
+let soundMenuOpen = false;
+let soundButtons = [];
 const isSpatial = () => step >= 4 && step < stages.length;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
@@ -214,6 +219,90 @@ function button(text, x, y, action, w = 0.75) {
   buttons.push(m);
   return m;
 }
+function clearSoundPanel() {
+  soundButtons = [];
+  while (soundPanel.children.length) {
+    const object = soundPanel.children[0];
+    object.traverse((node) => {
+      node.geometry?.dispose();
+      if (node.material) {
+        node.material.map?.dispose();
+        node.material.dispose();
+      }
+    });
+    soundPanel.remove(object);
+  }
+}
+function closeSoundMenu() {
+  soundMenuOpen = false;
+  clearSoundPanel();
+  soundPanel.visible = false;
+}
+function drawSoundMenu() {
+  clearSoundPanel();
+  if (!soundMenuOpen) return;
+  const background = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.88, 0.83),
+    new THREE.MeshBasicMaterial({ color: 0x0b2430, side: THREE.DoubleSide }),
+  );
+  background.position.z = -0.02;
+  soundPanel.add(background);
+  const previousParent = uiParent;
+  const previousFade = uiFadeAge;
+  uiParent = soundPanel;
+  uiFadeAge = 1;
+  const control = (text, x, y, width, action) => {
+    const mesh = label(text, x, y, width, 0.085, 34, "#e6f4f5", "#1b4550");
+    mesh.userData.label = text;
+    mesh.userData.action = () => {
+      sound.click();
+      action();
+      if (soundMenuOpen) drawSoundMenu();
+    };
+    soundButtons.push(mesh);
+  };
+  label("SOUND · A TO CLOSE", 0, 0.33, 0.72, 0.09, 36, "#a6f5d9");
+  control(`All sound: ${sound.muted ? "Off" : "On"}`, 0, 0.22, 0.69,
+    () => sound.toggle());
+  control("−", -0.29, 0.11, 0.11, () => sound.setVolume(sound.volume - 0.25));
+  label(`Volume ${Math.round(sound.volume * 100)}%`, 0, 0.11, 0.40, 0.085, 34);
+  control("+", 0.29, 0.11, 0.11, () => sound.setVolume(sound.volume + 0.25));
+  control(`Menu music: ${sound.musicEnabled ? "On" : "Off"}`, 0, 0, 0.69,
+    () => sound.setCategory("music", !sound.musicEnabled));
+  control(`Nature: ${sound.ambienceEnabled ? "On" : "Off"}`, 0, -0.11, 0.69,
+    () => sound.setCategory("ambience", !sound.ambienceEnabled));
+  control(`Effects: ${sound.effectsEnabled ? "On" : "Off"}`, 0, -0.22, 0.69,
+    () => sound.setCategory("effects", !sound.effectsEnabled));
+  control("Close", 0, -0.34, 0.34, closeSoundMenu);
+  soundPanel.traverse((object) => {
+    if (!object.material) return;
+    object.material.depthTest = false;
+    object.material.depthWrite = false;
+    object.renderOrder = object === background ? 89 : 90;
+  });
+  uiParent = previousParent;
+  uiFadeAge = previousFade;
+}
+function toggleSoundMenu() {
+  if (soundMenuOpen) {
+    closeSoundMenu();
+    return;
+  }
+  stopRainInput();
+  grab?.cancel();
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  const eye = cam.getWorldPosition(new THREE.Vector3());
+  const forward = cam.getWorldDirection(new THREE.Vector3());
+  forward.y = 0;
+  if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
+  forward.normalize();
+  soundPanel.position.copy(eye).addScaledVector(forward, 1.05);
+  soundPanel.position.y -= 0.18;
+  soundPanel.lookAt(eye);
+  soundPanel.visible = true;
+  soundMenuOpen = true;
+  drawSoundMenu();
+}
 function line(points, color, opacity = 1) {
   const geom = new THREE.BufferGeometry().setFromPoints(points);
   const m = new THREE.Line(
@@ -251,6 +340,7 @@ function point(p, color, r = 0.026, z = 0.045) {
   return m;
 }
 function openMenu() {
+  closeSoundMenu();
   stopRainInput();
   scan?.dispose();
   scan = null;
@@ -267,10 +357,16 @@ function openMenu() {
   draw();
 }
 function resetView() {
+  closeSoundMenu();
   if (devPreview) place();
   else pendingPlacement = true;
 }
 function runControllerShortcut(action) {
+  if (action === "sound") {
+    sound.click();
+    toggleSoundMenu();
+    return;
+  }
   if (action === "exit") {
     sound.click();
     if (isMenu()) renderer.xr.getSession()?.end();
@@ -281,12 +377,9 @@ function runControllerShortcut(action) {
   sound.click();
   if (action === "restart") start();
   else if (action === "reset") resetView();
-  else if (action === "sound") {
-    sound.toggle();
-    draw();
-  }
 }
 function start() {
+  closeSoundMenu();
   if (pixels) {
     startPixels();
     return;
@@ -1217,7 +1310,7 @@ function draw() {
     }
     for (const [name, action] of [
       ...(!isMenu() ? [["X · Restart", "restart"]] : []),
-      ["Y · Reset view", "reset"], ["A · Sound", "sound"],
+      ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
       [isMenu() ? "B · Exit XR" : "B · Exit demo", "exit"],
     ]) {
       const b = document.createElement("button");
@@ -1353,7 +1446,7 @@ function drawScene() {
       label("Explore a point cloud of your surroundings.\nB exits mixed reality from this menu.",
         0, 0.12, 2.1, 0.28, 36);
       button("Scan your room", 0, -0.25, startRoomScan, 1.75);
-      label("A toggles sound · Point and press the trigger",
+      label("A opens sound menu · Point and press the trigger",
         0, -0.62, 2.1, 0.13, 29, "#b6d1d9", "#0b2430");
       return;
     }
@@ -1464,6 +1557,7 @@ for (let i = 0; i < 2; i++) {
       hit.object.userData.action?.(hit);
       return;
     }
+    if (soundMenuOpen) return;
     if (viewshed) {
       viewshed.placeFromRay(raycaster);
       return;
@@ -1496,6 +1590,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.scanning = false;
   });
   c.addEventListener("squeezestart", () => {
+    if (soundMenuOpen) return;
     if (scan && (scan.room || scan.stage === 1) && grip.visible) {
       if (scan.room && !scan.frozen) return;
       grip.updateWorldMatrix(true, false);
@@ -1576,6 +1671,7 @@ function intersect(c) {
   rotation.extractRotation(c.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
+  if (soundMenuOpen) return raycaster.intersectObjects(soundButtons, false)[0];
   if ((layers && !layers.clipboard.visible) ||
       (viewshed && !viewshed.clipboard.visible) ||
       (pixels && !pixels.clipboard.visible)) return null;
@@ -1640,6 +1736,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
   }
 }
 renderer.xr.addEventListener("sessionend", () => {
+  closeSoundMenu();
   sound.setMenuMusic(false);
   sound.setActive(false);
   controllerShortcuts.reset();
@@ -1716,7 +1813,8 @@ renderer.setAnimationLoop((time, frame) => {
       !pixels &&
       (step >= 0 || step === -2) &&
       step < stages.length &&
-      renderer.xr.getSession().visibilityState === "visible"
+      renderer.xr.getSession().visibilityState === "visible" &&
+      !soundMenuOpen
     ) {
       elapsed += dt;
       if (elapsed >= 240) {
@@ -1727,8 +1825,8 @@ renderer.setAnimationLoop((time, frame) => {
     const landscapeDemo = pixels ?? viewshed ?? layers;
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
-      if (visible) landscapeDemo.update(dt);
-      const right = visible
+      if (visible && !soundMenuOpen) landscapeDemo.update(dt);
+      const right = visible && !soundMenuOpen
         ? controllers.find(({ c }) => c.userData.xrInput?.handedness === "right")
         : null;
       const gamepad = right?.c.userData.xrInput?.gamepad;
@@ -1738,7 +1836,7 @@ renderer.setAnimationLoop((time, frame) => {
         landscapeDemo.turn(Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
         rightTurnReady = false;
       }
-      const left = visible
+      const left = visible && !soundMenuOpen
         ? controllers.find(
             ({ c, grip }) =>
               c.userData.xrInput?.handedness === "left" && grip.visible,
@@ -1747,10 +1845,11 @@ renderer.setAnimationLoop((time, frame) => {
       const leftPad = left?.c.userData.xrInput?.gamepad;
       const leftX = leftPad?.mapping === "xr-standard" ? leftPad.axes[2] ?? 0 : 0;
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
-      if (visible) landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
+      if (visible && !soundMenuOpen)
+        landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
     }
-    if (rain && renderer.xr.getSession().visibilityState === "visible") {
+    if (rain && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
       let falling = false;
       if (
@@ -1779,7 +1878,7 @@ renderer.setAnimationLoop((time, frame) => {
       }
       if (rain.stage !== 0) rain.update(dt, falling);
     }
-    if (scan && renderer.xr.getSession().visibilityState === "visible") {
+    if (scan && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       if (scan.room)
         scan.updateFrame(
           frame,
@@ -1812,14 +1911,14 @@ renderer.setAnimationLoop((time, frame) => {
       rain?.grab.cancel();
       scan?.grab.cancel();
     }
-    for (const b of buttons) {
+    for (const b of soundMenuOpen ? soundButtons : buttons) {
       b.userData.baseColor ??= b.material.color.clone();
       b.material.color.copy(b.userData.baseColor);
     }
     for (const { c, beam, id } of controllers) {
       const hit = intersect(c);
-      const model = modelHit(c) || rainHit(c) || scanHit(c);
-      const ground = hit ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
+      const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) || scanHit(c);
+      const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
@@ -1869,6 +1968,16 @@ renderer.setAnimationLoop((time, frame) => {
   if (audible && rain && rain.water.added > previousWater)
     waterSoundUntil = time + 1500;
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
+  const landscapeAudioDemo = pixels ?? viewshed ?? layers;
+  const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
+    ? THREE.MathUtils.clamp(
+        1 - Math.abs(landscapeAudioDemo.visitor.x -
+          riverX(landscapeAudioDemo.visitor.y)) / 24,
+        0, 1,
+      )
+    : 0;
+  sound.setLandscape(!!(audible && landscapeAudioDemo), riverLevel,
+    landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0);
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {
@@ -1944,8 +2053,9 @@ if (
       ),
       camera,
     );
-    const ui = raycaster.intersectObjects(buttons, false)[0];
+    const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
     if (ui) ui.object.userData.action?.(ui);
+    else if (soundMenuOpen) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (rain?.stage === 1) {
