@@ -16,6 +16,7 @@ import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
 import { RainExperience } from "./rain/experience.js";
+import { rainThumbnail } from "./rain/gallery.js";
 import { ModelGrab } from "./manipulation.js";
 import {
   LayerExperience,
@@ -280,7 +281,7 @@ function start() {
     return;
   }
   if (rain) {
-    startRain(rain.kind);
+    startRain();
     return;
   }
   preservePose = null;
@@ -315,8 +316,11 @@ function startRain(kind = "drainage", explore = false) {
   rain?.dispose();
   rain = new RainExperience(scene, draw, kind, (event) => sound.cue(event));
   rain.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
-  if (explore) rain.stage = 1;
-  draw();
+  if (explore) rain.explore();
+  else {
+    rain.group.visible = false;
+    draw();
+  }
 }
 function startScan(sceneInfo) {
   if (!SCAN_SCENES.includes(sceneInfo)) sceneInfo = nextScanScene();
@@ -734,16 +738,49 @@ function drawPixelsUI() {
     );
   navigation(-1.03);
 }
+function drawRainChoiceCard(kind, x, title, subtitle) {
+  const card = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.1, 1.22),
+    new THREE.MeshBasicMaterial({ color: kind === "erosion" ? 0x47362f : 0x193e47,
+      side: THREE.DoubleSide }),
+  );
+  card.position.set(x, -0.08, 0.01);
+  card.userData.action = () => {
+    sound.click();
+    startRain(kind, true);
+  };
+  card.userData.label = title;
+  buttons.push(card);
+  uiParent.add(card);
+  const thumbnail = rainThumbnail(kind);
+  thumbnail.position.set(x, 0.1, 0.16);
+  uiParent.add(thumbnail);
+  label(title, x, -0.38, 1.04, 0.12, 37, "#ffffff").position.z = 0.37;
+  label(subtitle, x, -0.51, 1.04, 0.11, 25, "#c7e6e5").position.z = 0.37;
+}
+function drawRainChooserUI() {
+  label("Make It Rain", 0, 0.96, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
+  label("Point at a terrain and press trigger. Sculpt while water flows.",
+    0, 0.69, 2.3, 0.2, 31, "#b6d1d9", "#0b2430");
+  drawRainChoiceCard("drainage", -0.61, "Drainage sandbox", "Follow runoff and ponds");
+  drawRainChoiceCard("erosion", 0.61, "Erosion tray", "Watch channels form");
+  navigation();
+}
 function drawRainUI() {
   const r = rain;
+  if (r.stage === 0) {
+    drawRainChooserUI();
+    return;
+  }
   const copy = [
+    null,
     [
-      "Make It Rain",
-      "Water on the surface flows downhill.\nA ridge can send nearby drops toward different outlets.\nGRIP: move / turn the model. BOTH grips: resize.",
-    ],
-    [
-      "Where will your rain go?",
-      "Point at the land and HOLD the TRIGGER to rain.\nThe cloud follows your aim. Try both sides of the ridge.\nSIDE GRIP: move / turn. BOTH grips: resize.",
+      r.kind === "erosion"
+        ? "Shape the land. Watch water reshape it."
+        : "Shape the land. Follow the water.",
+      r.kind === "erosion"
+        ? "Runoff cuts loose soil; slower water deposits sediment.\nLEFT TRIGGER: pour. RIGHT TRIGGER: sculpt while it flows.\nGRIP: move / turn. BOTH grips: resize the tray."
+        : "Runoff follows slope toward an outlet; ridges form divides.\nLEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nGRIP: move / turn. BOTH grips: resize the model.",
     ],
     [
       "Predict the path",
@@ -766,60 +803,29 @@ function drawRainUI() {
       "A watershed is land that drains to a common outlet.\nRidges redirect runoff; hollows fill before spilling.\nThis model traces paths, not water depth or flood risk.",
     ];
   if (r.kind === "erosion") {
-    copy[0] = [
-      "Make It Rain · erosion tray",
-      "Water can move the land as well as flow over it.\nPour onto this tilted bed and watch channels develop.\nGRIP: move / turn. BOTH grips: resize.",
-    ];
     copy[4] = [
       "Water shapes its own path.",
       "Flow removes loose material and carries it downhill.\nChannels can join; slower water can leave sediment behind.\nThis accelerated experiment is not a real erosion forecast.",
     ];
   }
-  if (r.stage === 0 || r.stage === 1)
-    copy[r.stage] = [
-      r.kind === "erosion"
-        ? "Shape the land. Watch water reshape it."
-        : "Shape the land. Follow the water.",
-      r.kind === "erosion"
-        ? "Runoff cuts loose soil; slower water deposits sediment.\nLEFT TRIGGER: pour. RIGHT TRIGGER: sculpt while it flows.\nGRIP: move / turn. BOTH grips: resize the tray."
-        : "Runoff follows slope toward an outlet; ridges form divides.\nLEFT TRIGGER: rain. RIGHT TRIGGER: sculpt the land.\nGRIP: move / turn. BOTH grips: resize the model.",
-    ];
   const [title, body] = copy[r.stage];
   label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
   label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
-  if (r.stage === 0) {
-    button(
-      r.kind === "erosion" ? "Explore tray" : "Drainage sandbox",
-      -0.55,
-      -0.77,
-      () => r.explore(),
-      1.02,
-    );
-    button(
-      r.kind === "erosion" ? "Drainage sandbox" : "Erosion tray",
-      0.55,
-      -0.77,
-      () => startRain(r.kind === "erosion" ? "drainage" : "erosion", true),
-      1.02,
-    );
-  }
   if (r.stage === 1) {
     if (r.kind === "erosion") {
-      button("Reset", -0.96, -0.77, () => { stopRainInput(); r.restore(); }, 0.44);
-      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.48, -0.77,
-        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.44);
-      button(r.replayTime >= 0 ? "Live" : "Replay", 0, -0.77,
-        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.44);
-      button("Takeaways", 0.48, -0.77, () => { stopRainInput(); r.finish(); }, 0.44);
-      button("Drainage", 0.96, -0.77, () => startRain("drainage", true), 0.44);
+      button("Reset", -0.78, -0.77, () => { stopRainInput(); r.restore(); }, 0.48);
+      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, -0.77,
+        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.48);
+      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, -0.77,
+        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.48);
+      button("Takeaways", 0.78, -0.77, () => { stopRainInput(); r.finish(); }, 0.48);
     } else {
-      button("Reset terrain", -0.84, -0.77,
-        () => { stopRainInput(); r.restore(); }, 0.52);
-      button(r.overlay ? "Hide basins" : "Show basins", -0.28, -0.77,
-        () => r.toggleOverlay(), 0.52);
-      button(r.edited ? "Takeaways" : "Prediction", 0.28, -0.77,
-        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.52);
-      button("Erosion tray", 0.84, -0.77, () => startRain("erosion", true), 0.52);
+      button("Reset terrain", -0.59, -0.77,
+        () => { stopRainInput(); r.restore(); }, 0.66);
+      button(r.overlay ? "Hide basins" : "Show basins", 0.08, -0.77,
+        () => r.toggleOverlay(), 0.59);
+      button(r.edited ? "Takeaways" : "Prediction", 0.68, -0.77,
+        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.55);
     }
   }
   if (r.stage === 2) {
@@ -851,7 +857,7 @@ function drawRainUI() {
       "#e6f4f5",
       "#0b2430",
     );
-    button("Make rain again", 0, -0.77, () => startRain(r.kind), 1.65);
+    button("Make rain again", 0, -0.77, () => startRain(r.kind, true), 1.65);
   } else
     label(
       r.kind === "erosion"
@@ -1411,7 +1417,7 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
-    if (rain && grip.visible) {
+    if (rain && rain.stage !== 0 && grip.visible) {
       grip.updateWorldMatrix(true, false);
       rain.group.updateWorldMatrix(true, true);
       const local = rain.group.worldToLocal(
@@ -1464,7 +1470,7 @@ function scanHit(c) {
   return scan.hit(raycaster);
 }
 function rainHit(c) {
-  if (!rain) return null;
+  if (!rain || rain.stage === 0) return null;
   intersect(c);
   rain.group.updateWorldMatrix(true, true);
   return raycaster.intersectObject(rain.terrain, false)[0];
@@ -1655,14 +1661,16 @@ renderer.setAnimationLoop((time, frame) => {
       }
       if (rain.stroke) {
         const held = controllers[rain.stroke.id];
-        if (held?.grip.visible)
+        if (held?.grip.visible) {
+          const aimedAtTerrain = !intersect(held.c) && !!rainHit(held.c);
           rain.moveStroke(
             held.id,
             held.grip.getWorldPosition(new THREE.Vector3()),
+            aimedAtTerrain,
           );
-        else rain.endStroke();
+        } else rain.endStroke();
       }
-      rain.update(dt, falling);
+      if (rain.stage !== 0) rain.update(dt, falling);
     }
     if (scan && renderer.xr.getSession().visibilityState === "visible") {
       if (scan.room)

@@ -510,9 +510,14 @@ export class RainExperience {
     const hand = this.group.worldToLocal(worldHand.clone());
     this.stroke = { id, last: hand, offset: hit.clone().sub(hand) };
   }
-  moveStroke(id, worldHand) {
+  moveStroke(id, worldHand, aimedAtTerrain = true) {
     if (this.stroke?.id !== id) return;
     const p = this.group.worldToLocal(worldHand.clone());
+    if (!aimedAtTerrain) {
+      this.stroke.last.copy(p);
+      this.brush.visible = false;
+      return;
+    }
     const center = p.clone().add(this.stroke.offset);
     const delta = THREE.MathUtils.clamp(p.y - this.stroke.last.y, -0.08, 0.08);
     this.stroke.last.copy(p);
@@ -558,6 +563,7 @@ export class RainExperience {
   endStroke(id) {
     if (id !== undefined && this.stroke?.id !== id) return;
     this.stroke = null;
+    this.brush.visible = false;
     if (this.strokeDirty) {
       this.strokeDirty = false;
       this.rebuildRoutes();
@@ -863,7 +869,7 @@ export class RainExperience {
         this.onChange();
       }
     }
-    if (this.stage < 4) {
+    if (this.stage > 0 && this.stage < 4) {
       this.elapsed += dt;
       if (this.elapsed >= 240) {
         this.finish();

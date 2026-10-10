@@ -35,15 +35,15 @@ This is a scaled positioning model, **not a measurement of the visitor's real lo
 
 ## Make It Rain
 
-Choose **Make It Rain** inside the headset. This second experience is a floating synthetic landscape with two outlets, a drainage divide, contour lines, and a movable rain cloud.
+Choose **Make It Rain** inside the headset. The opening shows two clickable miniature terrain previews: **Drainage sandbox** and **Erosion tray**. Point at either surface and press the trigger to start that simulation. **Restart** returns to these choices. The drainage sandbox is a floating synthetic landscape with two outlets, a drainage divide, contour lines, and a movable rain cloud.
 
-1. Read the short explanation of surface runoff and choose **Drainage sandbox**.
+1. Choose the **Drainage sandbox** terrain thumbnail.
 2. Point at the terrain and **hold the left trigger**. The cloud follows the aiming point and rain travels downhill. Releasing the trigger stops new rain; existing drops finish their paths. Try both sides of the ridge.
 3. Toggle **Show basins** to color cells by their calculated outlet. Outlet A is blue and round; B is gold and square. Labels provide a cue independent of color.
 4. Choose **Prediction**, then select which outlet will receive rain at the gold marker. Either answer reveals the computed path and an explanation. **Rain here again** replays it.
 5. Read the takeaways or restart. The experience transitions to takeaways after four minutes of visible XR frame time.
 
-During exploration, **hold the left trigger on land to add water** and **hold the right trigger on land to sculpt**. Lift/lower to raise/dig; move sideways to shape adjacent ground. These work together without a mode switch, and editing preserves water and suspended sediment. One controller sculpts at a time. Release the right trigger to refresh basin colors; new rain paths use the current terrain even during a stroke. **Reset terrain** restores the drainage landscape; **Reset** restores erosion. Edits are temporary and cleared by Restart/Menu. Heights are bounded and the rim anchored. Bare-hand tracking is not implemented.
+During exploration, **hold the left trigger on land to add water** and **hold the right trigger on land to sculpt**. Lift/lower to raise/dig; move sideways to shape adjacent ground. These work together without a mode switch, and editing preserves water and suspended sediment. One controller sculpts at a time. The golden sculpt cursor disappears when the right controller no longer aims at terrain or its trigger is released. Release the right trigger to refresh basin colors; new rain paths use the current terrain even during a stroke. **Reset terrain** restores the drainage landscape; **Reset** restores erosion. Edits are temporary and cleared by Restart/Menu. Heights are bounded and the rim anchored. Bare-hand tracking is not implemented.
 
 To move the entire model, point at the terrain or reach near it and hold either **side grip**. Add the other grip to resize (scale 0.22–0.75). There are no separate grab handles. Left/right trigger roles use WebXR handedness, not controller connection order. Either trigger still selects UI buttons. **Reset View** restores pose and size without changing the experiment. Moving the model pauses new water input. Rotation changes the viewing angle, not simulated gravity. Hidden sessions, disconnects, and lost tracking release grabs/strokes.
 
@@ -51,12 +51,12 @@ After editing, blue/gold basin colors still indicate A/B; purple groups areas dr
 
 The 65×65 elevation grid and steepest-descent paths are computed locally. The illustration uses arbitrary water volumes and a fixed-step surface-level relaxation model, not calibrated hydraulics. It does not simulate infiltration, evaporation, erosion, real rainfall intensity, momentum, or flood risk. Trees are decoration and do not change runoff. Pond surfaces use grid cells and may still look stepped along shorelines. Particle speed is illustrative; synthetic model units have no geographic scale. This is not a real watershed dataset.
 
-For browser development review only, `?preview&demo=rain` opens the rain experience. Test buttons emit rain on either slope; pointer/trigger ray selection still needs Quest verification. Production has no desktop experience.
+For browser development review only, `?preview&demo=rain` opens the two-choice gallery; its thumbnails can be clicked to enter either simulation. Test buttons then emit rain on either slope; controller-ray selection still needs Quest verification. Production has no desktop experience.
 
 
 ### Erosion tray (inside Make It Rain)
 
-Choose **Erosion tray** from the Make It Rain introduction or drainage controls. A tilted, slightly rough, loose-sediment bed replaces the drainage landscape. Hold the left trigger over any chosen part of the bed to pour; release to stop adding water. Existing water keeps flowing. There are no start/stop pour controls. Flow cuts darker grooves, carries sediment, and can deposit lighter material downstream. Brown-tinted water indicates suspended sediment. **Reset** restores the original bed and clears water; it preserves the viewing pose. Choose **Drainage** to return to the other simulation. Switching experiments starts a fresh run, and each retains the four-minute wrap-up.
+Choose the **Erosion tray** terrain thumbnail at the Make It Rain opening. A tilted, slightly rough, loose-sediment bed replaces the drainage landscape. Hold the left trigger over any chosen part of the bed to pour; release to stop adding water. Existing water keeps flowing. There are no start/stop pour controls. Flow cuts darker grooves, carries sediment, and can deposit lighter material downstream. Brown-tinted water indicates suspended sediment. **Reset** restores the original bed and clears water; it preserves the viewing pose. **Restart** returns to both terrain choices. Each experiment starts fresh and retains the four-minute wrap-up.
 
 **Compare** overlays a denser white reference grid at the starting surface; it stays fixed while the actual terrain cuts down underneath. Darker grooves mark erosion and pale patches mark deposits. **Replay** plays saved bed states over four seconds with water paused, then restores the live simulation unchanged. It becomes useful after a few seconds of pouring; snapshots are kept only in memory. The loose-sand response is deliberately accelerated so channels become visible within about 10 seconds of sustained pouring. **Reset** restores the bed and hides the reference grid.
 

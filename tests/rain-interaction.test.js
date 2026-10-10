@@ -218,6 +218,11 @@ for (const kind of ["drainage", "erosion"])
     );
     r.moveStroke(0, new THREE.Vector3(-0.3, 1.07, -0.4));
     assert.ok(r.heights[id] > before[id]);
+    assert.equal(r.brush.visible, true);
+    const pausedHeight = r.heights[id];
+    r.moveStroke(0, new THREE.Vector3(-0.3, 1.1, -0.4), false);
+    assert.equal(r.brush.visible, false);
+    assert.equal(r.heights[id], pausedHeight);
     assert.equal(r.water, water);
     assert.equal(r.water.stored, volume);
     r.setSource(id);
@@ -227,6 +232,7 @@ for (const kind of ["drainage", "erosion"])
     assert.equal(r.stroke.id, 0);
     r.endStroke(0);
     assert.equal(r.stroke, null);
+    assert.equal(r.brush.visible, false);
     r.grab.begin(1, new THREE.Matrix4());
     r.beginStroke(0, new THREE.Vector3(), new THREE.Vector3());
     assert.equal(r.stroke, null);
