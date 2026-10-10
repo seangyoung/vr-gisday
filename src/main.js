@@ -1171,8 +1171,9 @@ function draw() {
       panel.append(b);
     }
     for (const [name, action] of [
-      ["X · Menu", "menu"], ["Y · Restart", "restart"],
-      ["A · Reset view", "reset"], ["B · Sound", "sound"],
+      ["Left stick · Menu", "menu"], ["X · Restart", "restart"],
+      ["Y · Reset view", "reset"], ["A · Sound", "sound"],
+      ["B · Exit XR", "exit"],
     ]) {
       const b = document.createElement("button");
       b.textContent = name;
@@ -1184,8 +1185,8 @@ function draw() {
 function controllerGuideCopy(hand) {
   if (hand !== "left" && hand !== "right") return "";
   const lines = hand === "left"
-    ? ["LEFT CONTROLLER", "X  Menu", "Y  Restart", "Hold stick  Exit XR"]
-    : ["RIGHT CONTROLLER", "A  Reset view", `B  Sound ${sound.muted ? "on" : "off"}`];
+    ? ["LEFT CONTROLLER", "Stick click  Menu", "X  Restart", "Y  Reset view", "Flat Menu  Leave XR"]
+    : ["RIGHT CONTROLLER", `A  Sound ${sound.muted ? "on" : "off"}`, "B  Exit XR"];
   if (rain?.stage === 1) {
     lines.push(hand === "left" ? "Trigger  Rain / pour" : "Trigger  Sculpt");
     lines.push("Grip  Move / resize");
@@ -1659,7 +1660,7 @@ renderer.setAnimationLoop((time, frame) => {
     const visibleSession = renderer.xr.getSession().visibilityState === "visible";
     if (visibleSession) {
       const actions = controllerShortcuts.update(
-        controllers.map(({ c }) => c.userData.xrInput).filter(Boolean), dt,
+        controllers.map(({ c }) => c.userData.xrInput).filter(Boolean),
       );
       if (actions.length) runControllerShortcut(actions[0]);
     } else controllerShortcuts.reset();

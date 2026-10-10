@@ -37,7 +37,7 @@ export class ControllerGuide {
       this.body.add(face);
     }
     this.panel = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.34, 0.29),
+      new THREE.PlaneGeometry(0.34, 0.32),
       new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, side: THREE.DoubleSide }),
     );
     this.panel.renderOrder = 50;
@@ -69,7 +69,7 @@ export class ControllerGuide {
     lines.forEach((line, index) => {
       ctx.fillStyle = index === 0 ? "#a6f5d9" : "#f0f9f8";
       ctx.font = `${index === 0 ? 600 : 500} ${index === 0 ? 48 : 43}px system-ui, sans-serif`;
-      ctx.fillText(line, 44, 65 + index * 92, 675);
+      ctx.fillText(line, 44, 60 + index * 82, 675);
     });
     this.panel.material.map?.dispose();
     this.panel.material.map = new THREE.CanvasTexture(canvas);
@@ -89,12 +89,11 @@ export class ControllerGuide {
     if (distance < 0.14 || distance > 1.1 || gaze < 0.76) return -Infinity;
     camera.getWorldQuaternion(cameraRotation);
     cameraRight.set(1, 0, 0).applyQuaternion(cameraRotation);
-    const offset = this.handedness === "left"
-      ? this.copy.includes("Clipboard") ? -0.54 : -0.17
-      : 0.17;
+    const hasClipboard = this.handedness === "left" && this.copy.includes("Clipboard");
+    const offset = this.handedness === "left" ? 0.17 : -0.17;
     this.panel.position.copy(handPosition)
       .addScaledVector(cameraRight, offset);
-    this.panel.position.y += 0.13;
+    this.panel.position.y += hasClipboard ? 0.3 : 0.13;
     this.panel.quaternion.copy(cameraRotation);
     this.panel.visible = true;
     return gaze - distance * 0.05;

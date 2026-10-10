@@ -10,39 +10,38 @@ const source = (handedness, down = []) => ({
   },
 });
 
-test("Quest face shortcuts fire once per press on the correct hand", () => {
+test("Quest stick and face shortcuts fire once per press on the correct hand", () => {
   const shortcuts = new ControllerShortcuts();
   const idle = [source("left"), source("right")];
-  assert.deepEqual(shortcuts.update(idle, 0.02), []);
-  assert.deepEqual(shortcuts.update([source("left", [4]), source("right", [4])], 0.02), ["menu", "reset"]);
-  assert.deepEqual(shortcuts.update([source("left", [4]), source("right", [4])], 0.02), []);
-  assert.deepEqual(shortcuts.update(idle, 0.02), []);
-  assert.deepEqual(shortcuts.update([source("left", [5]), source("right", [5])], 0.02), ["restart", "sound"]);
+  assert.deepEqual(shortcuts.update(idle), []);
+  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])]),
+    ["menu", "restart", "sound"]);
+  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])]), []);
+  assert.deepEqual(shortcuts.update(idle), []);
+  assert.deepEqual(shortcuts.update([source("left", [5]), source("right", [5])]),
+    ["reset", "exit"]);
 });
 
-test("exit needs a sustained left stick press and re-arms after release", () => {
+test("a left stick click opens Menu immediately and re-arms after release", () => {
   const shortcuts = new ControllerShortcuts();
-  shortcuts.update([source("left")], 0);
-  for (let i = 0; i < 11; i++)
-    assert.deepEqual(shortcuts.update([source("left", [3])], 0.1), []);
-  assert.deepEqual(shortcuts.update([source("left", [3])], 0.1), ["exit"]);
-  assert.deepEqual(shortcuts.update([source("left", [3])], 0.1), []);
-  shortcuts.update([source("left")], 0.1);
-  for (let i = 0; i < 11; i++) shortcuts.update([source("left", [3])], 0.1);
-  assert.deepEqual(shortcuts.update([source("left", [3])], 0.1), ["exit"]);
+  shortcuts.update([source("left")]);
+  assert.deepEqual(shortcuts.update([source("left", [3])]), ["menu"]);
+  assert.deepEqual(shortcuts.update([source("left", [3])]), []);
+  shortcuts.update([source("left")]);
+  assert.deepEqual(shortcuts.update([source("left", [3])]), ["menu"]);
   shortcuts.reset();
-  assert.deepEqual(shortcuts.update([source("left", [4])], 0.1), []);
+  assert.deepEqual(shortcuts.update([source("left", [3])]), []);
 });
 
 test("tracking loss and non-XR gamepads cannot leave shortcuts latched", () => {
   const shortcuts = new ControllerShortcuts();
-  shortcuts.update([source("left")], 0);
-  assert.deepEqual(shortcuts.update([source("left", [4])], 0.02), ["menu"]);
-  assert.deepEqual(shortcuts.update([], 0.02), []);
-  assert.deepEqual(shortcuts.update([source("left", [4])], 0.02), []);
-  shortcuts.update([source("left")], 0.02);
-  assert.deepEqual(shortcuts.update([source("left", [4])], 0.02), ["menu"]);
+  shortcuts.update([source("left")]);
+  assert.deepEqual(shortcuts.update([source("left", [4])]), ["restart"]);
+  assert.deepEqual(shortcuts.update([]), []);
+  assert.deepEqual(shortcuts.update([source("left", [4])]), []);
+  shortcuts.update([source("left")]);
+  assert.deepEqual(shortcuts.update([source("left", [4])]), ["restart"]);
   const ordinary = source("left", [4]);
   ordinary.gamepad.mapping = "standard";
-  assert.deepEqual(shortcuts.update([ordinary], 0.02), []);
+  assert.deepEqual(shortcuts.update([ordinary]), []);
 });
