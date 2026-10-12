@@ -92,9 +92,9 @@ The image covers a 144-by-144-model-meter window centered on the visitor. Its 1 
 
 ## See the Invisible
 
-The seventh experience starts with the electromagnetic spectrum: humans see visible light, while sensors can measure near infrared. After **Reveal the bands**, a synthetic overhead scene and four-band signature chart appear. Point at the scene to sample healthy leaves, stressed leaves, bare soil, water, or pavement. **Natural color** uses visible red/green/blue; **False color** assigns near infrared to display red, visible red to green, and visible green to blue; **NIR only** makes that invisible band visible as gray. Healthy leaves appear bright red in false color because their modeled NIR reflection is high, not because leaves are red. The four-minute takeaway defines spectral signature and false-color composite.
+The seventh experience starts with the electromagnetic spectrum: humans see visible light, while sensors can measure near infrared. After **Reveal the bands**, an oblique San Francisco Bay scene made by NASA from 1997 Landsat 5 imagery appears. **Natural color** displays visible red/green/blue; **False color** assigns near infrared to display red, visible red to green, and visible green to blue. **NIR only** extracts the false-color image's red display channel as an approximate grayscale NIR view. Point at water, city, or hills to compare their four displayed band brightnesses. The four-minute takeaway defines spectral signature and false-color composite.
 
-All band values, land-cover labels, and imagery are original illustrative data, not a satellite scene, calibrated reflectance, vegetation-health diagnosis, or sensor simulation. Development preview: `?preview&demo=spectral`.
+The source composites are real Landsat-derived visualizations, not raw band data. The bars sample rendered JPEG display values; they are **not** calibrated reflectance, NDVI, a vegetation-health diagnosis, or a quantitative comparison between independently stretched bands. The terrain in NASA's oblique rendering is exaggerated threefold. Development preview: `?preview&demo=spectral`.
 
 ## Where Did the Cluster Go?
 

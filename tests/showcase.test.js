@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
-import { SPECTRA, displayColor, surfaceAt } from "../src/showcase/spectral-model.js";
+import { displayedBandBrightness, nirGrayPixel } from "../src/showcase/spectral-model.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
   aggregationFor, blockAt,
@@ -12,16 +12,10 @@ import {
   projectionFitScale, relativeAreaScale,
 } from "../src/showcase/projection-model.js";
 
-test("synthetic spectral signatures make the invisible band reveal healthy leaves", () => {
-  assert.equal(surfaceAt(0.12, 0.2), "forest");
-  assert.equal(surfaceAt(0.31, 0.31), "stressed");
-  assert.equal(surfaceAt(0.59 + 0.075 * Math.sin(0.5 * 6.3 + 0.4), 0.5), "water");
-  assert.ok(SPECTRA.forest.bands[3] > SPECTRA.forest.bands[2] * 8);
-  assert.ok(SPECTRA.stressed.bands[3] < SPECTRA.forest.bands[3]);
-  const natural = displayColor("forest", "natural");
-  const falseColor = displayColor("forest", "false");
-  assert.ok(falseColor[0] > natural[0]);
-  assert.ok(falseColor[0] > falseColor[1]);
+test("rendered Landsat composites map display colors to sampled band brightness", () => {
+  assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
+    [96, 72, 38, 184]);
+  assert.deepEqual(nirGrayPixel([184, 53, 72, 255]), [184, 184, 184, 255]);
 });
 
 test("Snow blocks are conserved by each hypothetical ward plan", () => {

@@ -1,5 +1,16 @@
 # Third-party notices
 
+## NASA Landsat visualization
+
+The two San Francisco Bay Landsat composite JPEGs in `src/showcase/data/`
+come from NASA/Goddard Space Flight Center Scientific Visualization Studio,
+[*Creating Landsat Images from Raw Data: San Francisco - Oakland*](https://svs.gsfc.nasa.gov/936/).
+The natural-color frame is TM bands 3-2-1 and the false-color frame is
+TM bands 4-3-2. NASA SVS states that its visualizations are [public domain
+unless otherwise noted](https://svs.gsfc.nasa.gov/help/). Credit: NASA/Goddard
+Space Flight Center Scientific Visualization Studio. The displayed band bars
+are app-derived approximations from the rendered JPEGs, not NASA reflectance data.
+
 ## Three.js
 
 The MIT License

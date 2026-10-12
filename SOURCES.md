@@ -67,8 +67,9 @@ The app uses original synthetic colors and known model categories, averaged over
 - NASA Earth Observatory, [*Measuring Vegetation*](https://science.nasa.gov/earth/earth-observatory/measuring-vegetation-ndvi-evi/) — leaves absorb visible red and reflect much near infrared; red/NIR response can distinguish vegetation conditions.
 - NASA Earth Observatory, [*Why is that Forest Red and That Cloud Blue?*](https://earthobservatory.nasa.gov/features/FalseColor) — spectral signatures and assigning non-visible bands to display colors.
 - USGS, [Landsat/ASTER false-color example](https://www.usgs.gov/news/science-snippet/earthview-landsat-aster-work-together-russian-wildfires) — vegetation appears red when NIR is assigned to the display's red channel.
+- NASA Goddard Scientific Visualization Studio, [*Creating Landsat Images from Raw Data: San Francisco - Oakland*](https://svs.gsfc.nasa.gov/936/) — source of the aligned, unlabeled 960 × 540 natural-color Landsat 5 TM 3-2-1 and false-color 4-3-2 JPEG frames bundled in `src/showcase/data/`. NASA lists a 1997-09-27 Landsat dataset for the visualization and says the terrain is vertically exaggerated threefold. Credit: NASA/Goddard Space Flight Center Scientific Visualization Studio. [SVS usage guidance](https://svs.gsfc.nasa.gov/help/).
 
-The scene and four-band values in `src/showcase/spectral-model.js` are invented teaching data. They are plausible relative signatures, not calibrated reflectance or measured imagery.
+The demo samples blue, green, and red **display brightness** from the natural-color JPEG and an approximate NIR brightness from the false-color JPEG's red display channel. Those rendered channels may have different contrast stretches and JPEG artifacts. They are not raw Landsat measurements, calibrated reflectance, or a valid quantitative spectral signature/NDVI. NIR-only is a grayscale visualization of that same approximate display channel, not a standalone source band.
 
 ### Where Did the Cluster Go?
 
