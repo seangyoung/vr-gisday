@@ -72,6 +72,7 @@ function observationMarker() {
 export class ViewshedExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
+    this.started = true;
     this.onEvent = onEvent;
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();

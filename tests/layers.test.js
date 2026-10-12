@@ -22,6 +22,16 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   let changes = 0;
   const l = new LayerExperience(scene, () => changes++);
   assert.equal(l.selected.size, 0);
+  assert.equal(l.started, false);
+  l.toggle("roads");
+  l.update(240);
+  assert.equal(l.selected.size, 0);
+  assert.equal(l.finished, false);
+  assert.equal(l.elapsed, 0);
+  l.updateClipboard(null, new THREE.PerspectiveCamera(), true);
+  assert.equal(l.clipboard.visible, false);
+  l.begin();
+  assert.equal(l.started, true);
   assert.equal(l.variants.flat.world.visible, true);
   assert.equal(l.variants.raised.world.visible, false);
   for (const key of LAYER_KEYS.slice(1))
@@ -85,6 +95,7 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(l.selected.has("roads"), true);
   l.reset();
   assert.equal(l.finished, false);
+  assert.equal(l.started, true);
   assert.equal(l.selected.size, 0);
   assert.equal(l.variants.flat.world.visible, true);
   assert.ok(changes >= 7);
@@ -96,6 +107,7 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
 test("left-stick walking follows the view, terrain, bounds, and clipboard location", () => {
   const scene = new THREE.Scene();
   const l = new LayerExperience(scene, () => {});
+  l.begin();
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   l.place(camera);

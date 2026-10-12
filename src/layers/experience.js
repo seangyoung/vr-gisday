@@ -518,6 +518,7 @@ export class LayerExperience {
     }
     this.selected = new Set();
     this.elapsed = 0;
+    this.started = false;
     this.finished = false;
     this.lastLayer = null;
     this.reveal = null;
@@ -688,6 +689,10 @@ export class LayerExperience {
     }
   }
   updateClipboard(leftGrip, camera, preview = false) {
+    if (!this.started) {
+      this.clipboard.visible = false;
+      return;
+    }
     if (!leftGrip && !preview) {
       this.clipboard.visible = false;
       return;
@@ -714,8 +719,14 @@ export class LayerExperience {
     this.clipboard.visible = true;
     this.clipboard.updateWorldMatrix(true, true);
   }
+  begin() {
+    if (this.started) return;
+    this.started = true;
+    this.elapsed = 0;
+    this.onChange();
+  }
   toggle(key) {
-    if (!LAYER_KEYS.includes(key) || this.finished) return;
+    if (!this.started || !LAYER_KEYS.includes(key) || this.finished) return;
     if (this.reveal) {
       for (const variant of Object.values(this.variants))
         if (this.reveal.key !== "topography") variant[this.reveal.key].scale.y = 1;
@@ -756,6 +767,7 @@ export class LayerExperience {
     this.onChange();
   }
   update(dt) {
+    if (!this.started) return;
     if (this.reveal) {
       this.reveal.elapsed += dt;
       const { key, elapsed } = this.reveal;

@@ -704,6 +704,17 @@ function drawScanChooserUI() {
 }
 function drawLayersUI() {
   const l = layers;
+  if (!l.started) {
+    lessonCard(
+      "Stand Inside the Layers",
+      "GIS means Geographic Information System; it stacks map layers.\nStart blank; add terrain, trees, water, roads, and more.\nThe clipboard map and world around you change together.",
+      0.13,
+    );
+    button("Start building", 0, -0.43, () => l.begin(), 1.5);
+    label("After starting, raise your left hand to see the map and layer list.",
+      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    return;
+  }
   label(
     l.finished ? "A place, many datasets" : "Stand Inside the Layers",
     0,
@@ -1378,12 +1389,13 @@ function drawScene() {
   clear();
   const key = pixels ? `pixels:${pixels.finished}` :
     viewshed ? `viewshed:${viewshed.view}:${viewshed.finished}` :
-    layers ? `layers:${layers.view}:${layers.finished}` :
+    layers ? `layers:${layers.view}:${layers.started}:${layers.finished}` :
     scan ? `scan:${scan.room ? "room" : "model"}:${scan.stage}` :
     rain ? `rain:${rain.kind}:${rain.stage}` : `position:${step}`;
   if (key !== lastUIKey) uiFadeAge = 0;
   lastUIKey = key;
-  uiParent = pixels?.ui ?? viewshed?.ui ?? layers?.ui ?? content;
+  uiParent = pixels?.ui ?? viewshed?.ui ??
+    (layers?.started ? layers.ui : null) ?? content;
   if (pixels) {
     drawPixelsUI();
     return;

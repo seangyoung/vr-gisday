@@ -78,6 +78,7 @@ function footprint(cell) {
 export class PixelExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
+    this.started = true;
     this.onEvent = onEvent;
     this.clipboard.scale.setScalar(0.26);
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
