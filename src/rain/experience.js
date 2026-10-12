@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
+import { modelBoundsHit, handInsideModel } from "../model-target.js";
 import { createTray, ErosionWater, EROSION_SIZE } from "./erosion.js";
 import { WaterSurface } from "./water-surface.js";
 import { SurfaceWater } from "./water.js";
@@ -56,6 +57,10 @@ export class RainExperience {
     this.playback = 0;
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
+    this.grabBounds = new THREE.Box3(
+      new THREE.Vector3(-1.18, -0.23, -1.18),
+      new THREE.Vector3(1.18, 1.18, 1.18),
+    );
     scene.add(this.group);
     this.group.add(new THREE.HemisphereLight(0xd4f5ff, 0x39513a, 2.3));
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);
@@ -716,14 +721,20 @@ export class RainExperience {
     if (dir.lengthSq() < 0.01) dir.set(0, 0, -1);
     dir.normalize();
     this.group.position.copy(pos).addScaledVector(dir, 1.4);
-    this.group.position.y += this.kind === "erosion" ? 0.08 : 0.02;
+    this.group.position.y -= this.kind === "erosion" ? 0.15 : 0.18;
     this.group.rotation.set(
-      this.kind === "erosion" ? 0.18 : 0,
+      this.kind === "erosion" ? 0.46 : 0.42,
       Math.atan2(-dir.x, -dir.z),
       0,
       "YXZ",
     );
     this.group.scale.setScalar(0.43);
+  }
+  grabHit(raycaster) {
+    return modelBoundsHit(this.group, this.grabBounds, raycaster);
+  }
+  handNear(worldHand) {
+    return handInsideModel(this.group, this.grabBounds, worldHand);
   }
   explore() {
     this.stage = 1;

@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
+import { modelBoundsHit, handInsideModel } from "../model-target.js";
 import { buildScanScene, SCAN_SCENES } from "./scenes.js";
 const COLORS = { ground: 0x65cfd1, structure: 0xffd39b, vegetation: 0x99eb91 };
 const WHITE = new THREE.Color(0xffffff);
@@ -19,6 +20,10 @@ export class ScanExperience {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
+    this.grabBounds = new THREE.Box3(
+      new THREE.Vector3(-1.12, -0.1, -0.91),
+      new THREE.Vector3(1.12, 1.17, 0.91),
+    );
     this.targets = [];
     const mesh = (geometry, position, kind) => {
       const m = new THREE.Mesh(
@@ -88,9 +93,15 @@ export class ScanExperience {
     if (dir.lengthSq() < 0.01) dir.set(0, 0, -1);
     dir.normalize();
     this.group.position.copy(pos).addScaledVector(dir, 1.4);
-    this.group.position.y += 0.06;
-    this.group.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
+    this.group.position.y -= 0.12;
+    this.group.rotation.set(0.42, Math.atan2(-dir.x, -dir.z), 0, "YXZ");
     this.group.scale.setScalar(0.43);
+  }
+  grabHit(raycaster) {
+    return modelBoundsHit(this.group, this.grabBounds, raycaster);
+  }
+  handNear(worldHand) {
+    return handInsideModel(this.group, this.grabBounds, worldHand);
   }
   explore() {
     this.stage = 1;

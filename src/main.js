@@ -20,6 +20,7 @@ import { scanThumbnail } from "./scan/gallery.js";
 import { RainExperience } from "./rain/experience.js";
 import { rainThumbnail } from "./rain/gallery.js";
 import { ModelGrab } from "./manipulation.js";
+import { modelBeforeUi } from "./model-target.js";
 import {
   LayerExperience,
   LAYER_KEYS,
@@ -285,13 +286,14 @@ function drawSoundMenu() {
   control("Close", 0, -0.34, 0.34, closeSoundMenu);
   soundPanel.traverse((object) => {
     if (!object.material) return;
-    // Keep every menu surface in the transparent render pass so the solid
-    // backing draws after the scene, before the controls and labels.
+    // Keep the panel opaque, while respecting nearer controllers and rays.
     object.material.transparent = true;
     object.material.opacity = 1;
-    object.material.depthTest = false;
-    object.material.depthWrite = false;
-    object.renderOrder = object === background ? 89 : 90;
+    object.material.depthTest = true;
+    object.material.depthWrite = object === background;
+    // Controller button labels use render order 42 and should stay readable
+    // when a hand is held between the visitor and this panel.
+    object.renderOrder = object === background ? 20 : 21;
   });
   uiParent = previousParent;
   uiFadeAge = previousFade;
@@ -309,8 +311,8 @@ function toggleSoundMenu() {
   forward.y = 0;
   if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
   forward.normalize();
-  soundPanel.position.copy(eye).addScaledVector(forward, 1.05);
-  soundPanel.position.y -= 0.18;
+  soundPanel.position.copy(eye).addScaledVector(forward, 1.5);
+  soundPanel.position.y += 0.08;
   soundPanel.lookAt(eye);
   soundPanel.visible = true;
   soundMenuOpen = true;
@@ -656,11 +658,18 @@ function drawScanUI() {
     ],
   ];
   const [title, body] = copy[s.stage];
-  lessonCard(title, body);
-  label(
-    `${s.hideVegetation ? "Vegetation hidden · Missing ground stays missing" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
-    0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
-  );
+  if (s.stage === 1)
+    label(
+      `Scan different sides; first-hit surfaces leave gaps.\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
+      0, GUIDED_INFO_Y, 2.3, 0.2, 32, "#d8eae8", "#0b2430",
+    );
+  else {
+    lessonCard(title, body);
+    label(
+      `${s.hideVegetation ? "Vegetation hidden · Missing ground stays missing" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
+      0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
+    );
+  }
   button(
     s.reveal ? "Cloud only" : "Compare surfaces",
     -0.84,
@@ -1069,7 +1078,14 @@ function drawRainUI() {
     ];
   }
   const [title, body] = copy[r.stage];
-  lessonCard(title, body);
+  if (r.stage === 1)
+    label(
+      `Left trigger: rain · Right trigger: sculpt · Grips: move/size\n${r.kind === "erosion"
+        ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Runoff cuts channels and deposits sediment."
+        : r.overlay ? "Blue and gold mark the two drainage basins." : "Runoff follows slope; ridges divide basins."}`,
+      0, GUIDED_INFO_Y, 2.3, 0.2, 32, "#e6f4f5", "#0b2430",
+    );
+  else lessonCard(title, body);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
       button("Reset", -0.78, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.48);
@@ -1117,7 +1133,7 @@ function drawRainUI() {
       "#0b2430",
     );
     button("Make rain again", 0, GUIDED_ACTION_Y, () => startRain(r.kind, true), 1.65);
-  } else
+  } else if (r.stage !== 1)
     label(
       r.kind === "erosion"
         ? r.replayTime >= 0
@@ -1713,6 +1729,27 @@ for (let i = 0; i < 2; i++) {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
       return;
     const hit = intersect(c);
+    if (rain?.stage === 1) {
+      const land = rainHit(c);
+      if (modelBeforeUi(land, hit)) {
+        const action = rain.beginTrigger(
+          c.userData.xrInput?.handedness,
+          i,
+          land.point,
+          grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null,
+        );
+        c.userData.raining = action === "rain";
+        if (c.userData.raining) rainPointer = i;
+        return;
+      }
+    }
+    if (scan?.stage === 1 && !scan.room) {
+      const model = scan.grabHit(raycaster);
+      if (modelBeforeUi(model, hit)) {
+        c.userData.scanning = true;
+        return;
+      }
+    }
     if (hit) {
       hit.object.userData.action?.(hit);
       return;
@@ -1734,19 +1771,6 @@ for (let i = 0; i < 2; i++) {
       c.userData.scanning = true;
       return;
     }
-    if (rain?.stage === 1) {
-      const land = rainHit(c);
-      if (land) {
-        const action = rain.beginTrigger(
-          c.userData.xrInput?.handedness,
-          i,
-          land.point,
-          grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null,
-        );
-        c.userData.raining = action === "rain";
-        if (c.userData.raining) rainPointer = i;
-      }
-    }
   });
   c.addEventListener("selectend", () => {
     rain?.endStroke(i);
@@ -1758,7 +1782,10 @@ for (let i = 0; i < 2; i++) {
     if (scan && (scan.room || scan.stage === 1) && grip.visible) {
       if (scan.room && !scan.frozen) return;
       grip.updateWorldMatrix(true, false);
-      if (scan.grab.hands.size || (!intersect(c) && scanHit(c))) {
+      const ui = intersect(c);
+      const target = scan.room ? scanHit(c) : scan.grabHit(raycaster);
+      const near = !scan.room && scan.handNear(grip.getWorldPosition(new THREE.Vector3()));
+      if (scan.grab.hands.size || near || modelBeforeUi(target, ui)) {
         for (const { c: controller } of controllers)
           controller.userData.scanning = false;
         scan.grab.begin(i, grip.matrixWorld);
@@ -1767,16 +1794,10 @@ for (let i = 0; i < 2; i++) {
     }
     if (rain && rain.stage !== 0 && grip.visible) {
       grip.updateWorldMatrix(true, false);
-      rain.group.updateWorldMatrix(true, true);
-      const local = rain.group.worldToLocal(
-        grip.getWorldPosition(new THREE.Vector3()),
-      );
-      const near =
-        Math.abs(local.x) < 1.1 &&
-        Math.abs(local.z) < 1.1 &&
-        local.y > -0.15 &&
-        local.y < 1.1;
-      if (rain.grab.hands.size || (!intersect(c) && (near || rainHit(c)))) {
+      const ui = intersect(c);
+      const target = rain.grabHit(raycaster);
+      const near = rain.handNear(grip.getWorldPosition(new THREE.Vector3()));
+      if (rain.grab.hands.size || near || modelBeforeUi(target, ui)) {
         rain.endStroke();
         for (const { c: controller } of controllers)
           controller.userData.raining = false;
@@ -1836,9 +1857,9 @@ function intersect(c) {
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
   if (soundMenuOpen) return raycaster.intersectObjects(soundButtons, false)[0];
-  if ((layers && !layers.clipboard.visible) ||
-      (viewshed && !viewshed.clipboard.visible) ||
-      (pixels && !pixels.clipboard.visible)) return null;
+  if ((layers?.started && !layers.clipboard.visible) ||
+      (viewshed?.started && !viewshed.clipboard.visible) ||
+      (pixels?.started && !pixels.clipboard.visible)) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode, roomScan = mode === "immersive-ar") {
@@ -2030,15 +2051,16 @@ renderer.setAnimationLoop((time, frame) => {
         !rain.grab.hands.size
       ) {
         falling = !!active.c.userData.raining;
-        if (!intersect(active.c)) {
-          const land = rainHit(active.c);
-          if (land) rain.aim(land.point);
-        }
+        const ui = intersect(active.c);
+        const land = rainHit(active.c);
+        if (modelBeforeUi(land, ui)) rain.aim(land.point);
       }
       if (rain.stroke) {
         const held = controllers[rain.stroke.id];
         if (held?.grip.visible) {
-          const hit = !intersect(held.c) ? rainHit(held.c) : null;
+          const ui = intersect(held.c);
+          const land = rainHit(held.c);
+          const hit = modelBeforeUi(land, ui) ? land : null;
           rain.moveStroke(
             held.id,
             held.grip.getWorldPosition(new THREE.Vector3()),
@@ -2062,8 +2084,12 @@ renderer.setAnimationLoop((time, frame) => {
       else
         for (const { c } of controllers) {
           if (!c.visible) c.userData.scanning = false;
-          if (c.visible && c.userData.scanning && !intersect(c))
-            scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
+          if (c.visible && c.userData.scanning) {
+            const ui = intersect(c);
+            const model = scan.grabHit(raycaster);
+            if (!ui || modelBeforeUi(model, ui))
+              scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
+          }
         }
       scan.update(dt);
     }

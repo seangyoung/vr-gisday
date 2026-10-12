@@ -63,6 +63,13 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   camera.position.set(0, 1.6, 0);
   r.place(camera);
   const original = r.group.position.clone();
+  assert.ok(original.y < camera.position.y - 0.15);
+  assert.ok(r.group.rotation.x > 0.4);
+  const surface = r.group.localToWorld(new THREE.Vector3(0, r.heights[cellAt(0, 0)], 0));
+  const ray = new THREE.Raycaster(camera.position,
+    surface.clone().sub(camera.position).normalize());
+  assert.ok(r.grabHit(ray));
+  assert.ok(r.handNear(surface));
   r.water.add(cellAt(-0.3, -0.4), 0.001);
   const heights = r.heights.slice();
   const volume = r.water.stored;
@@ -79,7 +86,7 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   r.place(camera);
   assert.equal(r.grab.hands.size, 0);
   assert.ok(r.group.position.distanceTo(original) < 1e-9);
-  assert.ok(Math.abs(r.group.rotation.x) < 1e-9);
+  assert.ok(Math.abs(r.group.rotation.x - 0.42) < 1e-9);
   assert.equal(r.group.scale.x, 0.43);
   assert.equal(r.water.stored, volume);
   r.grab.begin(0, hand);
@@ -93,14 +100,15 @@ test("erosion tray resets to a forward pitch above a deeper physical base", () =
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   r.place(camera);
-  assert.ok(r.group.rotation.x > 0.15);
+  assert.ok(r.group.rotation.x > 0.45);
+  assert.ok(r.group.position.y < camera.position.y - 0.14);
   const base = r.group.children.find(
     (child) => child.geometry?.type === "BoxGeometry" && child.geometry.parameters.width === 2,
   );
   assert.ok(base.position.y < -0.15);
   r.group.rotation.x = 0;
   r.place(camera);
-  assert.ok(r.group.rotation.x > 0.15);
+  assert.ok(r.group.rotation.x > 0.45);
   r.dispose();
 });
 

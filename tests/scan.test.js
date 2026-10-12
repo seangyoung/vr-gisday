@@ -74,3 +74,19 @@ test("scan limit, miss handling, intro gate and four-minute wrap-up", () => {
   assert.equal(s.grab.hands.size, 0);
   s.dispose();
 });
+
+test("synthetic scan starts below eye level and its empty outline can be grabbed", () => {
+  const s = new ScanExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  s.place(camera);
+  s.explore();
+  assert.ok(s.group.position.y < camera.position.y - 0.11);
+  assert.ok(s.group.rotation.x > 0.4);
+  const target = s.group.localToWorld(new THREE.Vector3(0, 0.9, 0));
+  const direction = target.clone().sub(camera.position).normalize();
+  const raycaster = new THREE.Raycaster(camera.position, direction);
+  assert.ok(s.grabHit(raycaster));
+  assert.ok(s.handNear(target));
+  s.dispose();
+});
