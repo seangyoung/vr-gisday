@@ -558,7 +558,7 @@ function drawRoomUI() {
           : "Sweep across real surfaces";
   const body =
     s.stage === 0
-      ? "Uses browser estimates of real surfaces, with permission.\nYou are in MIXED REALITY; start and look around.\nA sparse surface scan; no camera images are recorded."
+      ? "Uses browser surface estimates, not lidar lasers.\nYou are in MIXED REALITY; start and look around.\nNo camera images are recorded."
       : s.stage === 2
         ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
         : s.frozen
@@ -620,7 +620,7 @@ function drawScanUI() {
     null,
     [
       `Explore: ${s.sceneInfo.name}`,
-      `Each ray records its first surface return.\n${s.sceneInfo.prompt}`,
+      `This model keeps the first surface hit of each ray.\n${s.sceneInfo.prompt}`,
     ],
     [
       s.sceneInfo.takeaway.title,
@@ -691,14 +691,14 @@ function drawScanChoiceCard(kind, x, title, subtitle, action) {
   label(subtitle, x, -0.51, 1.04, 0.11, 25, "#c7e6e5").position.z = 0.37;
 }
 function drawScanChooserUI() {
-  label("Scan the Hidden World", 0, 0.96, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
-  label("Choose a point-cloud experience. A range return becomes one 3D point.",
-    0, 0.69, 2.3, 0.2, 30, "#b6d1d9", "#0b2430");
-  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "Explore hidden surfaces", () => {
+  label("Scan the Hidden World", 0, 1.02, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
+  label("Lidar means Light Detection and Ranging.\nIt times reflected laser pulses to measure distance.\nMany measured points form a 3D point cloud.",
+    0, 0.705, 2.3, 0.31, 38, "#e6f4f5", "#0b2430");
+  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "Lidar first-hit model", () => {
     scan.group.visible = true;
     scan.explore();
   });
-  drawScanChoiceCard("room", 0.61, "Room scan · MR", "Scan nearby real surfaces", switchToRoomScan);
+  drawScanChoiceCard("room", 0.61, "Room scan · MR", "WebXR surface estimates", switchToRoomScan);
   label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }

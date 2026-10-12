@@ -7,7 +7,7 @@ export const SCAN_SCENES = [
     prompt: "Scan one wall, then turn the ruins around.\nWhich faces appear only from the other side?",
     takeaway: {
       title: "A gap in the cloud is not an empty space.",
-      body: "The walls blocked rays from reaching surfaces behind them.\nThat is occlusion: changing viewpoints can fill the gap.\nReal surveys align overlapping scans to build a fuller model.",
+      body: "The walls blocked rays from reaching surfaces behind them.\nThat is occlusion: changing viewpoints can fill the gap.\nAligned lidar scans can make a fuller 3D map.",
     },
   },
   {
@@ -15,7 +15,7 @@ export const SCAN_SCENES = [
     prompt: "Scan across the deck, then look beneath it.\nCan you capture the supports from above?",
     takeaway: {
       title: "A bridge needs more than an overhead view.",
-      body: "The deck hides supports and its underside from above.\nLow, oblique scans reveal clearance and hidden structure.\nSurveyors combine views before measuring the full bridge.",
+      body: "The deck hides supports and its underside from above.\nLow, oblique scans reveal clearance and hidden structure.\nCombining lidar views can map more of the bridge.",
     },
   },
   {
@@ -23,7 +23,7 @@ export const SCAN_SCENES = [
     prompt: "Sweep the rooftops, then move to the other side.\nWhich walls do the roofs and houses hide?",
     takeaway: {
       title: "Roofs can hide the streets below.",
-      body: "First-surface returns show roofs before covered walls.\nA roof-heavy cloud is not a complete building model.\nSide views add facades for mapping built features.",
+      body: "First-surface returns show roofs before covered walls.\nA roof-heavy cloud is not a complete building model.\nSide-view lidar adds facades to 3D building models.",
     },
   },
   {
@@ -31,7 +31,7 @@ export const SCAN_SCENES = [
     prompt: "Scan the stepped ground from above and from the side.\nWhere do you see edges and vertical faces?",
     takeaway: {
       title: "Height changes need well-placed samples.",
-      body: "The steps show up as changes in point elevation.\nSparse points near an edge can blur its true shape.\nTerrain models depend on point density and ground returns.",
+      body: "The steps show up as changes in point elevation.\nSparse points near an edge can blur its true shape.\nGround points can build a digital elevation model.",
     },
   },
   {
@@ -55,7 +55,7 @@ export const SCAN_SCENES = [
     prompt: "Sweep the platform and its narrow supports.\nDo all the slender pieces get the same number of points?",
     takeaway: {
       title: "Small features can be undersampled.",
-      body: "Narrow supports catch fewer rays than broad surfaces.\nPoint density limits the detail a scan can resolve.\nCloser or denser sampling helps document thin features.",
+      body: "Narrow supports catch fewer rays than broad surfaces.\nPoint density limits the detail a scan can resolve.\nDenser lidar sampling helps document thin features.",
     },
   },
 ];

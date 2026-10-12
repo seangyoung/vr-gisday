@@ -32,6 +32,7 @@ Routing uses the largest downhill gradient among eight neighboring cells, accoun
 ## Scan the Hidden World
 
 - USGS, *What is lidar data and where can I download it?*: https://www.usgs.gov/faqs/what-lidar-data-and-where-can-i-download-it — background on laser ranging, point clouds, vegetation/structure returns, and bare-earth products.
+- USGS, *What is the difference between lidar data and a digital elevation model (DEM)?*: https://www.usgs.gov/faqs/what-difference-between-lidar-data-and-a-digital-elevation-model-dem — point-cloud and ground-elevation-product distinction used in the terrain takeaway.
 - USGS, *Lidar Base Specification: Glossary*: https://www.usgs.gov/ngp-standards-and-specifications/lidar-base-specification-glossary — definitions of point classification and data voids, including obstruction.
 
 All demo geometry is original procedural content. The sampler illustrates first-hit occlusion; it is not a physical laser or multi-return vegetation model. Synthetic class labels are assigned by object identity, not inferred from observed points. Filtering does not reconstruct unobserved ground.
