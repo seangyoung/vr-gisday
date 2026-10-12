@@ -103,7 +103,7 @@ function drawMap(canvas, mode) {
   ctx.fillText("● Broad Street pump", 602, 228);
   if (mode === "points") {
     ctx.fillStyle = "#f0a987";
-    ctx.fillText("● Size = building count", 602, 276);
+    ctx.fillText("● Size = deaths at building", 602, 276);
     ctx.fillStyle = "#c4dce0";
     ctx.fillText("Pale gaps = streets", 602, 335);
     ctx.fillText("Dark shapes = blocks", 602, 370);
@@ -122,7 +122,7 @@ function drawMap(canvas, mode) {
   }
   ctx.fillStyle = "#9fbfc7";
   ctx.font = "19px system-ui";
-  ctx.fillText("Hypothetical wards · no population rate", 602, 555, 305);
+  ctx.fillText("Sample wards · mapped death counts", 602, 555, 305);
   ctx.strokeStyle = "#d5e5d6";
   ctx.lineWidth = 1.4;
   ctx.strokeRect(plot.x, plot.y, plot.size, plot.size);
@@ -162,7 +162,7 @@ export class ClusterExperience extends TimedExhibit {
     this.kind = "cluster";
     this.mode = "points";
     this.selection = null;
-    this.selectedText = "Point at a building to inspect its recorded death count.";
+    this.selectedText = "Point at a building to see its recorded death count.";
     this.mapCanvas = document.createElement("canvas");
     this.mapCanvas.width = 930;
     this.mapCanvas.height = 600;
@@ -183,7 +183,7 @@ export class ClusterExperience extends TimedExhibit {
     this.mode = mode;
     this.selection = null;
     this.selectedText = mode === "points"
-      ? "The buildings and roads remain fixed in every plan."
+      ? "Select a building circle to see its recorded deaths."
       : mode === "wardB"
         ? "Still six wards. New boundaries; which zone now looks largest?"
         : "Same 489 deaths, grouped into hypothetical street-bounded wards.";
@@ -220,7 +220,7 @@ export class ClusterExperience extends TimedExhibit {
       const zone = block ? aggregationFor(this.mode)[wardFor(block, this.mode)] : null;
       this.selection = zone ? { type: "zone", zone } : null;
       this.selectedText = zone
-        ? `Ward ${zone.name}: ${zone.deaths} recorded deaths across ${zone.blocks.length} blocks · count, not rate.`
+        ? `Ward ${zone.name}: ${zone.deaths} recorded deaths across ${zone.blocks.length} blocks.`
         : "Select a colored block to inspect its ward count.";
     }
     // Selecting changes only the transparent highlight and readout; the

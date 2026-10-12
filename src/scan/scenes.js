@@ -6,16 +6,16 @@ export const SCAN_SCENES = [
     id: "ruins", name: "Woodland ruins",
     prompt: "Scan one wall, then turn the ruins around.\nWhich faces appear only from the other side?",
     takeaway: {
-      title: "A gap in the cloud is not an empty space.",
-      body: "The walls blocked rays from reaching surfaces behind them.\nThat is occlusion: changing viewpoints can fill the gap.\nAligned lidar scans can make a fuller 3D map.",
+      title: "A wall can hide what lies behind it.",
+      body: "The wall blocks rays from surfaces behind it: occlusion.\nScan from another side to fill some of the gap.\nSurveyors align multiple lidar views for a fuller 3D map.",
     },
   },
   {
     id: "bridge", name: "Ravine bridge",
     prompt: "Scan across the deck, then look beneath it.\nCan you capture the supports from above?",
     takeaway: {
-      title: "A bridge needs more than an overhead view.",
-      body: "The deck hides supports and its underside from above.\nLow, oblique scans reveal clearance and hidden structure.\nCombining lidar views can map more of the bridge.",
+      title: "Look below the bridge deck.",
+      body: "The deck hides its supports from a high viewpoint.\nA low, angled scan reveals the underside and clearance.\nCombined lidar views show more of the bridge.",
     },
   },
   {
@@ -23,7 +23,7 @@ export const SCAN_SCENES = [
     prompt: "Sweep the rooftops, then move to the other side.\nWhich walls do the roofs and houses hide?",
     takeaway: {
       title: "Roofs can hide the streets below.",
-      body: "First-surface returns show roofs before covered walls.\nA roof-heavy cloud is not a complete building model.\nSide-view lidar adds facades to 3D building models.",
+      body: "First returns show roofs while walls stay hidden.\nA side scan adds facades to the building point cloud.\nSurveyors combine views to map more of a settlement.",
     },
   },
   {
@@ -31,15 +31,15 @@ export const SCAN_SCENES = [
     prompt: "Scan the stepped ground from above and from the side.\nWhere do you see edges and vertical faces?",
     takeaway: {
       title: "Height changes need well-placed samples.",
-      body: "The steps show up as changes in point elevation.\nSparse points near an edge can blur its true shape.\nGround points can build a digital elevation model.",
+      body: "The steps show up as changes in point height.\nDenser points sharpen the edges between levels.\nA digital elevation model (DEM) stores ground heights in a grid.",
     },
   },
   {
     id: "canopy", name: "Forest survey",
     prompt: "Scan the trail through the trees.\nThen hide plants: does new ground appear below them?",
     takeaway: {
-      title: "Filtering cannot reveal unseen ground.",
-      body: "Canopies intercept these first-surface rays.\nHiding green points removes trees, not the data gaps.\nA bare-earth model needs actual ground returns.",
+      title: "A ground map needs ground returns.",
+      body: "Canopies intercept the first ray hits in this model.\nHiding tree points leaves the unsampled ground as a gap.\nGround returns help build bare-earth elevation models.",
     },
   },
   {
@@ -47,14 +47,14 @@ export const SCAN_SCENES = [
     prompt: "Scan the roof and outside walls first.\nTurn the model to find the open side and columns.",
     takeaway: {
       title: "An enclosed space needs access.",
-      body: "The roof and walls block rays into the courtyard.\nAn opening offers a new line of sight to its columns.\nMissing interior points do not prove the interior is empty.",
+      body: "The roof and walls block rays into the courtyard.\nScan through the opening to reach its columns.\nA new viewpoint can reveal surfaces hidden from outside.",
     },
   },
   {
     id: "tower", name: "Survey tower",
     prompt: "Sweep the platform and its narrow supports.\nDo all the slender pieces get the same number of points?",
     takeaway: {
-      title: "Small features can be undersampled.",
+      title: "Thin features need denser sampling.",
       body: "Narrow supports catch fewer rays than broad surfaces.\nPoint density limits the detail a scan can resolve.\nDenser lidar sampling helps document thin features.",
     },
   },

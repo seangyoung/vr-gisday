@@ -29,7 +29,7 @@ export const stages = [
   },
   {
     title: "Two distances. Two possibilities.",
-    body: "A second known beacon gives us another distance.\nOnly the two white points fit BOTH measurements.\nChoose one: which will match a third beacon?",
+    body: "A second known beacon gives us another distance.\nThe circles cross at two white points; both fit.\nChoose one: which will match a third beacon?",
     action: null,
   },
   {
@@ -39,7 +39,7 @@ export const stages = [
   },
   {
     title: "Real measurements are imperfect.",
-    body: "Bands show distance ± a tolerance. White dots satisfy\nall three bands; they are possibilities, not probabilities.",
+    body: "Soft bands allow a small error in each distance.\nWhite dots fit all three bands: possible positions.\nA probability model would rank these possibilities.",
     action: "Take it into 3D",
   },
   {
@@ -59,7 +59,7 @@ export const stages = [
   },
   {
     title: "Four ranges. One common position.",
-    body: "The fourth beacon rules out the other white point.\nOne position fits all four exact ranges. Real GNSS uses\nsignal travel time (pseudorange) and solves clock bias.",
+    body: "Here the fourth beacon selects one exact position.\nGNSS estimates ranges from timed satellite signals;\na fourth signal also helps correct the receiver's clock.",
     action: "Finish",
   },
 ];

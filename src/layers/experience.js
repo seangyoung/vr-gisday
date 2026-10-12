@@ -17,12 +17,12 @@ export const LAYER_NAMES = {
   boundaries: "Political boundaries",
 };
 export const LAYER_HINTS = {
-  topography: "DEM (elevation grid): reveals ridges and valleys; used to model slope.",
-  vegetation: "Land cover: mapped trees show habitat, shade, and cleared corridors.",
-  hydrology: "Hydrography: a downhill river follows its carved channel and watershed.",
-  roads: "Transport network: a four-lane highway bridges the river.",
-  floodplain: "Floodplain: low ground beside the river; an illustrative terrain zone, not a flood forecast.",
-  boundaries: "Jurisdictions: fictional district lines are drawn by people, not barriers on the ground.",
+  topography: "Digital elevation model (DEM): a grid of ground heights.",
+  vegetation: "Land cover: trees mark shade, habitat, and clearings.",
+  hydrology: "Hydrography: the river follows low ground to its outlet.",
+  roads: "Road network: a four-lane highway bridges the river.",
+  floodplain: "Floodplain: low river land; hazard maps also use water levels.",
+  boundaries: "Jurisdictions: district lines organize people and services.",
 };
 export const LANDSCAPE_EXTENT = 160;
 const extent = LANDSCAPE_EXTENT;

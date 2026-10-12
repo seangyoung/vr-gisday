@@ -43,7 +43,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of San Francisco Bay in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Spin a globe, unfold it into three projections, and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Rain on a watershed to see where water drains, or shape an erosion tray and watch flowing water carve channels.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Build a point cloud from a model or your room. Change viewpoints to reveal surfaces hidden from the first scan.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>Change pixel size in an overhead view of the landscape. See when a river, road, and forest blend into mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of San Francisco Bay in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Spin a globe, unfold it into three projections, and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -657,9 +657,9 @@ function drawRoomUI() {
           : "Sweep across real surfaces";
   const body =
     s.stage === 0
-      ? "Uses browser surface estimates, not lidar lasers.\nYou are in MIXED REALITY; start and look around.\nNo camera images are recorded."
+      ? "Quest Browser estimates surfaces in your real room.\nMove your controller to collect points in mixed reality.\nThe points stay in this session and clear when you exit."
       : s.stage === 2
-        ? "These points came from your headset's surface estimates.\nGaps and simplified shapes reflect the data it supplied.\nThe scan stays in this session and clears on exit."
+        ? "Quest Browser estimated these surfaces in your room.\nGaps show where another viewpoint could add samples.\nLidar builds point clouds from timed laser returns."
         : s.frozen
           ? "Move the frozen point cloud to inspect gaps.\nResume returns points to their real-world positions.\nKeep passthrough visible as you explore."
           : "Aim at real surfaces and sweep.\nUp to three green dots mark actual surface returns.\nFreeze to inspect the point cloud you collected.";
@@ -715,27 +715,15 @@ function drawScanUI() {
     drawScanChooserUI();
     return;
   }
-  const copy = [
-    null,
-    [
-      `Explore: ${s.sceneInfo.name}`,
-      `This model keeps the first surface hit of each ray.\n${s.sceneInfo.prompt}`,
-    ],
-    [
-      s.sceneInfo.takeaway.title,
-      s.sceneInfo.takeaway.body,
-    ],
-  ];
-  const [title, body] = copy[s.stage];
   if (s.stage === 1)
     label(
-      `Scan different sides; first-hit surfaces leave gaps.\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
-      0, GUIDED_INFO_Y, 2.3, 0.2, 32, "#d8eae8", "#0b2430",
+      `${s.sceneInfo.prompt}\n${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
+      0, -0.84, 2.3, 0.24, 29, "#d8eae8", "#0b2430",
     );
   else {
-    lessonCard(title, body);
+    lessonCard(s.sceneInfo.takeaway.title, s.sceneInfo.takeaway.body);
     label(
-      `${s.hideVegetation ? "Vegetation hidden · Missing ground stays missing" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 samples · First surface only`,
+      `${s.hideVegetation ? "Vegetation hidden · Ground gaps remain" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 points · First-hit model`,
       0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
     );
   }
@@ -798,13 +786,13 @@ function drawScanChoiceCard(kind, x, title, subtitle, action) {
 }
 function drawScanChooserUI() {
   label("Scan the Hidden World", 0, 1.02, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
-  label("Lidar means Light Detection and Ranging.\nIt times reflected laser pulses to measure distance.\nMany measured points form a 3D point cloud.",
+  label("Lidar (light detection and ranging) times reflected laser pulses.\nEach pulse measures distance; many returns form a 3D point cloud.\nChoose a lidar model or sample your room in mixed reality.",
     0, 0.705, 2.3, 0.31, 38, "#e6f4f5", "#0b2430");
-  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "Lidar first-hit model", () => {
+  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "First surface hit", () => {
     scan.group.visible = true;
     scan.explore();
   });
-  drawScanChoiceCard("room", 0.61, "Room scan · MR", "WebXR surface estimates", switchToRoomScan);
+  drawScanChoiceCard("room", 0.61, "Room scan · MR", "Sample real surfaces", switchToRoomScan);
   label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
@@ -813,7 +801,7 @@ function drawLayersUI() {
   if (!l.started) {
     lessonCard(
       "Stand Inside the Layers",
-      "GIS means Geographic Information System; it stacks map layers.\nStart blank; add terrain, trees, water, roads, and more.\nThe clipboard map and world around you change together.",
+      "A geographic information system (GIS) combines place data in layers.\nAdd terrain, trees, water, roads, and boundaries to this landscape.\nWatch the overhead map and the world around you change together.",
       0.13,
     );
     button("Start building", 0, -0.43, () => l.begin(), 1.5);
@@ -833,7 +821,7 @@ function drawLayersUI() {
   );
   if (l.finished) {
     label(
-      "Each layer answers a different question.\nA floodplain is low land, not a flood prediction.\nPolitical boundaries are drawn by people; they are not physical walls.",
+      "Together, the layers show how roads, rivers, and terrain meet.\nThe floodplain highlights low river land; flood studies add water levels.\nPeople draw district boundaries to organize places and services.",
       0,
       0.48,
       2.35,
@@ -869,7 +857,7 @@ function drawLayersUI() {
       0, -0.69, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
     label(
       l.selected.has("floodplain")
-        ? "Blue: low river land · Not a modeled flood extent"
+        ? "Blue: low river land · flood studies also need water levels"
         : "Synthetic place · Map north is an arbitrary model direction",
       0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
     );
@@ -896,7 +884,7 @@ function drawViewshedUI() {
   );
   if (v.finished) {
     label(
-      "A viewshed tests line of sight across a DEM.\nThe ridge blocks the blue target at eye level; a tower can see it.\nThis model tests terrain only, not trees or buildings.",
+      "A viewshed traces sight lines over a digital elevation model (DEM).\nRaising the observer can reveal ground beyond a ridge.\nReal-world studies may also include trees and buildings.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Try another viewpoint", 0, -0.62, () => v.reset(), 1.5);
@@ -930,7 +918,7 @@ function drawViewshedUI() {
     label("Gold: observer · white ring: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
-    `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Terrain only`,
+    `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Ground heights`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
 }
@@ -953,7 +941,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Ground sample distance (GSD) is the pixel's ground width.\nLarge pixels mix narrow roads, rivers, and other cover.\nThese are averaged model colors, not satellite reflectance.",
+      "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis model averages colors; real sensors record light in bands.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     button("Compare again", 0, -0.62, () => p.reset(), 1.5);
@@ -996,7 +984,7 @@ function drawPixelsUI() {
     button("No", 1.03, -0.82, () => p.predictPureWater(false), 0.34);
   } else
     label(
-      `${p.answer === p.pureWaterAt48 ? "Correct" : "Look again"}: no pure-water 48 m pixel; narrow river mixes with land.`,
+      `${p.answer === p.pureWaterAt48 ? "Exactly" : "Compare the 48 m view"}: each river pixel also includes land. That blend is a mixed pixel.`,
       0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
     );
 }
@@ -1005,13 +993,13 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Our eyes see only a slice of electromagnetic radiation.\nCompare natural and false-color renderings of San Francisco Bay from Landsat.\nNear infrared reveals new patterns; this angled view exaggerates terrain relief.",
+        "Visible light is one slice of the electromagnetic spectrum.\nLandsat also senses near infrared (NIR), beyond human vision.\nCompare two Bay Area views; terrain height is exaggerated.",
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
-        "John Snow mapped cholera deaths near London's Broad Street pump.\nThese housing blocks are separated by streets. Group them into hypothetical wards;\nchanging administrative boundaries can change the map's apparent pattern.",
+        "John Snow mapped cholera deaths near a London water pump in 1854.\nGroup the same street blocks into different sample wards.\nWatch how ward boundaries change the shaded pattern of death counts.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A globe keeps the world's shape, but a flat map must distort it.\nDrag the globe to spin it, then compare three flat projections.\nTurn on Tissot's circles to see where each map stretches the Earth.",
+        "A map projection places Earth's curved surface on a flat map.\nDrag to spin the globe; choose a projection to change the map.\nTissot's circles show where shape and area stretch.",
         "Flatten the globe"],
     };
     const [title, body, action] = introductions[exhibit.kind];
@@ -1024,11 +1012,11 @@ function drawShowcaseUI() {
   if (exhibit.finished) {
     const takeaways = {
       spectral: ["Invisible data, visible pattern",
-        "A spectral signature is the pattern of reflection across wavelengths.\nLeaves often reflect much near infrared while water remains dark.\nThese bars approximate brightness in rendered images, not measured reflectance."],
-      cluster: ["The points did not move",
-        "MAUP means the modifiable areal unit problem.\nRegrouping the same street blocks changes the ward map's pattern.\nColors show recorded death counts, not population rates or causal proof."],
-      projection: ["Every flat map trades something",
-        "Tissot's circles reveal local stretching: roundness shows shape, size shows area.\nMercator keeps them round but enlarges them toward the poles.\nEqual-area changes their shape while preserving relative area."],
+        "A spectral signature describes how a surface responds across bands.\nLeaves often reflect much NIR light; water looks dark in NIR.\nThese bars show rendered-image brightness; reflectance needs calibrated data."],
+      cluster: ["Same deaths, new boundaries",
+        "Grouping the same deaths into wards changes the map's pattern.\nThis is the zoning effect of the modifiable areal unit problem (MAUP).\nShading shows counts; population data would support rate comparisons."],
+      projection: ["Every flat map makes a choice",
+        "Tissot's circles start equal in size on the globe.\nOn the map, their size shows area change; shape shows stretching.\nMercator keeps local shapes; equal-area keeps relative area."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
@@ -1037,9 +1025,9 @@ function drawShowcaseUI() {
   }
   if (exhibit.kind === "spectral") {
     const modeText = {
-      natural: "Visible red, green, blue · what our eyes approximate",
+      natural: "Natural color: visible red, green, and blue bands",
       false: "False color: NIR → red, red → green, green → blue",
-      nir: "Approximate NIR shown as gray · invisible to human eyes",
+      nir: "Approximate near-infrared view in gray",
     };
     label("San Francisco Bay · Landsat 5", 0, 0.96, 2.35, 0.18, 43, "#e6f4f5", "#0b2430");
     label(modeText[exhibit.mode], 0, -0.52, 2.4, 0.14, 29, "#e6f4f5", "#0b2430");
@@ -1059,9 +1047,9 @@ function drawShowcaseUI() {
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(exhibit.tissot
-      ? "Tissot: equal globe circles reveal local map stretching in size and shape."
+      ? "Tissot's circles: compare their size and shape across the map."
       : `${exhibit.projection === "equalArea" ? "Equal-area" :
-      exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"} · map area at 60° N is ${exhibit.areaAt60}× equatorial area`,
+      exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"}: equal land area at 60° N looks ${exhibit.areaAt60}× equator`,
     0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
     button("Plate Carrée", -0.8, -0.57,
       () => exhibit.setProjection("equirectangular"), 0.7);
@@ -1072,11 +1060,11 @@ function drawShowcaseUI() {
     button("Center ◀", -0.33, -0.79, () => exhibit.turnCenter(-30), 0.5);
     button("Center ▶", 0.24, -0.79, () => exhibit.turnCenter(30), 0.5);
     if (exhibit.projection === "equalArea")
-      button("Std 0° / 30°", 0.85, -0.79,
+      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.85, -0.79,
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.56);
     button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", -0.82, -1.0,
       () => exhibit.setTissot(!exhibit.tissot), 0.72);
-    label(`Center ${exhibit.centralMeridian}° · std ${exhibit.standardParallel}° · drag globe with trigger`,
+    label(`Center ${exhibit.centralMeridian}° · ${exhibit.projection === "equalArea" ? `true-scale latitude ${exhibit.standardParallel}°` : "drag globe with trigger"}`,
       0.37, -1.0, 1.55, 0.12, 25, "#b6d1d9", "#0b2430");
   }
 }
@@ -1137,18 +1125,18 @@ function drawRainUI() {
     ],
     [
       "One landscape. Two watersheds.",
-      "A watershed is land that drains to a common outlet.\nNearby drops can end up in different places.\nRidges divide the land into different drainage areas.",
+      "A watershed is land that drains to one outlet.\nDrops on opposite sides of a ridge reach different outlets.\nThe ridge is a drainage divide between the watersheds.",
     ],
   ];
   if (r.stage === 4 && r.edited)
     copy[4] = [
       "Change the land. Change the flow.",
-      "A watershed is land that drains to a common outlet.\nRidges redirect runoff; hollows fill before spilling.\nThis model traces paths, not water depth or flood risk.",
+      "A watershed is land that drains to one outlet.\nReshaping a ridge redirects runoff; hollows fill and spill.\nFlood studies also measure rainfall, soil, and water depth.",
     ];
   if (r.kind === "erosion") {
     copy[4] = [
       "Water shapes its own path.",
-      "Flow removes loose material and carries it downhill.\nChannels can join; slower water can leave sediment behind.\nThis accelerated experiment is not a real erosion forecast.",
+      "Fast flow lifts loose material and carries it downhill.\nChannels merge; slower water deposits some sediment.\nThe tray speeds up these changes so you can see them happen.",
     ];
   }
   const [title, body] = copy[r.stage];
@@ -1196,7 +1184,7 @@ function drawRainUI() {
   if (r.stage === 4) {
     label(
       r.kind === "erosion"
-        ? "Simplified water + loose sediment. No soil types, roots,\nreal-world erosion rates, or changing tray tilt."
+        ? "Real slopes also vary in soil, roots, and rainfall.\nField measurements help estimate how fast erosion happens."
         : "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
       0,
       GUIDED_INFO_Y,
@@ -1217,7 +1205,7 @@ function drawRainUI() {
           ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
           : r.overlay
             ? "A: blue / round outlet    ·    B: gold / square outlet"
-            : "Surface-flow model · Synthetic terrain · No flood prediction",
+            : "Surface-flow model · Follow paths and pond overflow",
       0,
       GUIDED_INFO_Y,
       2.3,
@@ -1650,9 +1638,9 @@ function drawScene() {
   }
   if (step === -2) {
     label("HOW SATELLITES FIND YOU", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
-    label("Distance is not direction.", 0, 0.52, 2.15, 0.2, 52);
+    label("One distance. Many directions.", 0, 0.52, 2.15, 0.2, 52);
     label(
-      "GNSS means Global Navigation Satellite System.\nGPS is one GNSS network. A receiver measures\nsignal travel times to estimate satellite distances.",
+      "GNSS means Global Navigation Satellite System.\nGPS is one such satellite system. A receiver uses\nsignal travel times to estimate distances to satellites.",
       0,
       0.13,
       2.15,
@@ -1660,7 +1648,7 @@ function drawScene() {
       39,
     );
     label(
-      "Known beacons stand in for satellites.\nEach distance has no direction. Combine them\nto see how GNSS narrows down your location.",
+      "Known beacons stand in for satellites.\nWe know each beacon's distance; direction remains unknown.\nCombine distances to narrow down your location.",
       0,
       -0.3,
       2.15,
@@ -1728,7 +1716,7 @@ function drawScene() {
   if (step >= stages.length) {
     label("You found your place.", 0, 0.68, 2, 0.2, 65, "#a6f5d9");
     label(
-      "Distance narrows the possibilities.\nMore well-placed beacons reduce ambiguity.\nMeasurement uncertainty leaves a region.",
+      "Each distance narrows the possible locations.\nMore well-placed beacons resolve ambiguity.\nMeasurement error leaves an area of possible positions.",
       0,
       0.18,
       2,

@@ -31,7 +31,7 @@ export class RoomScan {
         : "unavailable";
     this.message =
       this.status === "ready"
-        ? "Ready to request real surface hits."
+        ? "Ready to sample room surfaces."
         : mode !== "immersive-ar"
           ? "Exit XR, then choose Enter mixed reality.\nRoom scanning needs an AR session."
           : "This browser does not expose surface hit testing.\nUpdate Quest Browser or use the synthetic scene.";
@@ -89,7 +89,7 @@ export class RoomScan {
       entry.sources[0] = source;
       this.status = "waiting";
       this.message =
-        "Surface testing active. Point at nearby walls, floor, or furniture.";
+        "Aim at nearby walls, floor, or furniture to collect points.";
       this.onChange();
       if (typeof globalThis.XRRay !== "function") return;
       await Promise.all(FAN_OFFSETS.map(async (offset, index) => {
@@ -226,7 +226,7 @@ export class RoomScan {
       } else if (this.status !== "error") {
         this.status = "waiting";
         this.message =
-          "No surface hits yet. Look around; check room setup and spatial permissions.";
+          "Aim at a nearby wall or floor; check room permissions if points do not appear.";
       }
       this.onChange();
     }

@@ -108,7 +108,7 @@ function graphCanvas(bands, mode, ready) {
   210, 495, 405);
   ctx.fillStyle = "#b6d1d9";
   ctx.font = "17px system-ui";
-  ctx.fillText("Rendered JPEGs · not reflectance", 210, 532, 405);
+  ctx.fillText("Reflectance needs calibration", 210, 532, 405);
   return canvas;
 }
 
