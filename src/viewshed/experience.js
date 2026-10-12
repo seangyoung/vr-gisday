@@ -72,7 +72,6 @@ function observationMarker() {
 export class ViewshedExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
-    this.started = true;
     this.onEvent = onEvent;
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
@@ -133,6 +132,7 @@ export class ViewshedExperience extends LayerExperience {
     this.marker.userData.eye.position.y = height;
   }
   update(dt) {
+    if (!this.started) return;
     super.update(dt);
     this.revealAge = Math.min(1, this.revealAge + dt / 0.9);
     if (this.overlay) this.overlay.material.opacity = 0.43 * this.revealAge;
@@ -151,7 +151,7 @@ export class ViewshedExperience extends LayerExperience {
     this.setVisualHeight(this.visualHeight);
   }
   setObserver(x, z) {
-    if (this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (!this.started || this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
     this.observer.x = THREE.MathUtils.clamp(x, -LANDSCAPE_EXTENT + 2, LANDSCAPE_EXTENT - 2);
     this.observer.z = THREE.MathUtils.clamp(z, -LANDSCAPE_EXTENT + 2, LANDSCAPE_EXTENT - 2);
     this.refresh();
@@ -159,7 +159,7 @@ export class ViewshedExperience extends LayerExperience {
     this.onChange();
   }
   setHeight(height) {
-    if (this.finished || (height !== 2 && height !== 12)) return;
+    if (!this.started || this.finished || (height !== 2 && height !== 12)) return;
     this.observer.height = height;
     this.refresh();
     this.onEvent(this.trace.visible ? "correct" : "blocked");
@@ -173,6 +173,7 @@ export class ViewshedExperience extends LayerExperience {
     );
   }
   placeFromRay(raycaster) {
+    if (!this.started || this.finished) return false;
     const hit = this.hitTerrain(raycaster);
     if (!hit) return false;
     const local = this.group.worldToLocal(hit.point.clone());

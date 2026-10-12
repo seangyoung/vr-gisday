@@ -78,7 +78,6 @@ function footprint(cell) {
 export class PixelExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
-    this.started = true;
     this.onEvent = onEvent;
     this.clipboard.scale.setScalar(0.26);
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
@@ -118,7 +117,7 @@ export class PixelExperience extends LayerExperience {
     this.variants.raised.world.add(this.footprint);
   }
   setSize(size) {
-    if (this.finished || !PIXEL_SIZES.includes(size) || this.size === size) return;
+    if (!this.started || this.finished || !PIXEL_SIZES.includes(size) || this.size === size) return;
     const previous = this.size;
     this.size = size;
     this.refreshFootprint(previous);
@@ -126,6 +125,7 @@ export class PixelExperience extends LayerExperience {
     this.onChange();
   }
   update(dt) {
+    if (!this.started) return;
     super.update(dt);
     if (!this.footprint || this.footprintAge >= 1) return;
     this.footprintAge = Math.min(1, this.footprintAge + dt / 0.7);
@@ -138,13 +138,13 @@ export class PixelExperience extends LayerExperience {
     return this.model.raster(48).pixels.some(({ counts }) => counts[2] === 48 ** 2);
   }
   predictPureWater(answer) {
-    if (this.finished || this.answer !== null) return;
+    if (!this.started || this.finished || this.answer !== null) return;
     this.answer = answer;
     this.onEvent(answer === this.pureWaterAt48 ? "correct" : "blocked");
     this.onChange();
   }
   setProbe(x, z) {
-    if (this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (!this.started || this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
     this.probe.x = clamp(x);
     this.probe.z = clamp(z);
     this.refreshFootprint();
@@ -166,6 +166,7 @@ export class PixelExperience extends LayerExperience {
     return raycaster.intersectObject(this.pickGround, false)[0] ?? null;
   }
   placeFromRay(raycaster) {
+    if (!this.started || this.finished) return false;
     const hit = this.hitTerrain(raycaster);
     if (!hit) return false;
     const local = this.group.worldToLocal(hit.point.clone());

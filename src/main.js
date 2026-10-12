@@ -773,6 +773,17 @@ function drawLayersUI() {
 }
 function drawViewshedUI() {
   const v = viewshed;
+  if (!v.started) {
+    lessonCard(
+      "Can You See It?",
+      "A viewshed maps the ground visible from one observation point.\nRidges can block sight; a taller viewpoint may see over them.\nCan you see the blue target across this landscape?",
+      0.13,
+    );
+    button("Test the view", 0, -0.43, () => v.begin(), 1.5);
+    label("After starting, raise your left hand to see the map and controls.",
+      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    return;
+  }
   label(
     v.finished ? "What blocks the view?" : "Can You See It?",
     0, 0.91, 2.35, 0.19, 48, "#e6f4f5", "#0b2430",
@@ -819,6 +830,17 @@ function drawViewshedUI() {
 }
 function drawPixelsUI() {
   const p = pixels;
+  if (!p.started) {
+    lessonCard(
+      "How Big Is a Pixel?",
+      "Ground sample distance (GSD) is one image pixel's width on the ground.\nA larger pixel can mix a narrow river or road with nearby land.\nCompare the landscape with two maps of the same place at different pixel sizes.",
+      0.13,
+    );
+    button("Compare pixels", 0, -0.43, () => p.begin(), 1.5);
+    label("After starting, raise your left hand to see the images and controls.",
+      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    return;
+  }
   label(
     p.finished ? "What did the pixel miss?" : "How Big Is a Pixel?",
     0, 0.91, 2.35, 0.19, 48, "#e6f4f5", "#0b2430",
@@ -1387,14 +1409,15 @@ function updateUIFade(dt) {
 function drawScene() {
   (pixels ?? viewshed ?? layers)?.clearVisitorMarkers();
   clear();
-  const key = pixels ? `pixels:${pixels.finished}` :
-    viewshed ? `viewshed:${viewshed.view}:${viewshed.finished}` :
+  const key = pixels ? `pixels:${pixels.started}:${pixels.finished}` :
+    viewshed ? `viewshed:${viewshed.view}:${viewshed.started}:${viewshed.finished}` :
     layers ? `layers:${layers.view}:${layers.started}:${layers.finished}` :
     scan ? `scan:${scan.room ? "room" : "model"}:${scan.stage}` :
     rain ? `rain:${rain.kind}:${rain.stage}` : `position:${step}`;
   if (key !== lastUIKey) uiFadeAge = 0;
   lastUIKey = key;
-  uiParent = pixels?.ui ?? viewshed?.ui ??
+  uiParent = (pixels?.started ? pixels.ui : null) ??
+    (viewshed?.started ? viewshed.ui : null) ??
     (layers?.started ? layers.ui : null) ?? content;
   if (pixels) {
     drawPixelsUI();

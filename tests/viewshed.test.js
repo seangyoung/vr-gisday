@@ -34,6 +34,14 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   scene.background = new THREE.Color(0x071820);
   let changes = 0;
   const demo = new ViewshedExperience(scene, () => changes++);
+  assert.equal(demo.started, false);
+  demo.update(240);
+  assert.equal(demo.finished, false);
+  assert.equal(demo.elapsed, 0);
+  demo.setHeight(12);
+  assert.equal(demo.observer.height, 2);
+  demo.begin();
+  assert.equal(demo.started, true);
   assert.equal(demo.selected.has("topography"), true);
   assert.equal(demo.selected.has("boundaries"), false);
   assert.equal(demo.view, "map");
@@ -61,6 +69,7 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   assert.equal(demo.finished, true);
   demo.reset();
   assert.equal(demo.finished, false);
+  assert.equal(demo.started, true);
   assert.deepEqual(demo.observer, { x: 0, z: 0, height: 2 });
   assert.ok(changes >= 5);
   demo.dispose();
