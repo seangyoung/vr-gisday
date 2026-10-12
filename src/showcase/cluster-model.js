@@ -1,48 +1,96 @@
 import source from "./data/snow.json" with { type: "json" };
+import blockSource from "./data/snow-blocks.json" with { type: "json" };
 
 export const SNOW_BUILDINGS = source.buildings.map(([x, y, deaths]) => ({ x, y, deaths }));
 export const SNOW_PUMPS = source.pumps.map(([x, y, name]) => ({ x, y, name }));
+export const SNOW_BLOCKS = blockSource.blocks.map(([deaths, x, y, rings], id) =>
+  ({ id, deaths, x, y, rings }));
 export const SNOW_TOTAL = SNOW_BUILDINGS.reduce((sum, point) => sum + point.deaths, 0);
-// Fixed British National Grid window; all aggregations use the same mapped buildings.
+// One fixed British National Grid window keeps buildings, blocks, and pumps aligned.
 export const SNOW_WINDOW = Object.freeze({
   minX: 529115, maxX: 529700, minY: 180770, maxY: 181350,
 });
 
+// Hypothetical ward centers. Each plan assigns whole historical housing blocks;
+// their shared street corridors, not a square grid, form the visible boundaries.
 export const CLUSTER_MODES = Object.freeze({
   points: { name: "Mapped buildings" },
-  fine: { name: "Small zones", columns: 10, rows: 10, shift: 0 },
-  shifted: { name: "Shifted zones", columns: 10, rows: 10, shift: 0.5 },
-  coarse: { name: "Large zones", columns: 5, rows: 5, shift: 0 },
+  wardA: { name: "Ward plan A · six zones", seeds: [
+    [529240, 181040], [529320, 181220], [529390, 181040],
+    [529530, 181195], [529550, 181010], [529420, 180870],
+  ] },
+  wardB: { name: "Ward plan B · six zones", seeds: [
+    [529230, 180990], [529355, 181190], [529450, 181065],
+    [529610, 181140], [529555, 180945], [529345, 180925],
+  ] },
+  wardC: { name: "Larger wards · five zones", seeds: [
+    [529220, 181040], [529350, 181210], [529445, 181065],
+    [529570, 181165], [529485, 180915],
+  ] },
 });
 
-export function aggregateBuildings(buildings, window, columns, rows, shift = 0) {
-  const width = (window.maxX - window.minX) / columns;
-  const height = (window.maxY - window.minY) / rows;
-  const cells = new Map();
-  const first = shift ? -1 : 0;
-  for (let row = first; row < rows; row++)
-    for (let col = first; col < columns; col++)
-      cells.set(`${col}:${row}`, {
-        col, row,
-        x0: window.minX + (col + shift) * width,
-        y0: window.minY + (row + shift) * height,
-        x1: window.minX + (col + 1 + shift) * width,
-        y1: window.minY + (row + 1 + shift) * height,
-        deaths: 0,
-      });
-  for (const point of buildings) {
-    const col = Math.floor((point.x - window.minX) / width - shift);
-    const row = Math.floor((point.y - window.minY) / height - shift);
-    const key = `${col}:${row}`;
-    cells.get(key).deaths += point.deaths;
-  }
-  return [...cells.values()];
+export function wardFor(block, mode) {
+  const seeds = CLUSTER_MODES[mode]?.seeds;
+  if (!seeds) return null;
+  let best = 0, distance = Infinity;
+  seeds.forEach(([x, y], index) => {
+    const d = (block.x - x) ** 2 + (block.y - y) ** 2;
+    if (d < distance) { best = index; distance = d; }
+  });
+  return best;
 }
 
 export function aggregationFor(mode) {
-  const config = CLUSTER_MODES[mode];
-  return config.columns
-    ? aggregateBuildings(SNOW_BUILDINGS, SNOW_WINDOW,
-      config.columns, config.rows, config.shift)
-    : [];
+  const seeds = CLUSTER_MODES[mode]?.seeds;
+  if (!seeds) return [];
+  const zones = seeds.map((_, id) => ({
+    id, name: String.fromCharCode(65 + id), blocks: [], deaths: 0, x: 0, y: 0,
+  }));
+  for (const block of SNOW_BLOCKS) {
+    const zone = zones[wardFor(block, mode)];
+    zone.blocks.push(block);
+    zone.deaths += block.deaths;
+    zone.x += block.x;
+    zone.y += block.y;
+  }
+  for (const zone of zones) {
+    zone.x /= zone.blocks.length;
+    zone.y /= zone.blocks.length;
+  }
+  return zones;
+}
+
+function inRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[i], [bx, by] = ring[j];
+    if ((ay > y) !== (by > y) &&
+        x < ((bx - ax) * (y - ay)) / (by - ay) + ax) inside = !inside;
+  }
+  return inside;
+}
+
+function distanceToRing(x, y, ring) {
+  let nearest = Infinity;
+  for (let i = 1; i < ring.length; i++) {
+    const [ax, ay] = ring[i - 1], [bx, by] = ring[i];
+    const dx = bx - ax, dy = by - ay;
+    const t = Math.max(0, Math.min(1,
+      ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
+    nearest = Math.min(nearest, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+  }
+  return nearest;
+}
+
+export function blockAt(x, y, roadTolerance = 10) {
+  let closest = null, distance = Infinity;
+  for (const block of SNOW_BLOCKS) {
+    const inside = block.rings.reduce((value, ring) => value !== inRing(x, y, ring), false);
+    if (inside) return block;
+    for (const ring of block.rings) {
+      const d = distanceToRing(x, y, ring);
+      if (d < distance) { distance = d; closest = block; }
+    }
+  }
+  return distance <= roadTolerance ? closest : null;
 }

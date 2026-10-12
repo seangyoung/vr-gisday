@@ -4,8 +4,8 @@ import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
 import { SPECTRA, displayColor, surfaceAt } from "../src/showcase/spectral-model.js";
 import {
-  SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
-  aggregationFor,
+  SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
+  aggregationFor, blockAt,
 } from "../src/showcase/cluster-model.js";
 import { projectNormalized, relativeAreaScale } from "../src/showcase/projection-model.js";
 
@@ -21,21 +21,26 @@ test("synthetic spectral signatures make the invisible band reveal healthy leave
   assert.ok(falseColor[0] > falseColor[1]);
 });
 
-test("Snow building counts are conserved by all arbitrary aggregation schemes", () => {
+test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(SNOW_BUILDINGS.length, 250);
   assert.equal(SNOW_PUMPS.length, 8);
+  assert.equal(SNOW_BLOCKS.length, 40);
   assert.equal(SNOW_TOTAL, 489);
-  for (const mode of ["fine", "shifted", "coarse"])
-    assert.equal(aggregationFor(mode).reduce((sum, cell) => sum + cell.deaths, 0),
-      SNOW_TOTAL);
-  const fine = aggregationFor("fine");
-  const shifted = aggregationFor("shifted");
-  assert.equal(fine.length, 100);
-  assert.equal(shifted.length, 121);
-  assert.notDeepEqual(fine.map((cell) => cell.deaths),
-    shifted.map((cell) => cell.deaths));
-  assert.ok(Math.max(...aggregationFor("coarse").map((cell) => cell.deaths)) >
-    Math.max(...fine.map((cell) => cell.deaths)));
+  assert.equal(SNOW_BLOCKS.reduce((sum, block) => sum + block.deaths, 0),
+    SNOW_TOTAL);
+  for (const [mode, count] of [["wardA", 6], ["wardB", 6], ["wardC", 5]]) {
+    const zones = aggregationFor(mode);
+    assert.equal(zones.length, count);
+    assert.ok(zones.every((zone) => zone.blocks.length > 0));
+    assert.equal(zones.reduce((sum, zone) => sum + zone.deaths, 0), SNOW_TOTAL);
+    assert.deepEqual(zones.flatMap((zone) => zone.blocks.map((block) => block.id))
+      .sort((a, b) => a - b), SNOW_BLOCKS.map((block) => block.id));
+  }
+  assert.notDeepEqual(aggregationFor("wardA").map((zone) => zone.deaths),
+    aggregationFor("wardB").map((zone) => zone.deaths));
+  assert.equal(blockAt(SNOW_BLOCKS[0].x, SNOW_BLOCKS[0].y, 0)?.id,
+    SNOW_BLOCKS[0].id);
+  assert.equal(blockAt(0, 0), null);
 });
 
 test("projection examples preserve distinct distortion tradeoffs", () => {

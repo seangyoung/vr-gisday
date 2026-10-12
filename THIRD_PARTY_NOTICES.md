@@ -39,10 +39,12 @@ The 1:110m land GeoJSON in `src/showcase/data/ne_110m_land.json` comes from
 public-domain map dataset. The app draws its own globe and projection texture
 from those coordinates.
 
-## John Snow building and pump coordinates
+## John Snow buildings, housing blocks, and pump coordinates
 
-The compact fields in `src/showcase/data/snow.json` were extracted from
-[GeoDa's Snow2](https://geodacenter.github.io/data-and-lab/snow2/) and
+The compact fields in `src/showcase/data/snow.json` and
+`src/showcase/data/snow-blocks.json` were extracted from
+[GeoDa's Snow2](https://geodacenter.github.io/data-and-lab/snow2/),
+[Snow3](https://geodacenter.github.io/data-and-lab/snow3/), and
 [Snow6](https://geodacenter.github.io/data-and-lab/snow6/) downloads, credited
 to the University of Chicago Center for Spatial Data Science and its cited
 digitizers. GeoDa's documentation lists the digitizations' license as unknown.

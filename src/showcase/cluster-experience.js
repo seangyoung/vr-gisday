@@ -1,7 +1,7 @@
-import { TimedExhibit, canvasPanel, replacePanelTexture } from "./exhibit.js";
+import { TimedExhibit, canvasPanel } from "./exhibit.js";
 import {
-  CLUSTER_MODES, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor,
+  CLUSTER_MODES, SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
+  aggregationFor, blockAt, wardFor,
 } from "./cluster-model.js";
 
 const plot = { x: 45, y: 35, size: 520 };
@@ -10,54 +10,72 @@ const px = (x) => plot.x + (x - SNOW_WINDOW.minX) /
 const py = (y) => plot.y + (SNOW_WINDOW.maxY - y) /
   (SNOW_WINDOW.maxY - SNOW_WINDOW.minY) * plot.size;
 
-function deathColor(density) {
-  if (!density) return "#1a3a46";
-  if (density < 5) return "#417779";
-  if (density < 15) return "#8fb375";
-  if (density < 30) return "#e7ab66";
-  return "#e36e64";
+function countColor(count) {
+  if (count < 25) return "#315b66";
+  if (count < 50) return "#55867f";
+  if (count < 100) return "#9eae74";
+  if (count < 150) return "#dfaa6a";
+  return "#dd7569";
 }
 
-function mapCanvas(mode, selected) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 930;
-  canvas.height = 600;
+function blockPath(ctx, block) {
+  ctx.beginPath();
+  for (const ring of block.rings) {
+    ring.forEach(([x, y], index) => {
+      if (index === 0) ctx.moveTo(px(x), py(y));
+      else ctx.lineTo(px(x), py(y));
+    });
+    ctx.closePath();
+  }
+}
+
+function drawMap(canvas, mode) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#102b38";
-  ctx.fillRect(0, 0, 930, 600);
-  ctx.fillStyle = "#153743";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // The pale gaps between source housing-block polygons are street corridors.
+  ctx.fillStyle = "#a2b4aa";
   ctx.fillRect(plot.x, plot.y, plot.size, plot.size);
   ctx.save();
   ctx.beginPath();
   ctx.rect(plot.x, plot.y, plot.size, plot.size);
   ctx.clip();
+  const zones = aggregationFor(mode);
+  for (const block of SNOW_BLOCKS) {
+    blockPath(ctx, block);
+    const zone = zones[wardFor(block, mode)];
+    ctx.fillStyle = zone ? countColor(zone.deaths) : "#25444f";
+    ctx.fill("evenodd");
+    ctx.strokeStyle = "#dae7d5";
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+  }
   if (mode === "points") {
     for (const point of SNOW_BUILDINGS) {
       ctx.beginPath();
-      ctx.arc(px(point.x), py(point.y), 3 + Math.sqrt(point.deaths) * 1.6,
+      ctx.arc(px(point.x), py(point.y), 2.3 + Math.sqrt(point.deaths) * 1.45,
         0, Math.PI * 2);
-      ctx.fillStyle = "#efaa91";
+      ctx.fillStyle = "#f0a987";
       ctx.fill();
-      ctx.strokeStyle = "#412c30";
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#422e32";
+      ctx.lineWidth = 0.7;
       ctx.stroke();
     }
   } else {
-    for (const cell of aggregationFor(mode)) {
-      const area = (cell.x1 - cell.x0) * (cell.y1 - cell.y0);
-      const density = cell.deaths / area * 10000;
-      const x = px(cell.x0), y = py(cell.y1);
-      const width = px(cell.x1) - x, height = py(cell.y0) - y;
-      ctx.fillStyle = deathColor(density);
-      ctx.fillRect(x, y, width, height);
-      ctx.strokeStyle = "#cce7dc88";
-      ctx.lineWidth = 1.4;
-      ctx.strokeRect(x, y, width, height);
-      if (selected && cell.col === selected.col && cell.row === selected.row) {
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(x + 2, y + 2, width - 4, height - 4);
-      }
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 19px system-ui";
+    for (const zone of zones) {
+      const x = px(zone.x), y = py(zone.y);
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fillStyle = "#102b38";
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(zone.name, x, y + 1);
     }
   }
   ctx.restore();
@@ -65,10 +83,10 @@ function mapCanvas(mode, selected) {
     const broad = pump.name.includes("Broad");
     const x = px(pump.x), y = py(pump.y);
     ctx.beginPath();
-    ctx.arc(x, y, broad ? 11 : 6, 0, Math.PI * 2);
-    ctx.fillStyle = broad ? "#ffdf7b" : "#85c8c6";
+    ctx.arc(x, y, broad ? 9 : 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = broad ? "#ffe17c" : "#72cecf";
     ctx.fill();
-    ctx.strokeStyle = "#092332";
+    ctx.strokeStyle = "#132d36";
     ctx.lineWidth = 2;
     ctx.stroke();
   }
@@ -80,23 +98,23 @@ function mapCanvas(mode, selected) {
   ctx.fillStyle = "#c4dce0";
   ctx.fillText("1854 Soho, London", 602, 102);
   ctx.fillText(`${SNOW_BUILDINGS.length} mapped buildings`, 602, 144);
-  ctx.fillText(`${SNOW_TOTAL} deaths in this dataset`, 602, 177);
-  ctx.fillStyle = "#ffdf7b";
+  ctx.fillText(`${SNOW_TOTAL} recorded deaths`, 602, 177);
+  ctx.fillStyle = "#ffe17c";
   ctx.fillText("● Broad Street pump", 602, 228);
   if (mode === "points") {
-    ctx.fillStyle = "#efaa91";
-    ctx.fillText("● Circle size = deaths", 602, 276);
+    ctx.fillStyle = "#f0a987";
+    ctx.fillText("● Size = building count", 602, 276);
     ctx.fillStyle = "#c4dce0";
-    ctx.fillText("Each mark is a building", 602, 333);
-    ctx.fillText("with recorded deaths.", 602, 365);
+    ctx.fillText("Pale gaps = streets", 602, 335);
+    ctx.fillText("Dark shapes = blocks", 602, 370);
   } else {
     ctx.fillStyle = "#c4dce0";
-    ctx.fillText("Deaths per 10,000 m²", 602, 270);
-    const entries = [["0", 0], ["< 5", 2], ["5–15", 9],
-      ["15–30", 22], ["30+", 40]];
-    entries.forEach(([name, density], i) => {
-      const y = 298 + i * 41;
-      ctx.fillStyle = deathColor(density);
+    ctx.fillText("Deaths per zone · count", 602, 270);
+    const entries = [["0–24", 0], ["25–49", 25], ["50–99", 50],
+      ["100–149", 100], ["150+", 150]];
+    entries.forEach(([name, count], index) => {
+      const y = 298 + index * 41;
+      ctx.fillStyle = countColor(count);
       ctx.fillRect(602, y, 30, 27);
       ctx.fillStyle = "#e9f5f0";
       ctx.fillText(name, 644, y + 22);
@@ -104,11 +122,38 @@ function mapCanvas(mode, selected) {
   }
   ctx.fillStyle = "#9fbfc7";
   ctx.font = "19px system-ui";
-  ctx.fillText("Area density ≠ mortality risk", 602, 555);
-  ctx.strokeStyle = "#8eb1b9";
-  ctx.lineWidth = 2;
+  ctx.fillText("Hypothetical wards · no population rate", 602, 555, 305);
+  ctx.strokeStyle = "#d5e5d6";
+  ctx.lineWidth = 1.4;
   ctx.strokeRect(plot.x, plot.y, plot.size, plot.size);
-  return canvas;
+}
+
+function drawSelection(canvas, selection) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!selection) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(plot.x, plot.y, plot.size, plot.size);
+  ctx.clip();
+  if (selection.type === "building") {
+    ctx.beginPath();
+    ctx.arc(px(selection.point.x), py(selection.point.y),
+      7 + Math.sqrt(selection.point.deaths) * 1.45, 0, Math.PI * 2);
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  } else {
+    for (const block of selection.zone.blocks) {
+      blockPath(ctx, block);
+      ctx.fillStyle = "#ffffff30";
+      ctx.fill("evenodd");
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
 }
 
 export class ClusterExperience extends TimedExhibit {
@@ -116,36 +161,37 @@ export class ClusterExperience extends TimedExhibit {
     super(root, onChange);
     this.kind = "cluster";
     this.mode = "points";
-    this.selected = null;
-    this.selectedText = "Point at the map to inspect a building or zone.";
-    this.fade = 1;
-    this.map = canvasPanel(mapCanvas(this.mode, this.selected), 2.22, 1.43, 0, 0.14);
+    this.selection = null;
+    this.selectedText = "Point at a building to inspect its recorded death count.";
+    this.mapCanvas = document.createElement("canvas");
+    this.mapCanvas.width = 930;
+    this.mapCanvas.height = 600;
+    drawMap(this.mapCanvas, this.mode);
+    this.map = canvasPanel(this.mapCanvas, 2.22, 1.43, 0, 0.14);
     this.group.add(this.map);
+    this.selectionCanvas = document.createElement("canvas");
+    this.selectionCanvas.width = 930;
+    this.selectionCanvas.height = 600;
+    this.selectionMap = canvasPanel(this.selectionCanvas, 2.22, 1.43, 0, 0.14);
+    this.selectionMap.position.z = 0.006;
+    this.selectionMap.material.transparent = true;
+    this.selectionMap.material.depthWrite = false;
+    this.group.add(this.selectionMap);
   }
   setMode(mode) {
     if (!this.started || this.finished || !CLUSTER_MODES[mode]) return;
     this.mode = mode;
-    this.selected = null;
+    this.selection = null;
     this.selectedText = mode === "points"
-      ? "The individual building pattern stays the same."
-      : mode === "shifted"
-        ? "Same grid size, different starting position. Where is the peak now?"
-        : "Same buildings, new grouping. Does the hotspot look different?";
-    this.refresh();
-  }
-  refresh() {
-    replacePanelTexture(this.map, mapCanvas(this.mode, this.selected));
-    this.fade = 0;
-    this.map.material.transparent = true;
-    this.map.material.opacity = 0;
+      ? "The buildings and roads remain fixed in every plan."
+      : mode === "wardB"
+        ? "Still six wards. New boundaries; which zone now looks largest?"
+        : "Same 489 deaths, grouped into hypothetical street-bounded wards.";
+    drawMap(this.mapCanvas, mode);
+    this.map.material.map.needsUpdate = true;
+    drawSelection(this.selectionCanvas, null);
+    this.selectionMap.material.map.needsUpdate = true;
     this.onChange();
-  }
-  update(dt) {
-    super.update(dt);
-    if (this.fade < 1) {
-      this.fade = Math.min(1, this.fade + dt / 0.45);
-      this.map.material.opacity = this.fade;
-    }
   }
   selectFromRay(raycaster) {
     if (!this.started || this.finished) return false;
@@ -164,17 +210,24 @@ export class ClusterExperience extends TimedExhibit {
       const near = SNOW_BUILDINGS.map((point) => ({ point,
         distance: Math.hypot(px(point.x) - mapX, py(point.y) - mapY) }))
         .sort((a, b) => a.distance - b.distance)[0];
-      this.selectedText = near.distance <= 14
+      this.selection = near.distance <= 14
+        ? { type: "building", point: near.point } : null;
+      this.selectedText = this.selection
         ? `${near.point.deaths} recorded death${near.point.deaths === 1 ? "" : "s"} at this mapped building.`
-        : "Select a circle to inspect its recorded deaths.";
+        : "Select a building circle to inspect its count.";
     } else {
-      this.selected = aggregationFor(this.mode).find((cell) =>
-        x >= cell.x0 && x < cell.x1 && y >= cell.y0 && y < cell.y1) ?? null;
-      this.selectedText = this.selected
-        ? `${this.selected.deaths} deaths in this teaching zone. Counts are not disease rates.`
-        : "No mapped deaths in this zone.";
+      const block = blockAt(x, y);
+      const zone = block ? aggregationFor(this.mode)[wardFor(block, this.mode)] : null;
+      this.selection = zone ? { type: "zone", zone } : null;
+      this.selectedText = zone
+        ? `Ward ${zone.name}: ${zone.deaths} recorded deaths across ${zone.blocks.length} blocks · count, not rate.`
+        : "Select a colored block to inspect its ward count.";
     }
-    this.refresh();
+    // Selecting changes only the transparent highlight and readout; the
+    // expensive base map texture stays in place without a fade or reload.
+    drawSelection(this.selectionCanvas, this.selection);
+    this.selectionMap.material.map.needsUpdate = true;
+    this.onChange("selection");
     return true;
   }
 }

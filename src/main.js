@@ -43,7 +43,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing · Candidate</div><h2>See the Invisible</h2><p>Compare visible and near-infrared bands, sample spectral signatures, and see why healthy vegetation glows red in a false-color image.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation · Candidate</div><h2>Where Did the Cluster Go?</h2><p>Group mapped Soho cholera deaths into different teaching zones to see how scale and boundaries change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections · Candidate</div><h2>Make the World Flat</h2><p>Unfold a rotating globe into three map projections, then change the map center and compare distortion.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing · Candidate</div><h2>See the Invisible</h2><p>Compare visible and near-infrared bands, sample spectral signatures, and see why healthy vegetation glows red in a false-color image.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation · Candidate</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections · Candidate</div><h2>Make the World Flat</h2><p>Unfold a rotating globe into three map projections, then change the map center and compare distortion.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -100,12 +100,14 @@ let lastAnimatedRangeStep = null;
 let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
+let clusterReadout = null;
 let soundMenuOpen = false;
 let soundButtons = [];
 const isSpatial = () => step >= 4 && step < stages.length;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
+  clusterReadout = null;
   rangeAnimations = [];
   animationAge = 0;
   uiFadeMeshes = [];
@@ -148,25 +150,7 @@ function label(
   const c = document.createElement("canvas");
   c.width = 1200;
   c.height = Math.round((1200 * h) / w);
-  const ctx = c.getContext("2d");
-  if (bg) {
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, c.width, c.height);
-  }
-  size = (size * (w >= 0.8 ? 2.3 : 1.6)) / w;
-  ctx.font = `500 ${size}px system-ui, sans-serif`;
-  ctx.fillStyle = color;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const lines = text.split("\n");
-  lines.forEach((s, i) =>
-    ctx.fillText(
-      s,
-      c.width / 2,
-      c.height / 2 + (i - (lines.length - 1) / 2) * size * 1.4,
-      c.width - 35,
-    ),
-  );
+  paintLabel(c, text, w, size, color, bg);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
@@ -185,6 +169,34 @@ function label(
   mesh.position.set(x, y, 0.02);
   uiParent.add(mesh);
   return mesh;
+}
+function paintLabel(c, text, w, size, color, bg) {
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (bg) {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, c.width, c.height);
+  }
+  size = (size * (w >= 0.8 ? 2.3 : 1.6)) / w;
+  ctx.font = `500 ${size}px system-ui, sans-serif`;
+  ctx.fillStyle = color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const lines = text.split("\n");
+  lines.forEach((s, i) =>
+    ctx.fillText(
+      s,
+      c.width / 2,
+      c.height / 2 + (i - (lines.length - 1) / 2) * size * 1.4,
+      c.width - 35,
+    ),
+  );
+}
+function updateClusterReadout() {
+  if (!clusterReadout || !showcase || showcase.kind !== "cluster") return;
+  const texture = clusterReadout.material.map;
+  paintLabel(texture.image, showcase.selectedText, 2.35, 27, "#b6d1d9", "#0b2430");
+  texture.needsUpdate = true;
 }
 // Keep guided content within a comfortable downward glance from eye level.
 const GUIDED_CARD_Y = -0.57;
@@ -539,7 +551,10 @@ function startShowcase(kind) {
     projection: ProjectionExperience,
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
-  showcase = new Constructor(root, draw);
+  showcase = new Constructor(root, (reason) => {
+    if (reason === "selection") updateClusterReadout();
+    else draw();
+  });
   draw();
 }
 function startRoomScan() {
@@ -939,7 +954,7 @@ function drawShowcaseUI() {
         "Our eyes see only a slice of electromagnetic radiation.\nSensors can measure near infrared, which plants reflect strongly.\nBuild a false-color view, then sample surfaces to compare their signatures.",
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
-        "John Snow mapped cholera deaths near London's Broad Street pump.\nThe same mapped buildings can look different when grouped into zones.\nChange zone size and position to explore the modifiable areal unit problem.",
+        "John Snow mapped cholera deaths near London's Broad Street pump.\nThese housing blocks are separated by streets. Group them into hypothetical wards;\nchanging administrative boundaries can change the map's apparent pattern.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
         "A globe keeps the world's shape, but a flat map must distort it.\nWatch a globe unfold into different cylindrical projections.\nTry changing the projection, center, and standard parallel.",
@@ -957,7 +972,7 @@ function drawShowcaseUI() {
       spectral: ["Invisible data, visible pattern",
         "A spectral signature is the pattern of reflection across bands.\nHealthy leaves reflect much near infrared and little visible red.\nFalse color assigns measured bands to display colors; red does not mean red leaves."],
       cluster: ["The points did not move",
-        "MAUP means the modifiable areal unit problem.\nChanging zone size or boundaries changes the map's pattern.\nThese are death counts per area, not disease rates or causal proof."],
+        "MAUP means the modifiable areal unit problem.\nRegrouping the same street blocks changes the ward map's pattern.\nColors show recorded death counts, not population rates or causal proof."],
       projection: ["Every flat map trades something",
         "Mercator keeps local angles but enlarges high latitudes.\nEqual-area keeps relative area but changes shapes.\nChoose a projection for your question; no flat world map preserves everything."],
     };
@@ -982,10 +997,11 @@ function drawShowcaseUI() {
   } else if (exhibit.kind === "cluster") {
     label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
     button("Buildings", -0.86, -0.77, () => exhibit.setMode("points"), 0.53);
-    button("Small zones", -0.28, -0.77, () => exhibit.setMode("fine"), 0.53);
-    button("Shift zones", 0.29, -0.77, () => exhibit.setMode("shifted"), 0.53);
-    button("Large zones", 0.86, -0.77, () => exhibit.setMode("coarse"), 0.53);
-    label(exhibit.selectedText, 0, -1.0, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
+    button("6 wards A", -0.28, -0.77, () => exhibit.setMode("wardA"), 0.53);
+    button("6 wards B", 0.29, -0.77, () => exhibit.setMode("wardB"), 0.53);
+    button("5 wards", 0.86, -0.77, () => exhibit.setMode("wardC"), 0.53);
+    clusterReadout = label(exhibit.selectedText, 0, -1.0, 2.35, 0.12,
+      27, "#b6d1d9", "#0b2430");
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(`${exhibit.projection === "equalArea" ? "Equal-area" :
