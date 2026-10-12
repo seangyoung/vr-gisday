@@ -83,6 +83,7 @@ The scene and four-band values in `src/showcase/spectral-model.js` are invented 
 ### Make the World Flat
 
 - USGS, [How are different map projections used?](https://www.usgs.gov/faqs/how-are-different-map-projections-used) — no flat world map preserves shape, area, distance, and direction everywhere; Mercator inflates high-latitude areas and equal-area maps trade shape.
+- USGS, [*Map Projections—A Working Manual*](https://pubs.usgs.gov/pp/1395/report.pdf), section 4 — Tissot's indicatrix represents how a tiny circle on the globe becomes a circle or ellipse on a map. The app draws larger finite circles for legibility, so these are illustrative approximations of the infinitesimal construction.
 - [Natural Earth vector data](https://github.com/nvkelso/natural-earth-vector), public domain. `src/showcase/data/ne_110m_land.json` is the project's 1:110m land GeoJSON as fetched on 2026-10-12; SHA-256 prefix `9e0729ee253ca7d7`. Coordinates are rendered into an original canvas texture at runtime.
 
-The three cylindrical projection formulas and local area-scale comparison are in `src/showcase/projection-model.js`. Mercator is capped at 85° latitude for finite display; this intentional display limit is not a geographic boundary. Coastline detail comes from the 1:110m generalized source, not a high-resolution global atlas.
+The three cylindrical projection formulas, local area-scale comparison, indicatrix axis ratios, and uniform display fit are in `src/showcase/projection-model.js`. Mercator is capped at 85° latitude for finite display; this intentional display limit is not a geographic boundary. Coastline detail comes from the 1:110m generalized source, not a high-resolution global atlas.

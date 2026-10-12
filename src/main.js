@@ -43,7 +43,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing · Candidate</div><h2>See the Invisible</h2><p>Compare visible and near-infrared bands, sample spectral signatures, and see why healthy vegetation glows red in a false-color image.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation · Candidate</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections · Candidate</div><h2>Make the World Flat</h2><p>Unfold a rotating globe into three map projections, then change the map center and compare distortion.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing · Candidate</div><h2>See the Invisible</h2><p>Compare visible and near-infrared bands, sample spectral signatures, and see why healthy vegetation glows red in a false-color image.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation · Candidate</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections · Candidate</div><h2>Make the World Flat</h2><p>Spin a globe, unfold it into three projections, and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -91,6 +91,8 @@ const controllerShortcuts = new ControllerShortcuts();
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
+let previewSpinPointer = null;
+let previewSpinTime = 0;
 let floatingModel = null,
   grab = null,
   preservePose = null;
@@ -957,7 +959,7 @@ function drawShowcaseUI() {
         "John Snow mapped cholera deaths near London's Broad Street pump.\nThese housing blocks are separated by streets. Group them into hypothetical wards;\nchanging administrative boundaries can change the map's apparent pattern.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A globe keeps the world's shape, but a flat map must distort it.\nWatch a globe unfold into different cylindrical projections.\nTry changing the projection, center, and standard parallel.",
+        "A globe keeps the world's shape, but a flat map must distort it.\nDrag the globe to spin it, then compare three flat projections.\nTurn on Tissot's circles to see where each map stretches the Earth.",
         "Flatten the globe"],
     };
     const [title, body, action] = introductions[exhibit.kind];
@@ -974,7 +976,7 @@ function drawShowcaseUI() {
       cluster: ["The points did not move",
         "MAUP means the modifiable areal unit problem.\nRegrouping the same street blocks changes the ward map's pattern.\nColors show recorded death counts, not population rates or causal proof."],
       projection: ["Every flat map trades something",
-        "Mercator keeps local angles but enlarges high latitudes.\nEqual-area keeps relative area but changes shapes.\nChoose a projection for your question; no flat world map preserves everything."],
+        "Tissot's circles reveal local stretching: roundness shows shape, size shows area.\nMercator keeps them round but enlarges them toward the poles.\nEqual-area changes their shape while preserving relative area."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
@@ -1004,7 +1006,9 @@ function drawShowcaseUI() {
       27, "#b6d1d9", "#0b2430");
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
-    label(`${exhibit.projection === "equalArea" ? "Equal-area" :
+    label(exhibit.tissot
+      ? "Tissot: equal globe circles reveal local map stretching in size and shape."
+      : `${exhibit.projection === "equalArea" ? "Equal-area" :
       exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"} · map area at 60° N is ${exhibit.areaAt60}× equatorial area`,
     0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
     button("Plate Carrée", -0.8, -0.57,
@@ -1018,8 +1022,10 @@ function drawShowcaseUI() {
     if (exhibit.projection === "equalArea")
       button("Std 0° / 30°", 0.85, -0.79,
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.56);
-    label(`Center ${exhibit.centralMeridian}° · standard parallel ${exhibit.standardParallel}° (equal-area only)`,
-      0, -1.0, 2.35, 0.12, 26, "#b6d1d9", "#0b2430");
+    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", -0.82, -1.0,
+      () => exhibit.setTissot(!exhibit.tissot), 0.72);
+    label(`Center ${exhibit.centralMeridian}° · std ${exhibit.standardParallel}° · drag globe with trigger`,
+      0.37, -1.0, 1.55, 0.12, 25, "#b6d1d9", "#0b2430");
   }
 }
 function drawRainChoiceCard(kind, x, title, subtitle) {
@@ -1507,7 +1513,8 @@ function controllerGuideContext(hand) {
   }
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
-  if (showcase) return ["Select", null, onMenu, exitLabel];
+  if (showcase) return [showcase.kind === "projection" ? "Drag globe" : "Select",
+    null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
 }
@@ -1780,6 +1787,8 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (showcase) {
+      if (showcase.kind === "projection" && showcase.beginSpin(raycaster, i))
+        return;
       showcase.selectFromRay?.(raycaster);
       return;
     }
@@ -1789,6 +1798,7 @@ for (let i = 0; i < 2; i++) {
     }
   });
   c.addEventListener("selectend", () => {
+    showcase?.endSpin?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -2030,6 +2040,15 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     const landscapeDemo = pixels ?? viewshed ?? layers;
+    if (showcase?.kind === "projection" && showcase.spinningBy !== null) {
+      const active = controllers.find(({ id }) => id === showcase.spinningBy);
+      if (!visibleSession || !active?.c.visible || soundMenuOpen)
+        showcase.endSpin(showcase.spinningBy);
+      else {
+        intersect(active.c);
+        showcase.dragSpin(raycaster, active.id, dt);
+      }
+    }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
@@ -2133,11 +2152,13 @@ renderer.setAnimationLoop((time, frame) => {
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) || scanHit(c);
       const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       const exhibitPanel = hit || soundMenuOpen || !showcase?.started ? null :
-        raycaster.intersectObject(showcase.image ?? showcase.map, false)[0];
+        raycaster.intersectObjects(showcase.kind === "projection"
+          ? [showcase.globe, showcase.map] : [showcase.image ?? showcase.map], false)[0];
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
-        !scan?.grab.hands.has(id);
+        !scan?.grab.hands.has(id) &&
+        showcase?.spinningBy !== id;
       beam.scale.z = hit ? hit.distance : model ? model.distance :
         ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
       beam.material.color.set(
@@ -2278,7 +2299,14 @@ if (
     else if (soundMenuOpen) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
-    else if (showcase) showcase.selectFromRay?.(raycaster);
+    else if (showcase) {
+      if (showcase.kind === "projection" &&
+          showcase.beginSpin(raycaster, "preview")) {
+        previewSpinPointer = e.pointerId;
+        previewSpinTime = e.timeStamp;
+        renderer.domElement.setPointerCapture(e.pointerId);
+      } else showcase.selectFromRay?.(raycaster);
+    }
     else if (rain?.stage === 1) {
       rain.group.updateWorldMatrix(true, true);
       const land = raycaster.intersectObject(rain.terrain, false)[0];
@@ -2291,11 +2319,21 @@ if (
 }
 
 if (devPreview) {
-  window.addEventListener("pointerup", () => {
+  window.addEventListener("pointerup", (e) => {
     previewRaining = false;
+    if (e.pointerId === previewSpinPointer) {
+      showcase?.endSpin?.("preview");
+      previewSpinPointer = null;
+    }
+  });
+  window.addEventListener("pointercancel", (e) => {
+    if (e.pointerId === previewSpinPointer) {
+      showcase?.endSpin?.("preview");
+      previewSpinPointer = null;
+    }
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
-    if (rain?.stage !== 1) return;
+    if (e.pointerId !== previewSpinPointer && rain?.stage !== 1) return;
     raycaster.setFromCamera(
       new THREE.Vector2(
         (e.clientX / innerWidth) * 2 - 1,
@@ -2303,6 +2341,12 @@ if (devPreview) {
       ),
       camera,
     );
+    if (e.pointerId === previewSpinPointer) {
+      showcase?.dragSpin?.(raycaster, "preview",
+        Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
+      previewSpinTime = e.timeStamp;
+      return;
+    }
     rain.group.updateWorldMatrix(true, true);
     const hit = raycaster.intersectObject(rain.terrain, false)[0];
     if (hit) rain.aim(hit.point);

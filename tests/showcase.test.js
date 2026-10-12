@@ -7,7 +7,10 @@ import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
   aggregationFor, blockAt,
 } from "../src/showcase/cluster-model.js";
-import { projectNormalized, relativeAreaScale } from "../src/showcase/projection-model.js";
+import {
+  GlobeSpin, indicatrixAxes, projectMetric, projectNormalized,
+  projectionFitScale, relativeAreaScale,
+} from "../src/showcase/projection-model.js";
 
 test("synthetic spectral signatures make the invisible band reveal healthy leaves", () => {
   assert.equal(surfaceAt(0.12, 0.2), "forest");
@@ -57,6 +60,41 @@ test("projection examples preserve distinct distortion tradeoffs", () => {
   const equal0 = projectNormalized(90, 60, "equalArea", 0);
   const equal30 = projectNormalized(90, 60, "equalArea", 30);
   assert.ok(equal30.x < equal0.x && equal30.y > equal0.y);
+});
+
+test("Tissot axes reflect shape and area without display stretching", () => {
+  const plate = indicatrixAxes("equirectangular", 60);
+  const mercator = indicatrixAxes("mercator", 60);
+  const equalArea = indicatrixAxes("equalArea", 60);
+  assert.ok(Math.abs(plate.horizontal - 2) < 1e-12);
+  assert.equal(plate.vertical, 1);
+  assert.ok(Math.abs(mercator.horizontal - mercator.vertical) < 1e-12);
+  assert.ok(Math.abs(mercator.horizontal * mercator.vertical - 4) < 1e-12);
+  assert.ok(Math.abs(equalArea.horizontal * equalArea.vertical - 1) < 1e-12);
+  assert.ok(equalArea.horizontal > equalArea.vertical);
+  for (const projection of ["equirectangular", "mercator", "equalArea"]) {
+    const scale = projectionFitScale(projection);
+    assert.ok(Math.abs(projectMetric(180, 0, projection).x * scale) <= 0.860001);
+    const edge = projection === "mercator" ? 85 : 90;
+    assert.ok(Math.abs(projectMetric(0, edge, projection).y * scale) <= 0.530001);
+  }
+});
+
+test("globe swipe coasts, settles, and resumes its default spin", () => {
+  const spin = new GlobeSpin();
+  spin.begin(0, 0);
+  spin.drag(0.3, 0.1, 0.05);
+  assert.ok(spin.yaw > 0 && spin.pitch < 0);
+  const initialYaw = spin.yaw;
+  spin.end();
+  spin.step(0.1);
+  assert.ok(spin.yaw > initialYaw + 0.016);
+  for (let i = 0; i < 400; i++) spin.step(0.02);
+  assert.ok(Math.abs(spin.yawVelocity) < 1e-6);
+  assert.ok(Math.abs(spin.pitch) < 0.02);
+  const settledYaw = spin.yaw;
+  spin.step(1);
+  assert.ok(Math.abs(spin.yaw - settledYaw - 0.16) < 1e-5);
 });
 
 test("new exhibits wait at their introduction and wrap up after four minutes", () => {
