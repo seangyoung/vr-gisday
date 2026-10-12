@@ -32,6 +32,9 @@ import { renderLayerMap } from "./layers/map.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { PixelExperience } from "./pixels/experience.js";
 import { PIXEL_EXTENT } from "./pixels/model.js";
+import { SpectralExperience } from "./showcase/spectral-experience.js";
+import { ClusterExperience } from "./showcase/cluster-experience.js";
+import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { ControllerGuide } from "./controller-guide.js";
 const nextScanScene = createSceneRotation();
@@ -39,7 +42,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Six short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Make rain fall on a miniature landscape. Follow the water, cross a ridge, and discover where different watersheds lead.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Sweep a scanner to reveal a point cloud. Explore blind spots, change viewpoints, and filter vegetation.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>See how much ground one image pixel covers. Change resolution, compare an aerial image with the landscape, and discover mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing · Candidate</div><h2>See the Invisible</h2><p>Compare visible and near-infrared bands, sample spectral signatures, and see why healthy vegetation glows red in a false-color image.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation · Candidate</div><h2>Where Did the Cluster Go?</h2><p>Group mapped Soho cholera deaths into different teaching zones to see how scale and boundaries change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections · Candidate</div><h2>Make the World Flat</h2><p>Unfold a rotating globe into three map projections, then change the map center and compare distortion.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -78,6 +81,8 @@ let scan = null;
 let layers = null;
 let viewshed = null;
 let pixels = null;
+let showcase = null;
+let menuPage = "main";
 let xrMode = null;
 let pendingRoomHandoff = false;
 let rightTurnReady = true;
@@ -97,7 +102,7 @@ let lastUIKey = "";
 let soundMenuOpen = false;
 let soundButtons = [];
 const isSpatial = () => step >= 4 && step < stages.length;
-const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels;
+const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
   rangeAnimations = [];
@@ -358,6 +363,8 @@ function openMenu() {
   viewshed = null;
   pixels?.dispose();
   pixels = null;
+  showcase?.dispose();
+  showcase = null;
   rain?.dispose();
   rain = null;
   preservePose = null;
@@ -390,6 +397,10 @@ function start() {
   closeSoundMenu();
   if (pixels) {
     startPixels();
+    return;
+  }
+  if (showcase) {
+    startShowcase(showcase.kind);
     return;
   }
   if (viewshed) {
@@ -510,6 +521,23 @@ function startPixels() {
   pixels?.dispose();
   pixels = new PixelExperience(scene, draw, (event) => sound.cue(event));
   pixels.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
+}
+function startShowcase(kind) {
+  stopRainInput();
+  rain?.dispose(); rain = null;
+  scan?.dispose(); scan = null;
+  layers?.dispose(); layers = null;
+  viewshed?.dispose(); viewshed = null;
+  pixels?.dispose(); pixels = null;
+  showcase?.dispose();
+  const Constructor = {
+    spectral: SpectralExperience,
+    cluster: ClusterExperience,
+    projection: ProjectionExperience,
+  }[kind];
+  if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
+  showcase = new Constructor(root, draw);
   draw();
 }
 function startRoomScan() {
@@ -893,6 +921,81 @@ function drawPixelsUI() {
       `${p.answer === p.pureWaterAt48 ? "Correct" : "Look again"}: no pure-water 48 m pixel; narrow river mixes with land.`,
       0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
     );
+}
+function drawShowcaseUI() {
+  const exhibit = showcase;
+  if (!exhibit.started) {
+    const introductions = {
+      spectral: ["See the Invisible",
+        "Our eyes see only a slice of electromagnetic radiation.\nSensors can measure near infrared, which plants reflect strongly.\nBuild a false-color view, then sample surfaces to compare their signatures.",
+        "Reveal the bands"],
+      cluster: ["Where Did the Cluster Go?",
+        "John Snow mapped cholera deaths near London's Broad Street pump.\nThe same mapped buildings can look different when grouped into zones.\nChange zone size and position to explore the modifiable areal unit problem.",
+        "Explore the pattern"],
+      projection: ["Make the World Flat",
+        "A globe keeps the world's shape, but a flat map must distort it.\nWatch a globe unfold into different cylindrical projections.\nTry changing the projection, center, and standard parallel.",
+        "Flatten the globe"],
+    };
+    const [title, body, action] = introductions[exhibit.kind];
+    lessonCard(title, body, 0.13);
+    button(action, 0, -0.43, () => exhibit.begin(), 1.6);
+    label("About four minutes · Raise a controller to see its button labels.",
+      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    return;
+  }
+  if (exhibit.finished) {
+    const takeaways = {
+      spectral: ["Invisible data, visible pattern",
+        "A spectral signature is the pattern of reflection across bands.\nHealthy leaves reflect much near infrared and little visible red.\nFalse color assigns measured bands to display colors; red does not mean red leaves."],
+      cluster: ["The points did not move",
+        "MAUP means the modifiable areal unit problem.\nChanging zone size or boundaries changes the map's pattern.\nThese are death counts per area, not disease rates or causal proof."],
+      projection: ["Every flat map trades something",
+        "Mercator keeps local angles but enlarges high latitudes.\nEqual-area keeps relative area but changes shapes.\nChoose a projection for your question; no flat world map preserves everything."],
+    };
+    const [title, body] = takeaways[exhibit.kind];
+    lessonCard(title, body, -0.05);
+    button("Try again", 0, -0.62, () => startShowcase(exhibit.kind), 1.4);
+    return;
+  }
+  if (exhibit.kind === "spectral") {
+    const modeText = {
+      natural: "Visible red, green, blue · what our eyes approximate",
+      false: "False color: NIR → red, red → green, green → blue",
+      nir: "Near infrared shown as gray · invisible to human eyes",
+    };
+    label("See the Invisible", 0, 0.96, 2.35, 0.18, 47, "#e6f4f5", "#0b2430");
+    label(modeText[exhibit.mode], 0, -0.52, 2.4, 0.14, 29, "#e6f4f5", "#0b2430");
+    button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"), 0.72);
+    button("False color", 0, -0.75, () => exhibit.setMode("false"), 0.72);
+    button("NIR only", 0.78, -0.75, () => exhibit.setMode("nir"), 0.72);
+    label("Point at the image and press trigger to sample a surface.",
+      0, -0.98, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
+  } else if (exhibit.kind === "cluster") {
+    label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
+    button("Buildings", -0.86, -0.77, () => exhibit.setMode("points"), 0.53);
+    button("Small zones", -0.28, -0.77, () => exhibit.setMode("fine"), 0.53);
+    button("Shift zones", 0.29, -0.77, () => exhibit.setMode("shifted"), 0.53);
+    button("Large zones", 0.86, -0.77, () => exhibit.setMode("coarse"), 0.53);
+    label(exhibit.selectedText, 0, -1.0, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
+  } else {
+    label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
+    label(`${exhibit.projection === "equalArea" ? "Equal-area" :
+      exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"} · map area at 60° N is ${exhibit.areaAt60}× equatorial area`,
+    0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
+    button("Plate Carrée", -0.8, -0.57,
+      () => exhibit.setProjection("equirectangular"), 0.7);
+    button("Mercator", 0, -0.57, () => exhibit.setProjection("mercator"), 0.7);
+    button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7);
+    button(exhibit.flat ? "Wrap" : "Flatten", -0.9, -0.79,
+      () => exhibit.transitionTo(!exhibit.flat), 0.5);
+    button("Center ◀", -0.33, -0.79, () => exhibit.turnCenter(-30), 0.5);
+    button("Center ▶", 0.24, -0.79, () => exhibit.turnCenter(30), 0.5);
+    if (exhibit.projection === "equalArea")
+      button("Std 0° / 30°", 0.85, -0.79,
+        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.56);
+    label(`Center ${exhibit.centralMeridian}° · standard parallel ${exhibit.standardParallel}° (equal-area only)`,
+      0, -1.0, 2.35, 0.12, 26, "#b6d1d9", "#0b2430");
+  }
 }
 function drawRainChoiceCard(kind, x, title, subtitle) {
   const card = new THREE.Mesh(
@@ -1372,6 +1475,7 @@ function controllerGuideContext(hand) {
   }
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
+  if (showcase) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
 }
@@ -1409,7 +1513,8 @@ function updateUIFade(dt) {
 function drawScene() {
   (pixels ?? viewshed ?? layers)?.clearVisitorMarkers();
   clear();
-  const key = pixels ? `pixels:${pixels.started}:${pixels.finished}` :
+  const key = showcase ? `showcase:${showcase.kind}:${showcase.started}:${showcase.finished}:${showcase.mode ?? showcase.projection}` :
+    pixels ? `pixels:${pixels.started}:${pixels.finished}` :
     viewshed ? `viewshed:${viewshed.view}:${viewshed.started}:${viewshed.finished}` :
     layers ? `layers:${layers.view}:${layers.started}:${layers.finished}` :
     scan ? `scan:${scan.room ? "room" : "model"}:${scan.stage}` :
@@ -1419,6 +1524,10 @@ function drawScene() {
   uiParent = (pixels?.started ? pixels.ui : null) ??
     (viewshed?.started ? viewshed.ui : null) ??
     (layers?.started ? layers.ui : null) ?? content;
+  if (showcase) {
+    drawShowcaseUI();
+    return;
+  }
   if (pixels) {
     drawPixelsUI();
     return;
@@ -1495,23 +1604,30 @@ function drawScene() {
       return;
     }
     label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
-    label("Choose an experience", 0, 0.54, 2, 0.2, 58);
+    label(menuPage === "candidates" ? "Three candidate demos" : "Choose an experience",
+      0, 0.54, 2, 0.2, 58);
+    if (menuPage === "candidates") {
+      label("Try these short lessons, then tell us which should stay.",
+        0, 0.27, 2.3, 0.13, 30, "#b6d1d9", "#0b2430");
+      button("See the Invisible", 0, 0.02, () => startShowcase("spectral"), 1.8);
+      button("Where Did the Cluster Go?", 0, -0.22,
+        () => startShowcase("cluster"), 1.8);
+      button("Make the World Flat", 0, -0.46,
+        () => startShowcase("projection"), 1.8);
+      button("Back to first six", 0, -0.76,
+        () => { menuPage = "main"; draw(); }, 1.5);
+      return;
+    }
     button("Find Yourself", 0, 0.27, start, 1.75);
     button("Make It Rain", 0, 0.09, startRain, 1.75);
-    label(
-      "About 4 minutes each · Point and press the trigger",
-      0,
-      -0.82,
-      2,
-      0.12,
-      32,
-    );
     button("Scan the Hidden World", 0, -0.09, startScan, 1.75);
     button("Stand Inside the Layers", 0, -0.27, startLayers, 1.75);
     button("Can You See It?", 0, -0.45, startViewshed, 1.75);
     button("How Big Is a Pixel?", 0, -0.63, startPixels, 1.75);
+    button("Try three new demos", 0, -0.87,
+      () => { menuPage = "candidates"; draw(); }, 1.75);
     label("Raise either controller into view for button shortcuts",
-      0, -1.03, 2.3, 0.13, 29, "#b6d1d9", "#0b2430");
+      0, -1.1, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 
     return;
   }
@@ -1608,6 +1724,10 @@ for (let i = 0; i < 2; i++) {
     }
     if (pixels) {
       pixels.placeFromRay(raycaster);
+      return;
+    }
+    if (showcase) {
+      showcase.selectFromRay?.(raycaster);
       return;
     }
     if (scan?.stage === 1) {
@@ -1755,6 +1875,9 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
     viewshed = null;
     pixels?.dispose();
     pixels = null;
+    showcase?.dispose();
+    showcase = null;
+    menuPage = "main";
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -1791,6 +1914,9 @@ renderer.xr.addEventListener("sessionend", () => {
   viewshed = null;
   pixels?.dispose();
   pixels = null;
+  showcase?.dispose();
+  showcase = null;
+  menuPage = "main";
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -1867,6 +1993,7 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     const landscapeDemo = pixels ?? viewshed ?? layers;
+    if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
       if (visible && !soundMenuOpen) landscapeDemo.update(dt);
@@ -1963,11 +2090,14 @@ renderer.setAnimationLoop((time, frame) => {
       const hit = intersect(c);
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) || scanHit(c);
       const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
+      const exhibitPanel = hit || soundMenuOpen || !showcase?.started ? null :
+        raycaster.intersectObject(showcase.image ?? showcase.map, false)[0];
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id);
-      beam.scale.z = hit ? hit.distance : model ? model.distance : ground ? ground.distance : 4;
+      beam.scale.z = hit ? hit.distance : model ? model.distance :
+        ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
       beam.material.color.set(
         grab?.hands.has(id) ||
           scan?.grab.hands.has(id) ||
@@ -1975,7 +2105,7 @@ renderer.setAnimationLoop((time, frame) => {
           rain?.stroke?.id === id
           ? 0xffca83
           : model
-            || ground
+            || ground || exhibitPanel
             ? 0xffffff
             : 0xa6f5d9,
       );
@@ -1987,6 +2117,7 @@ renderer.setAnimationLoop((time, frame) => {
     landscapeDemo.update(dt);
     landscapeDemo.updateClipboard(null, camera, true);
   }
+  if (devPreview && showcase && !renderer.xr.isPresenting) showcase.update(dt);
   if (devPreview && rain && !renderer.xr.isPresenting)
     rain.update(dt, previewRaining);
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
@@ -2057,6 +2188,9 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
     camera.position.y = 1.6;
     startPixels();
+  } else if (["spectral", "cluster", "projection"].includes(
+    new URLSearchParams(location.search).get("demo"))) {
+    startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
     startRain();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
@@ -2102,6 +2236,7 @@ if (
     else if (soundMenuOpen) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
+    else if (showcase) showcase.selectFromRay?.(raycaster);
     else if (rain?.stage === 1) {
       rain.group.updateWorldMatrix(true, true);
       const land = raycaster.intersectObject(rain.terrain, false)[0];

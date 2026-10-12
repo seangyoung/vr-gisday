@@ -59,3 +59,30 @@ The expanded landscape and visibility overlay use original synthetic geometry an
 - USGS, *Prevalence of pure versus mixed snow cover pixels across spatial resolutions*: https://www.usgs.gov/publications/prevalence-pure-versus-mixed-snow-cover-pixels-across-spatial-resolutions-alpine — real-world example of fractional land-cover mixtures in pixels at different sizes.
 
 The app uses original synthetic colors and known model categories, averaged over fixed square ground areas. It illustrates ground pixel size and mixing; it does not simulate a particular satellite, spectral response, image sharpness, or physical radiance measurement.
+
+## Candidate demos — checked 2026-10-12
+
+### See the Invisible
+
+- NASA Earth Observatory, [*Measuring Vegetation*](https://science.nasa.gov/earth/earth-observatory/measuring-vegetation-ndvi-evi/) — leaves absorb visible red and reflect much near infrared; red/NIR response can distinguish vegetation conditions.
+- NASA Earth Observatory, [*Why is that Forest Red and That Cloud Blue?*](https://earthobservatory.nasa.gov/features/FalseColor) — spectral signatures and assigning non-visible bands to display colors.
+- USGS, [Landsat/ASTER false-color example](https://www.usgs.gov/news/science-snippet/earthview-landsat-aster-work-together-russian-wildfires) — vegetation appears red when NIR is assigned to the display's red channel.
+
+The scene and four-band values in `src/showcase/spectral-model.js` are invented teaching data. They are plausible relative signatures, not calibrated reflectance or measured imagery.
+
+### Where Did the Cluster Go?
+
+- University of Chicago Center for Spatial Data Science, [Snow2 building deaths](https://geodacenter.github.io/data-and-lab/snow2/) and [Snow6 pumps](https://geodacenter.github.io/data-and-lab/snow6/); [documentation](https://geodacenter.github.io/data-and-lab/data/snow_documentation.pdf). The locally stored, rounded `COORD_X`, `COORD_Y`, death count, and pump name fields were extracted from `snow2.zip` and `snow6.zip` on 2026-10-12. The source describes these as Snow-map digitizations. Its documentation lists the modern digitization's license as **unknown**; attribution is provided here, but no open-license claim is made.
+- Esri, [MAUP definition](https://support.esri.com/en-us/gis-dictionary/modifiable-areal-unit-problem) — scale and zoning effects. The demo's square grids are original calculations over the same points.
+- Mark Monmonier, [*How to Lie with Maps*](https://press.uchicago.edu/ucp/books/book/chicago/H/bo27400568.html), University of Chicago Press — conceptual inspiration for comparing Snow's point map with areal aggregations. No book image, wording, or boundaries were copied.
+
+`src/showcase/data/snow.json` retains 250 buildings totaling 489 recorded deaths plus 8 pumps. It uses the British National Grid coordinate fields rather than the GeoJSON geographic geometry because the latter contains repeated point coordinates in the `snow2.zip` download. Source ZIP SHA-256 prefixes at extraction: `snow2` `f29fcff80dde63cd`, `snow6` `3cb386ef6ad205a3`. The app's 10×10, half-cell-shifted 10×10, and 5×5 grids are teaching choices. Shading is deaths per 10,000 m²; no population denominator, inferential cluster test, or causal estimate is provided.
+
+`python3 scripts/prepare-showcase-data.py` can rebuild the two compact source files using Python's standard library. It checks complete SHA-256 hashes and stops for review if an upstream download changes; normal app builds do not access the network.
+
+### Make the World Flat
+
+- USGS, [How are different map projections used?](https://www.usgs.gov/faqs/how-are-different-map-projections-used) — no flat world map preserves shape, area, distance, and direction everywhere; Mercator inflates high-latitude areas and equal-area maps trade shape.
+- [Natural Earth vector data](https://github.com/nvkelso/natural-earth-vector), public domain. `src/showcase/data/ne_110m_land.json` is the project's 1:110m land GeoJSON as fetched on 2026-10-12; SHA-256 prefix `9e0729ee253ca7d7`. Coordinates are rendered into an original canvas texture at runtime.
+
+The three cylindrical projection formulas and local area-scale comparison are in `src/showcase/projection-model.js`. Mercator is capped at 85° latitude for finite display; this intentional display limit is not a geographic boundary. Coastline detail comes from the 1:110m generalized source, not a high-resolution global atlas.

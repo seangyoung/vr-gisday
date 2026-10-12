@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with a simple immersive experience menu. Six playable modules: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, and **How Big Is a Pixel?**.
+Quest-focused WebXR app with a simple immersive experience menu. Six established modules: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, and **How Big Is a Pixel?**. A second menu holds three candidate lessons for testing: **See the Invisible**, **Where Did the Cluster Go?**, and **Make the World Flat**.
 
 ## Run
 
@@ -90,6 +90,24 @@ Choose the sixth experience in VR. It uses the same synthetic terrain, forest, r
 
 The image covers a 144-by-144-model-meter window centered on the visitor. Its 1 m synthetic land-cover samples are grouped into larger square pixels, and each displayed RGB value is the arithmetic mean of the model colors in that square. Tree canopies, river width, and highway position come from the same procedural world geometry, but the image is **not** satellite imagery or a physical sensor simulation: it does not model reflectance, optics, atmosphere, geolocation error, or real measured land cover. The square outline and area display teach nominal ground pixel size. Development-only `?preview&demo=pixels` supports visual review; Quest clipboard legibility, ground-targeting, and frame rate still need headset testing.
 
+## See the Invisible — candidate
+
+The seventh experience starts with the electromagnetic spectrum: humans see visible light, while sensors can measure near infrared. After **Reveal the bands**, a synthetic overhead scene and four-band signature chart appear. Point at the scene to sample healthy leaves, stressed leaves, bare soil, water, or pavement. **Natural color** uses visible red/green/blue; **False color** assigns near infrared to display red, visible red to green, and visible green to blue; **NIR only** makes that invisible band visible as gray. Healthy leaves appear bright red in false color because their modeled NIR reflection is high, not because leaves are red. The four-minute takeaway defines spectral signature and false-color composite.
+
+All band values, land-cover labels, and imagery are original illustrative data, not a satellite scene, calibrated reflectance, vegetation-health diagnosis, or sensor simulation. Development preview: `?preview&demo=spectral`.
+
+## Where Did the Cluster Go? — candidate
+
+The eighth experience uses 250 mapped Soho buildings and eight pumps from GeoDa's digitization of Snow's 1855 Broad Street map. Those buildings represent 489 recorded deaths **in this particular source file**, not every cholera death in the outbreak. **Buildings** shows the original mapped points, with circle size representing death count. **Small zones**, **Shift zones**, and **Large zones** group those unchanged counts into square teaching grids; point at a zone to read its count. The two small grids have the same cell dimensions but different origins, demonstrating the zoning effect. The large grid demonstrates a change of aggregation scale. All three shade deaths per 10,000 m² on a fixed legend. This is an area density, **not a population-based mortality rate**. The grids are arbitrary teaching boundaries, not historical administrative units or reconstructions of Monmonier's specific map panels. The pump and point coordinates use the source's British National Grid fields.
+
+The lesson is inspired by Mark Monmonier's Snow-map aggregation example in *How to Lie with Maps*. It shows why the modifiable areal unit problem (MAUP) can change a map's apparent pattern without moving any underlying observations. It does not establish a statistically significant cluster or prove a causal source. Development preview: `?preview&demo=cluster`.
+
+## Make the World Flat — candidate
+
+The ninth experience displays a slowly rotating globe beside the same public-domain Natural Earth land outlines on a surface that unfolds into a flat map. The visitor can choose **Plate Carrée** (equirectangular), **Mercator**, or **Cylindrical equal-area**; **Wrap/Flatten** animates the transformation. The **Center** controls move the central meridian in 30° steps; in equal-area mode the standard parallel can be switched between 0° and 30°. A readout compares each projection's local map-area scale at 60° N with the equator: approximately 2×, 4×, and 1×, respectively. The projection mesh has about 4,700 vertices and updates locally in the browser, so the interactive choices require no server or runtime download. This is a teaching comparison of three cylindrical projections, not a general-purpose projection editor. Development preview: `?preview&demo=projection`.
+
+Each candidate starts its four-minute timer only after its introduction button is pressed. **X** restarts it, **Y** recenters the display, **A** opens the existing sound menu, and **B** returns to the candidate menu. The landing page and VR submenu label these three as candidates until headset testing determines which to keep. On Quest, check stereo readability, controller targeting, frame rate, and whether the visual transitions communicate the lesson clearly.
+
 ## Scan the Hidden World
 
 Choose the third experience in the shared menu, then select **Synthetic scan** or **Room scan · MR** from the two cards. The choice screen briefly explains that lidar (Light Detection and Ranging) times returning laser pulses to build a 3D point cloud. The synthetic scan opens an outlined miniature scene; hold the trigger and sweep a controller through it to collect a point cloud. It illustrates first-surface sampling without using a laser or measuring return time. One side grip moves/rotates the model; both grips resize it (0.22–0.75, default 0.43). Rotate and scan another side to observe formerly blocked surfaces. **Reset View** restores the pose without discarding points.
@@ -137,6 +155,7 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 - Four-minute wrap-up, headset sleep/resume, and fresh-session reset work.
 - In each landscape demo, walk onto the road from either bank, cross the bridge at deck height, and approach along the river to pass underneath without rising onto the deck. Inspect shoulders for visible gaps above the terrain.
 - Repeat several visitors and check comfort and frame rate.
+- In the candidate submenu, verify that spectral sampling changes the signature chart, all four Snow groupings keep the pump and mapped buildings aligned, and the projection mesh animates smoothly between globe and flat maps. Check color/legend readability and the new 3D panels from seated and standing height.
 
 ## Assets
 

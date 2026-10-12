@@ -31,3 +31,19 @@ Controller profile JSON and GLB models in `public/controller-profiles/` come fro
 distributed under the MIT License; the full package notice is copied to
 `public/controller-profiles/LICENSE.md`. The local `profilesList.json` selects
 the bundled Quest profiles and generic fallback from that package.
+
+## Natural Earth land outlines
+
+The 1:110m land GeoJSON in `src/showcase/data/ne_110m_land.json` comes from
+[Natural Earth Vector](https://github.com/nvkelso/natural-earth-vector), a
+public-domain map dataset. The app draws its own globe and projection texture
+from those coordinates.
+
+## John Snow building and pump coordinates
+
+The compact fields in `src/showcase/data/snow.json` were extracted from
+[GeoDa's Snow2](https://geodacenter.github.io/data-and-lab/snow2/) and
+[Snow6](https://geodacenter.github.io/data-and-lab/snow6/) downloads, credited
+to the University of Chicago Center for Spatial Data Science and its cited
+digitizers. GeoDa's documentation lists the digitizations' license as unknown.
+See `SOURCES.md` for provenance and the limitations of this teaching use.
