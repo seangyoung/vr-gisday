@@ -893,7 +893,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nRidges can block sight; a taller viewpoint may see over them.\nCan you see the blue target across this landscape?",
+      "A viewshed maps the ground visible from one observation point.\nHere a bare-earth digital elevation model (DEM) supplies ground heights.\nRidges can block sight. Can a taller viewpoint see the blue target?",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -907,7 +907,7 @@ function drawViewshedUI() {
   );
   if (v.finished) {
     label(
-      "A viewshed traces sight lines over a digital elevation model (DEM).\nRaising the observer can reveal ground beyond a ridge.\nReal-world studies may also include trees and buildings.",
+      "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights.\nRaising the observer can reveal ground beyond a ridge.\nFor a site with trees or buildings, a surface model can add their heights to the analysis.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -941,7 +941,7 @@ function drawViewshedUI() {
     label("Gold: observer · white ring: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
-    `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Ground heights`,
+    `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
 }

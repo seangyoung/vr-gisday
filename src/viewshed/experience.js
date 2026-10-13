@@ -73,7 +73,9 @@ export class ViewshedExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
     this.onEvent = onEvent;
-    this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
+    // Show the bare-earth surface used by the sightline calculation. The
+    // vegetation and highway remain available in the shared landscape demos.
+    this.selected = new Set(["topography", "hydrology"]);
     this.applyVisibility();
     this.view = "map";
     this.sampler = new TerrainSampler(LANDSCAPE_EXTENT, 320);

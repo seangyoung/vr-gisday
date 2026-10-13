@@ -43,6 +43,11 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   demo.begin();
   assert.equal(demo.started, true);
   assert.equal(demo.selected.has("topography"), true);
+  assert.equal(demo.selected.has("hydrology"), true);
+  assert.equal(demo.selected.has("vegetation"), false);
+  assert.equal(demo.selected.has("roads"), false);
+  assert.equal(demo.variants.raised.vegetation.visible, false);
+  assert.equal(demo.variants.raised.roads.visible, false);
   assert.equal(demo.selected.has("boundaries"), false);
   assert.equal(demo.view, "map");
   assert.ok(demo.pickGround.geometry.attributes.position.count < demo.ground.raised.geometry.attributes.position.count / 10);
