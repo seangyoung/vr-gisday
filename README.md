@@ -92,9 +92,9 @@ The image covers a 144-by-144-model-meter window centered on the visitor. Its 1 
 
 ## See the Invisible
 
-The seventh experience starts with the electromagnetic spectrum: humans see visible light, while sensors can measure near infrared. After **Reveal the bands**, an oblique San Francisco Bay scene made by NASA from 1997 Landsat 5 imagery appears. **Natural color** displays visible red/green/blue; **False color** assigns near infrared to display red, visible red to green, and visible green to blue. **NIR only** extracts the false-color image's red display channel as an approximate grayscale NIR view. Point at water, city, or hills to compare their four displayed band brightnesses. The four-minute takeaway defines spectral signature and false-color composite.
+The seventh experience starts with the electromagnetic spectrum: humans see visible light, while sensors can measure near infrared. After **Reveal the bands**, visitors explore three real, aligned natural/false-color image pairs: San Francisco Bay (Landsat 5, 1997), the Everglades and Miami (Landsat 5, 2011), and Lilongwe, Malawi (Landsat 8, 2018). The **Next scene** button cycles through all three before repeating; the Bay opens first, then the other scenes appear in a shuffled order. Florida's leafy fields and wetlands show a strong vegetation–water contrast, while Lilongwe reveals trees along streams and in neighborhoods. **Natural color** displays visible red/green/blue; **False color** assigns near infrared to display red, visible red to green, and visible green to blue. **NIR only** extracts the false-color image's red display channel as an approximate grayscale NIR view. Point and trigger on the image to compare displayed band brightnesses. **Takeaways** opens a short, scene-specific explanation and can be revisited before the four-minute ending.
 
-The source composites are real Landsat-derived visualizations, not raw band data. The bars sample rendered JPEG display values; they are **not** calibrated reflectance, NDVI, a vegetation-health diagnosis, or a quantitative comparison between independently stretched bands. The terrain in NASA's oblique rendering is exaggerated threefold. Development preview: `?preview&demo=spectral`.
+The source composites are real Landsat-derived visualizations, not raw band data. The bars sample rendered JPEG display values; they are **not** calibrated reflectance, NDVI, a vegetation-health diagnosis, or a quantitative comparison between independently stretched bands. The Lilongwe natural-color image is pan-sharpened and downsampled to align with its false-color display image. The terrain in NASA's oblique Bay rendering is exaggerated threefold. Development preview: `?preview&demo=spectral`.
 
 ## Where Did the Cluster Go?
 
@@ -155,7 +155,7 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 - Four-minute wrap-up, headset sleep/resume, and fresh-session reset work.
 - In each landscape demo, walk onto the road from either bank, cross the bridge at deck height, and approach along the river to pass underneath without rising onto the deck. Inspect shoulders for visible gaps above the terrain.
 - Repeat several visitors and check comfort and frame rate.
-- In the nine-demo gallery, verify that all cards are legible and selectable from seated and standing height. Check that B returns from each demo to the same gallery. In the three newest demos, verify spectral sampling, all four Snow groupings, and the globe-to-map transition and Tissot overlay.
+- In the nine-demo gallery, verify that all cards are legible and selectable from seated and standing height. Check that B returns from each demo to the same gallery. In the three newest demos, verify spectral sampling in all three real scenes and the Takeaways screen, all four Snow groupings, and the globe-to-map transition and Tissot overlay.
 
 ## Assets
 

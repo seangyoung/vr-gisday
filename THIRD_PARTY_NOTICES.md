@@ -1,6 +1,6 @@
 # Third-party notices
 
-## NASA Landsat visualization
+## NASA Landsat visualizations
 
 The two San Francisco Bay Landsat composite JPEGs in `src/showcase/data/`
 come from NASA/Goddard Space Flight Center Scientific Visualization Studio,
@@ -10,6 +10,17 @@ TM bands 4-3-2. NASA SVS states that its visualizations are [public domain
 unless otherwise noted](https://svs.gsfc.nasa.gov/help/). Credit: NASA/Goddard
 Space Flight Center Scientific Visualization Studio. The displayed band bars
 are app-derived approximations from the rendered JPEGs, not NASA reflectance data.
+
+The paired southeastern Florida / Everglades JPEGs come from NASA Earth
+Observatory's [*Why is that Forest Red and That Cloud Blue?*](https://science.nasa.gov/earth/earth-observatory/how-to-interpret-a-false-color-satellite-image/).
+Credit: NASA Earth Observatory image by Matt Radcliff, using Landsat 5 data
+from the U.S. Geological Survey Earth Explorer.
+
+The paired 2018 Lilongwe JPEGs come from NASA Earth Observatory's
+[*Lilongwe and Landsat Grew Up Together*](https://science.nasa.gov/earth/earth-observatory/lilongwe-and-landsat-grew-up-together-144401/).
+Credit: NASA Earth Observatory images by Lauren Dauphin, using Landsat data
+from the U.S. Geological Survey. The natural-color source is pan-sharpened;
+the app downsamples it to align with the false-color display image.
 
 ## Three.js
 

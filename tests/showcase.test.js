@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
 import { displayedBandBrightness, nirGrayPixel } from "../src/showcase/spectral-model.js";
+import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
   aggregationFor, blockAt,
@@ -16,6 +17,18 @@ test("rendered Landsat composites map display colors to sampled band brightness"
   assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
     [96, 72, 38, 184]);
   assert.deepEqual(nirGrayPixel([184, 53, 72, 255]), [184, 184, 184, 255]);
+});
+
+test("real spectral scenes rotate without an immediate repeat", () => {
+  const next = createSpectralSceneRotation(() => 0.4);
+  const firstCycle = [next(), next(), next()];
+  assert.equal(firstCycle[0].id, "bay");
+  assert.deepEqual(new Set(firstCycle.map((scene) => scene.id)),
+    new Set(SPECTRAL_SCENES.map((scene) => scene.id)));
+  const secondCycle = [next(), next(), next()];
+  assert.notEqual(secondCycle[0].id, firstCycle.at(-1).id);
+  assert.deepEqual(new Set(secondCycle.map((scene) => scene.id)),
+    new Set(SPECTRAL_SCENES.map((scene) => scene.id)));
 });
 
 test("Snow blocks are conserved by each hypothetical ward plan", () => {

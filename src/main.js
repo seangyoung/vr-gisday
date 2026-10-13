@@ -43,7 +43,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Rain on a watershed to see where water drains, or shape an erosion tray and watch flowing water carve channels.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Build a point cloud from a model or your room. Change viewpoints to reveal surfaces hidden from the first scan.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>Change pixel size in an overhead view of the landscape. See when a river, road, and forest blend into mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of San Francisco Bay in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Spin a globe, unfold it into three projections, and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Choose a VR experience in your headset, or open the mixed reality room scan.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Rain on a watershed to see where water drains, or shape an erosion tray and watch flowing water carve channels.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Build a point cloud from a model or your room. Change viewpoints to reveal surfaces hidden from the first scan.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>Change pixel size in an overhead view of the landscape. See when a river, road, and forest blend into mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of three places in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Spin a globe, unfold it into three projections, and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR experiences + mixed reality room scan</footer>`;
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.domElement.id = "scene";
@@ -993,7 +993,7 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Visible light is one slice of the electromagnetic spectrum.\nLandsat also senses near infrared (NIR), beyond human vision.\nCompare two Bay Area views; terrain height is exaggerated.",
+        "Satellites measure visible colors and near infrared (NIR).\nLeaves scatter much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nGroup the same street blocks into different sample wards.\nWatch how ward boundaries change the shaded pattern of death counts.",
@@ -1009,10 +1009,21 @@ function drawShowcaseUI() {
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
+  if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
+    lessonCard(`${exhibit.sceneInfo.name} · takeaways`,
+      `A spectral signature describes a surface's response across bands.\nFalse color assigns NIR to red; leafy areas often appear red.\n${exhibit.sceneInfo.observation}`, -0.02);
+    label("Scientists map vegetation and water with calibrated bands.\nHere the sample bars show rendered-image brightness.",
+      0, -0.45, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
+    if (exhibit.finished)
+      button("Try again", 0, -0.72, () => startShowcase("spectral"), 1.4);
+    else {
+      button("Keep exploring", -0.58, -0.72, () => exhibit.keepExploring(), 1.0);
+      button("Next scene", 0.58, -0.72, () => exhibit.nextScene(), 1.0);
+    }
+    return;
+  }
   if (exhibit.finished) {
     const takeaways = {
-      spectral: ["Invisible data, visible pattern",
-        "A spectral signature describes how a surface responds across bands.\nLeaves often reflect much NIR light; water looks dark in NIR.\nThese bars show rendered-image brightness; reflectance needs calibrated data."],
       cluster: ["Same deaths, new boundaries",
         "Grouping the same deaths into wards changes the map's pattern.\nThis is the zoning effect of the modifiable areal unit problem (MAUP).\nShading shows counts; population data would support rate comparisons."],
       projection: ["Every flat map makes a choice",
@@ -1029,13 +1040,17 @@ function drawShowcaseUI() {
       false: "False color: NIR → red, red → green, green → blue",
       nir: "Approximate near-infrared view in gray",
     };
-    label("San Francisco Bay · Landsat 5", 0, 0.96, 2.35, 0.18, 43, "#e6f4f5", "#0b2430");
-    label(modeText[exhibit.mode], 0, -0.52, 2.4, 0.14, 29, "#e6f4f5", "#0b2430");
+    label(`${exhibit.sceneInfo.name} · ${exhibit.sceneInfo.sensor}`,
+      0, 0.96, 2.35, 0.18, 40, "#e6f4f5", "#0b2430");
+    label(exhibit.sceneInfo.prompt, 0, -0.42, 2.4, 0.12, 28,
+      "#d8f3e6", "#0b2430");
+    label(modeText[exhibit.mode], 0, -0.58, 2.4, 0.12, 27,
+      "#e6f4f5", "#0b2430");
     button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"), 0.72);
     button("False color", 0, -0.75, () => exhibit.setMode("false"), 0.72);
     button("NIR only", 0.78, -0.75, () => exhibit.setMode("nir"), 0.72);
-    label("Point and sample water, city, or hills · NASA SVS, 1997",
-      0, -0.98, 2.3, 0.12, 28, "#b6d1d9", "#0b2430");
+    button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
+    button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {
     label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
     button("Buildings", -0.86, -0.77, () => exhibit.setMode("points"), 0.53);
