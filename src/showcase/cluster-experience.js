@@ -11,11 +11,11 @@ const py = (y) => plot.y + (SNOW_WINDOW.maxY - y) /
   (SNOW_WINDOW.maxY - SNOW_WINDOW.minY) * plot.size;
 
 function countColor(count) {
-  if (count < 25) return "#315b66";
-  if (count < 50) return "#55867f";
-  if (count < 100) return "#9eae74";
-  if (count < 150) return "#dfaa6a";
-  return "#dd7569";
+  if (count < 25) return "#edf4fa";
+  if (count < 50) return "#bfdbeb";
+  if (count < 100) return "#86b7d2";
+  if (count < 150) return "#4889b1";
+  return "#18577e";
 }
 
 function blockPath(ctx, block) {
@@ -101,19 +101,21 @@ function drawMap(canvas, mode) {
   ctx.fillText(`${SNOW_TOTAL} recorded deaths`, 602, 177);
   ctx.fillStyle = "#ffe17c";
   ctx.fillText("● Broad Street pump", 602, 228);
+  ctx.fillStyle = "#72cecf";
+  ctx.fillText("● Other mapped pumps", 602, 262);
   if (mode === "points") {
     ctx.fillStyle = "#f0a987";
-    ctx.fillText("● Size = deaths at building", 602, 276);
+    ctx.fillText("● Size = deaths at building", 602, 307);
     ctx.fillStyle = "#c4dce0";
-    ctx.fillText("Pale gaps = streets", 602, 335);
-    ctx.fillText("Dark shapes = blocks", 602, 370);
+    ctx.fillText("Pale gaps = streets", 602, 355);
+    ctx.fillText("Dark shapes = blocks", 602, 390);
   } else {
     ctx.fillStyle = "#c4dce0";
-    ctx.fillText("Deaths per zone · count", 602, 270);
+    ctx.fillText("Deaths per zone · count", 602, 305);
     const entries = [["0–24", 0], ["25–49", 25], ["50–99", 50],
       ["100–149", 100], ["150+", 150]];
     entries.forEach(([name, count], index) => {
-      const y = 298 + index * 41;
+      const y = 331 + index * 40;
       ctx.fillStyle = countColor(count);
       ctx.fillRect(602, y, 30, 27);
       ctx.fillStyle = "#e9f5f0";
@@ -177,6 +179,11 @@ export class ClusterExperience extends TimedExhibit {
     this.selectionMap.material.transparent = true;
     this.selectionMap.material.depthWrite = false;
     this.group.add(this.selectionMap);
+  }
+  finish() {
+    if (!this.started || this.finished) return;
+    this.group.visible = false;
+    super.finish();
   }
   setMode(mode) {
     if (!this.started || this.finished || !CLUSTER_MODES[mode]) return;

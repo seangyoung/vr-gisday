@@ -118,4 +118,16 @@ test("new exhibits wait at their introduction and wrap up after four minutes", (
   assert.equal(changes, 2);
   exhibit.dispose();
   assert.equal(root.children.length, 0);
+  const manual = new TimedExhibit(root, () => changes++);
+  manual.finish();
+  assert.equal(manual.finished, false);
+  manual.begin();
+  manual.update(10);
+  manual.finish();
+  assert.equal(manual.finished, true);
+  manual.update(240);
+  assert.equal(manual.elapsed, 10);
+  assert.equal(changes, 4);
+  manual.dispose();
+  assert.equal(root.children.length, 0);
 });

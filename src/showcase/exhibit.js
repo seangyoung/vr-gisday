@@ -18,13 +18,15 @@ export class TimedExhibit {
     this.group.visible = true;
     this.onChange();
   }
+  finish() {
+    if (!this.started || this.finished) return;
+    this.finished = true;
+    this.onChange();
+  }
   update(dt) {
     if (!this.started || this.finished) return;
     this.elapsed += dt;
-    if (this.elapsed >= 240) {
-      this.finished = true;
-      this.onChange();
-    }
+    if (this.elapsed >= 240) this.finish();
   }
   dispose() {
     this.group.removeFromParent();

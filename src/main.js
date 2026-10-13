@@ -1050,12 +1050,15 @@ function drawShowcaseUI() {
   if (exhibit.finished) {
     const takeaways = {
       cluster: ["Same deaths, new boundaries",
-        "Grouping the same deaths into wards changes the map's pattern.\nThis is the zoning effect of the modifiable areal unit problem (MAUP).\nShading shows counts; population data would support rate comparisons."],
+        "Administrative ward totals can hide a street-level concentration.\nChanging boundaries changes the shading around the same mapped deaths.\nThis zoning effect is part of MAUP: the modifiable areal unit problem."],
       projection: ["Every flat map makes a choice",
         "Tissot's circles start equal in size on the globe.\nOn the map, their size shows area change; shape shows stretching.\nMercator keeps local shapes; equal-area keeps relative area."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
+    if (exhibit.kind === "cluster")
+      label("The colors show death counts per ward. Population data would support rate comparisons.",
+        0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
     takeawayActions(-0.62);
     return;
   }
@@ -1084,6 +1087,7 @@ function drawShowcaseUI() {
     button("5 wards", 0.86, -0.77, () => exhibit.setMode("wardC"), 0.53);
     clusterReadout = label(exhibit.selectedText, 0, -1.0, 2.35, 0.12,
       27, "#b6d1d9", "#0b2430");
+    button("Takeaway", 0, -1.21, () => exhibit.finish(), 1.1);
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(exhibit.tissot
