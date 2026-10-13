@@ -2,7 +2,8 @@ import * as THREE from "three";
 import land from "./data/ne_110m_land.json" with { type: "json" };
 import { TimedExhibit } from "./exhibit.js";
 import {
-  GlobeSpin, PROJECTIONS, projectMetric, projectionFitScale, relativeAreaScale,
+  GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, projectMetric,
+  projectionFitScale, relativeAreaScale,
 } from "./projection-model.js";
 
 function drawTissot(ctx, canvas) {
@@ -11,7 +12,7 @@ function drawTissot(ctx, canvas) {
   const x = (lon) => (lon + 180) / 360 * canvas.width;
   const y = (lat) => (90 - lat) / 180 * canvas.height;
   for (const latitude of [-60, -30, 0, 30, 60])
-    for (const longitude of [-120, -60, 0, 60, 120]) {
+    for (const longitude of TISSOT_LONGITUDES) {
       const lat = latitude * radians;
       const lon = longitude * radians;
       ctx.beginPath();
@@ -117,6 +118,12 @@ function textureFor(canvas) {
   return texture;
 }
 
+export function orientGlobe(globe, spin) {
+  // Apply pitch in viewer space after yaw. With local-axis pitch (YXZ),
+  // vertical drag reverses when the globe's far side rotates toward us.
+  globe.rotation.set(spin.pitch, spin.yaw, 0, "XYZ");
+}
+
 export class ProjectionExperience extends TimedExhibit {
   constructor(root, onChange) {
     super(root, onChange);
@@ -152,6 +159,13 @@ export class ProjectionExperience extends TimedExhibit {
     super.begin();
     this.transitionTo(true);
   }
+  finish() {
+    if (!this.started || this.finished) return;
+    this.spinningBy = null;
+    this.spin.end();
+    this.group.visible = false;
+    super.finish();
+  }
   paintTexture() {
     const ctx = this.displayCanvas.getContext("2d");
     ctx.clearRect(0, 0, this.displayCanvas.width, this.displayCanvas.height);
@@ -185,7 +199,7 @@ export class ProjectionExperience extends TimedExhibit {
     if (this.spinningBy !== source) return;
     const [azimuth, elevation] = this.rayAngles(raycaster);
     this.spin.drag(azimuth, elevation, dt);
-    this.globe.rotation.set(this.spin.pitch, this.spin.yaw, 0, "YXZ");
+    orientGlobe(this.globe, this.spin);
   }
   endSpin(source) {
     if (this.spinningBy !== source) return;
@@ -241,9 +255,9 @@ export class ProjectionExperience extends TimedExhibit {
   }
   update(dt) {
     super.update(dt);
-    if (!this.started) return;
+    if (!this.started || this.finished) return;
     this.spin.step(dt);
-    this.globe.rotation.set(this.spin.pitch, this.spin.yaw, 0, "YXZ");
+    orientGlobe(this.globe, this.spin);
     if (this.transitionAge >= 1) return;
     this.transitionAge = Math.min(1, this.transitionAge + dt / 0.9);
     const ease = 1 - (1 - this.transitionAge) ** 3;

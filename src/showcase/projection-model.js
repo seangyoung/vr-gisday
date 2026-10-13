@@ -4,6 +4,10 @@ export const PROJECTIONS = Object.freeze({
   equalArea: "Cylindrical equal-area",
 });
 
+// The two edge entries are one meridian shown on both sides of the texture;
+// together they complete the sixth circle column across the Pacific seam.
+export const TISSOT_LONGITUDES = Object.freeze([-180, -120, -60, 0, 60, 120, 180]);
+
 const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
 const mercatorLimit = mercatorY(85 * deg);

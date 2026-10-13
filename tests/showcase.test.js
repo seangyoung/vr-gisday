@@ -9,9 +9,10 @@ import {
   aggregationFor, blockAt,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, indicatrixAxes, projectMetric, projectNormalized,
+  GlobeSpin, TISSOT_LONGITUDES, indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale,
 } from "../src/showcase/projection-model.js";
+import { orientGlobe } from "../src/showcase/projection-experience.js";
 
 test("rendered Landsat composites map display colors to sampled band brightness", () => {
   assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
@@ -70,6 +71,8 @@ test("projection examples preserve distinct distortion tradeoffs", () => {
 });
 
 test("Tissot axes reflect shape and area without display stretching", () => {
+  assert.deepEqual(TISSOT_LONGITUDES.slice(1).map((lon, i) => lon - TISSOT_LONGITUDES[i]),
+    [60, 60, 60, 60, 60, 60]);
   const plate = indicatrixAxes("equirectangular", 60);
   const mercator = indicatrixAxes("mercator", 60);
   const equalArea = indicatrixAxes("equalArea", 60);
@@ -102,6 +105,20 @@ test("globe swipe coasts, settles, and resumes its default spin", () => {
   const settledYaw = spin.yaw;
   spin.step(1);
   assert.ok(Math.abs(spin.yaw - settledYaw - 0.16) < 1e-5);
+});
+
+test("upward globe drag lifts the visible surface on both sides of the globe", () => {
+  const globe = new THREE.Object3D();
+  for (const [yaw, front] of [
+    [0, new THREE.Vector3(0, 0, 1)],
+    [Math.PI, new THREE.Vector3(0, 0, -1)],
+  ]) {
+    orientGlobe(globe, { yaw, pitch: 0 });
+    const before = front.clone().applyEuler(globe.rotation).y;
+    orientGlobe(globe, { yaw, pitch: -0.2 });
+    const after = front.clone().applyEuler(globe.rotation).y;
+    assert.ok(after > before);
+  }
 });
 
 test("new exhibits wait at their introduction and wrap up after four minutes", () => {
