@@ -1016,7 +1016,7 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Satellites measure visible colors and near infrared (NIR).\nLeaves scatter much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
+        "Satellites measure visible colors and near infrared (NIR).\nHealthy leaves reflect much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nGroup the same street blocks into different sample wards.\nWatch how ward boundaries change the shaded pattern of death counts.",
