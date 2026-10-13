@@ -516,20 +516,20 @@ export class RainExperience {
     const hand = this.group.worldToLocal(worldHand.clone());
     this.stroke = {
       id,
-      last: hand,
-      offset: hit.clone().sub(hand),
+      handX: worldHand.x,
+      handZ: worldHand.z,
+      lastHeight: hand.y,
       center: hit,
     };
   }
-  moveStroke(id, worldHand, aimedAtTerrain = true, worldHit = null) {
+  moveStroke(id, worldHand) {
     if (this.stroke?.id !== id) return;
-    const p = this.group.worldToLocal(worldHand.clone());
-    if (aimedAtTerrain)
-      this.stroke.center.copy(
-        worldHit ? this.group.worldToLocal(worldHit.clone()) : p.clone().add(this.stroke.offset),
-      );
-    const delta = THREE.MathUtils.clamp(p.y - this.stroke.last.y, -0.08, 0.08);
-    this.stroke.last.copy(p);
+    const verticalHand = new THREE.Vector3(
+      this.stroke.handX, worldHand.y, this.stroke.handZ,
+    );
+    const height = this.group.worldToLocal(verticalHand).y;
+    const delta = THREE.MathUtils.clamp(height - this.stroke.lastHeight, -0.08, 0.08);
+    this.stroke.lastHeight = height;
     this.applyBrush(this.stroke.center.x, this.stroke.center.z, delta);
   }
   applyBrush(x, z, delta) {

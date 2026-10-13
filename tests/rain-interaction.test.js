@@ -227,6 +227,30 @@ test("high-resolution erosion sculpting rebases the experiment and preserves the
 });
 
 for (const kind of ["drainage", "erosion"])
+  test(`${kind}: a tilted model sculpts only at the locked spot from vertical hand travel`, () => {
+    const r = new RainExperience(new THREE.Scene(), () => {}, kind);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.6, 0);
+    r.place(camera);
+    r.explore();
+    const id = r.cellAt(-0.3, -0.4);
+    const localHit = new THREE.Vector3(-0.3, r.heights[id], -0.4);
+    const hit = r.group.localToWorld(localHit);
+    const hand = hit.clone().add(new THREE.Vector3(0, 0.35, 0));
+    const original = r.heights.slice();
+    r.beginStroke(0, hit, hand);
+    r.moveStroke(0, hand.clone().add(new THREE.Vector3(0.4, 0, 0.4)));
+    assert.deepEqual(r.heights, original,
+      "sideways hand motion must not sculpt a pitched surface");
+    r.moveStroke(0, hand.clone().add(new THREE.Vector3(0.4, 0.06, 0.4)));
+    assert.ok(r.heights[id] > original[id]);
+    assert.ok(Math.abs(r.stroke.center.x + 0.3) < 1e-9);
+    assert.ok(Math.abs(r.stroke.center.z + 0.4) < 1e-9);
+    r.endStroke(0);
+    r.dispose();
+  });
+
+for (const kind of ["drainage", "erosion"])
   test(`${kind}: sculpt and rain together without clearing water`, () => {
     const r = new RainExperience(new THREE.Scene(), () => {}, kind);
     r.explore();
@@ -244,19 +268,19 @@ for (const kind of ["drainage", "erosion"])
     assert.ok(r.heights[id] > before[id]);
     assert.equal(r.brush.visible, true);
     const heldHeight = r.heights[id];
-    r.moveStroke(0, new THREE.Vector3(-0.3, 1.1, -0.4), false);
+    r.moveStroke(0, new THREE.Vector3(-0.3, 1.1, -0.4));
     assert.equal(r.brush.visible, true);
     assert.ok(r.heights[id] > heldHeight);
     assert.equal(r.stroke.center.x, -0.3);
     assert.equal(r.stroke.center.z, -0.4);
     const other = r.cellAt(0.4, 0.3),
       otherBefore = r.heights[other];
-    r.moveStroke(0, new THREE.Vector3(-0.3, 1.12, -0.4), true,
-      new THREE.Vector3(0.4, 0.5, 0.3));
-    r.moveStroke(0, new THREE.Vector3(1, 1.16, 1), false);
-    assert.equal(r.stroke.center.x, 0.4);
-    assert.equal(r.stroke.center.z, 0.3);
-    assert.ok(r.heights[other] > otherBefore);
+    r.moveStroke(0, new THREE.Vector3(-0.3, 1.12, -0.4));
+    r.moveStroke(0, new THREE.Vector3(1, 1.16, 1));
+    assert.equal(r.stroke.center.x, -0.3);
+    assert.equal(r.stroke.center.z, -0.4);
+    assert.equal(r.heights[other], otherBefore,
+      "moving the ray or hand sideways cannot move the active brush");
     assert.equal(r.water, water);
     assert.equal(r.water.stored, volume);
     r.setSource(id);
@@ -267,6 +291,12 @@ for (const kind of ["drainage", "erosion"])
     r.endStroke(0);
     assert.equal(r.stroke, null);
     assert.equal(r.brush.visible, false);
+    r.beginStroke(0, new THREE.Vector3(0.4, otherBefore, 0.3),
+      new THREE.Vector3(0.4, 1, 0.3));
+    r.moveStroke(0, new THREE.Vector3(0.4, 1.08, 0.3));
+    assert.ok(r.heights[other] > otherBefore,
+      "a fresh trigger can select a different terrain spot");
+    r.endStroke(0);
     r.grab.begin(1, new THREE.Matrix4());
     r.beginStroke(0, new THREE.Vector3(), new THREE.Vector3());
     assert.equal(r.stroke, null);

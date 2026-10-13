@@ -324,7 +324,7 @@ export class LabSound {
     this.water.gain.setTargetAtTime(
       on ? 0.3 : 0,
       this.context.currentTime,
-      0.1,
+      on ? 0.025 : 0.1,
     );
   }
 }

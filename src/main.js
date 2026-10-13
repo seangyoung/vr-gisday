@@ -1833,7 +1833,7 @@ for (let i = 0; i < 2; i++) {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
       return;
     const hit = intersect(c);
-    if (rain?.stage === 1) {
+    if (rain?.stage === 1 && !soundMenuOpen) {
       const land = rainHit(c);
       if (modelBeforeUi(land, hit)) {
         const action = rain.beginTrigger(
@@ -1843,7 +1843,10 @@ for (let i = 0; i < 2; i++) {
           grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null,
         );
         c.userData.raining = action === "rain";
-        if (c.userData.raining) rainPointer = i;
+        if (c.userData.raining) {
+          rainPointer = i;
+          sound.setWater(true);
+        }
         return;
       }
     }
@@ -2090,7 +2093,6 @@ renderer.setAnimationLoop((time, frame) => {
   updateRangeAnimations(dt);
   updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
-  const previousWater = rain?.water.added ?? 0;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     const visibleSession = renderer.xr.getSession().visibilityState === "visible";
@@ -2172,17 +2174,13 @@ renderer.setAnimationLoop((time, frame) => {
       if (rain.stroke) {
         const held = controllers[rain.stroke.id];
         if (held?.grip.visible) {
-          const ui = intersect(held.c);
-          const land = rainHit(held.c);
-          const hit = modelBeforeUi(land, ui) ? land : null;
           rain.moveStroke(
             held.id,
             held.grip.getWorldPosition(new THREE.Vector3()),
-            !!hit,
-            hit?.point,
           );
         } else rain.endStroke();
       }
+      if (falling || rain.pouring) waterSoundUntil = time + 350;
       if (rain.stage !== 0) rain.update(dt, falling);
     }
     if (scan && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
@@ -2260,8 +2258,10 @@ renderer.setAnimationLoop((time, frame) => {
     landscapeDemo.updateClipboard(null, camera, true);
   }
   if (devPreview && showcase && !renderer.xr.isPresenting) showcase.update(dt);
-  if (devPreview && rain && !renderer.xr.isPresenting)
+  if (devPreview && rain && !renderer.xr.isPresenting) {
     rain.update(dt, previewRaining);
+    if (previewRaining || rain.pouring) waterSoundUntil = time + 350;
+  }
   if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
   if (previewGuide && !renderer.xr.isPresenting)
     for (const { grip, id } of controllers) {
@@ -2282,8 +2282,6 @@ renderer.setAnimationLoop((time, frame) => {
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
-  if (audible && rain && rain.water.added > previousWater)
-    waterSoundUntil = time + 1500;
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
   const landscapeAudioDemo = pixels ?? viewshed ?? layers;
   const riverLevel = landscapeAudioDemo?.selected.has("hydrology")

@@ -4,8 +4,10 @@ import { LabSound } from "../src/sound.js";
 
 class Param {
   value = 0;
-  setTargetAtTime(v) {
+  calls = [];
+  setTargetAtTime(v, when, constant) {
     this.value = v;
+    this.calls.push({ v, when, constant });
   }
   setValueAtTime(v) {
     this.value = v;
@@ -51,6 +53,24 @@ class Context {
     return new Node();
   }
 }
+test("rain sound begins at input time and fades when pouring stops", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.unlock();
+    sound.context.currentTime = 12;
+    sound.setWater(true);
+    assert.deepEqual(sound.water.gain.calls.at(-1),
+      { v: 0.3, when: 12, constant: 0.025 });
+    sound.context.currentTime = 13;
+    sound.setWater(false);
+    assert.deepEqual(sound.water.gain.calls.at(-1),
+      { v: 0, when: 13, constant: 0.1 });
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
 test("audio starts lazily, scan cues are bounded, and mute/visibility silence all effects", () => {
   const old = globalThis.AudioContext;
   globalThis.AudioContext = Context;
