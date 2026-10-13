@@ -98,6 +98,10 @@ test("a visitor starts in an empty flat landscape and can compose any layer orde
   assert.equal(l.started, true);
   assert.equal(l.selected.size, 0);
   assert.equal(l.variants.flat.world.visible, true);
+  l.finish();
+  assert.equal(l.finished, true);
+  l.reset();
+  assert.equal(l.finished, false);
   assert.ok(changes >= 7);
   l.dispose();
   scene.remove(leftGrip);

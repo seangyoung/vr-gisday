@@ -91,6 +91,10 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.equal(demo.size, 24);
   assert.deepEqual(demo.probe, { x: 0, z: -3 });
   assert.equal(demo.answer, null);
+  demo.finish();
+  assert.equal(demo.finished, true);
+  demo.reset();
+  assert.equal(demo.finished, false);
   assert.ok(changes >= 4);
   demo.dispose();
   assert.equal(scene.children.length, 0);

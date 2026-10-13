@@ -76,6 +76,10 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
   assert.equal(demo.finished, false);
   assert.equal(demo.started, true);
   assert.deepEqual(demo.observer, { x: 0, z: 0, height: 2 });
+  demo.finish();
+  assert.equal(demo.finished, true);
+  demo.reset();
+  assert.equal(demo.finished, false);
   assert.ok(changes >= 5);
   demo.dispose();
   assert.equal(scene.children.length, 0);

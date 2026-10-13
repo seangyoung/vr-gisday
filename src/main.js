@@ -844,7 +844,7 @@ function drawLayersUI() {
   );
   if (l.finished) {
     label(
-      "Together, the layers show how roads, rivers, and terrain meet.\nThe floodplain highlights low river land; flood studies add water levels.\nPeople draw district boundaries to organize places and services.",
+      "GIS overlays datasets at shared locations to reveal relationships.\nThe river follows low terrain; roads cross it; flood studies add water levels.\nDistrict boundaries organize places and services.",
       0,
       0.48,
       2.35,
@@ -884,6 +884,7 @@ function drawLayersUI() {
         : "Synthetic place · Map north is an arbitrary model direction",
       0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
     );
+    button("Takeaway", 0, -1.01, () => l.finish(), 1.4);
 
     return;
   }
@@ -944,6 +945,7 @@ function drawViewshedUI() {
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
+  button("Takeaway", 0, -1.01, () => v.finish(), 1.4);
 }
 function drawPixelsUI() {
   const p = pixels;
@@ -1010,6 +1012,7 @@ function drawPixelsUI() {
       `${p.answer === p.pureWaterAt48 ? "Exactly" : "Compare the 48 m view"}: each river pixel also includes land. That blend is a mixed pixel.`,
       0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
     );
+  button("Takeaway", 0, -1.01, () => p.finish(), 1.4);
 }
 function drawShowcaseUI() {
   const exhibit = showcase;
