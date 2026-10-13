@@ -118,6 +118,23 @@ test("only hit-test poses with held trigger are recorded and sources cancel at w
   assert.equal(cancelled, 1);
   r.dispose();
 });
+test("visitor can finish room scanning early and keep the collected cloud", async () => {
+  let cancelled = 0;
+  const input = { targetRaySpace: {} };
+  const r = make({
+    requestHitTestSource: async () => ({ cancel() { cancelled++; } }),
+  });
+  await r.ensureSource(input);
+  r.record({ x: 0, y: 0.5, z: -2 }, origin);
+  assert.equal(r.stage, 1);
+  r.finish();
+  assert.equal(r.stage, 2);
+  assert.equal(r.frozen, true);
+  assert.equal(r.records.length, 1);
+  assert.equal(cancelled, 1);
+  assert.equal(r.record({ x: 0.5, y: 0.5, z: -2 }, origin), false);
+  r.dispose();
+});
 test("a controller sweep records three independent surface hits when offset rays work", async () => {
   const originalRay = globalThis.XRRay;
   globalThis.XRRay = class {

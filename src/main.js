@@ -242,6 +242,17 @@ function button(text, x, y, action, w = 0.75) {
   buttons.push(m);
   return m;
 }
+function takeawayActions(y, restart = start) {
+  button("Restart", -0.57, y, restart, 1.02);
+  button("Exit to Menu", 0.57, y, openMenu, 1.02);
+}
+function foregroundTakeaway() {
+  for (const mesh of uiParent.children) {
+    mesh.renderOrder = 10;
+    mesh.material.depthTest = false;
+    mesh.material.depthWrite = false;
+  }
+}
 function menuCard({ title, lines, category, glyph, color, action }, index) {
   const canvas = document.createElement("canvas");
   canvas.width = 720;
@@ -666,6 +677,13 @@ function drawRoomUI() {
   if (intro) {
     label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
     label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
+  } else if (s.stage === 2) {
+    lessonCard(title, body);
+    label(`${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+      0, GUIDED_INFO_Y, 2.3, 0.12, 27, "#d8eae8", "#0b2430");
+    takeawayActions(GUIDED_ACTION_Y);
+    foregroundTakeaway();
+    return;
   } else lessonCard(title, body);
   if (intro) {
     label(s.message, 0, -0.5, 2.3, 0.14, 27, "#e6f4f5", "#0b2430");
@@ -680,29 +698,29 @@ function drawRoomUI() {
       0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
-      s.stage === 2 ? "Scan again" : s.frozen ? "Resume" : "Freeze",
-      -0.6,
+      s.frozen ? "Resume" : "Freeze",
+      -0.84,
       GUIDED_ACTION_Y,
       () => {
         stopRainInput();
-        if (s.stage === 2) startRoomScan();
-        else if (s.frozen) s.resume();
+        if (s.frozen) s.resume();
         else s.freeze();
       },
-      0.56,
+      0.52,
     );
-    button("Color", 0, GUIDED_ACTION_Y, () => s.toggleColor(), 0.56);
+    button("Color", -0.28, GUIDED_ACTION_Y, () => s.toggleColor(), 0.52);
     button(
       s.status === "error" || s.status === "waiting" ? "Retry" : "Clear",
-      0.6,
+      0.28,
       GUIDED_ACTION_Y,
       () => {
         stopRainInput();
         if (s.status === "error" || s.status === "waiting") s.retry();
         else s.clearScan();
       },
-      0.56,
+      0.52,
     );
+    button("Takeaways", 0.84, GUIDED_ACTION_Y, () => s.finish(), 0.52);
   }
 }
 function drawScanUI() {
@@ -715,36 +733,37 @@ function drawScanUI() {
     drawScanChooserUI();
     return;
   }
-  if (s.stage === 1)
+  if (s.stage === 1) {
     label(
       `${s.sceneInfo.prompt}\n${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
       0, -0.84, 2.3, 0.24, 29, "#d8eae8", "#0b2430",
     );
-  else {
+  } else {
     lessonCard(s.sceneInfo.takeaway.title, s.sceneInfo.takeaway.body);
     label(
       `${s.hideVegetation ? "Vegetation hidden · Ground gaps remain" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 points · First-hit model`,
-      0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
+      0, -0.96, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
     );
   }
+  const actionY = s.stage === 2 ? -1.17 : GUIDED_ACTION_Y;
   button(
     s.reveal ? "Cloud only" : "Compare surfaces",
     -0.84,
-    GUIDED_ACTION_Y,
+    actionY,
     () => s.toggleReveal(),
     0.52,
   );
   button(
     s.hideVegetation ? "All points" : "Hide plants",
     -0.28,
-    GUIDED_ACTION_Y,
+    actionY,
     () => s.toggleVegetation(),
     0.52,
   );
   button(
     s.stage === 2 ? "Re-scan" : "Clear scan",
     0.28,
-    GUIDED_ACTION_Y,
+    actionY,
     () => {
       stopRainInput();
       if (s.stage === 2) startScan(s.sceneInfo, true);
@@ -755,7 +774,7 @@ function drawScanUI() {
   button(
     s.stage === 2 ? "Next scene" : "Takeaways",
     0.84,
-    GUIDED_ACTION_Y,
+    actionY,
     () => {
       stopRainInput();
       if (s.stage === 2) startScan(undefined, true);
@@ -763,6 +782,10 @@ function drawScanUI() {
     },
     0.52,
   );
+  if (s.stage === 2) {
+    takeawayActions(-1.39);
+    foregroundTakeaway();
+  }
 }
 function drawScanChoiceCard(kind, x, title, subtitle, action) {
   const card = new THREE.Mesh(
@@ -830,7 +853,7 @@ function drawLayersUI() {
       "#e6f4f5",
       "#0b2430",
     );
-    button("Build another view", 0, -0.62, () => l.reset(), 1.5);
+    takeawayActions(-0.62);
 
     return;
   }
@@ -887,7 +910,7 @@ function drawViewshedUI() {
       "A viewshed traces sight lines over a digital elevation model (DEM).\nRaising the observer can reveal ground beyond a ridge.\nReal-world studies may also include trees and buildings.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
-    button("Try another viewpoint", 0, -0.62, () => v.reset(), 1.5);
+    takeawayActions(-0.62);
 
     return;
   }
@@ -944,7 +967,7 @@ function drawPixelsUI() {
       "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis model averages colors; real sensors record light in bands.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
-    button("Compare again", 0, -0.62, () => p.reset(), 1.5);
+    takeawayActions(-0.62);
 
     return;
   }
@@ -1014,12 +1037,11 @@ function drawShowcaseUI() {
       `A spectral signature describes a surface's response across bands.\nFalse color assigns NIR to red; leafy areas often appear red.\n${exhibit.sceneInfo.observation}`, -0.02);
     label("Scientists map vegetation and water with calibrated bands.\nHere the sample bars show rendered-image brightness.",
       0, -0.45, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
-    if (exhibit.finished)
-      button("Try again", 0, -0.72, () => startShowcase("spectral"), 1.4);
-    else {
+    if (!exhibit.finished) {
       button("Keep exploring", -0.58, -0.72, () => exhibit.keepExploring(), 1.0);
       button("Next scene", 0.58, -0.72, () => exhibit.nextScene(), 1.0);
     }
+    takeawayActions(exhibit.finished ? -0.72 : -0.96);
     return;
   }
   if (exhibit.finished) {
@@ -1031,7 +1053,7 @@ function drawShowcaseUI() {
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
-    button("Try again", 0, -0.62, () => startShowcase(exhibit.kind), 1.4);
+    takeawayActions(-0.62);
     return;
   }
   if (exhibit.kind === "spectral") {
@@ -1209,7 +1231,8 @@ function drawRainUI() {
       "#e6f4f5",
       "#0b2430",
     );
-    button("Make rain again", 0, GUIDED_ACTION_Y, () => startRain(r.kind, true), 1.65);
+    takeawayActions(GUIDED_ACTION_Y);
+    foregroundTakeaway();
   } else if (r.stage !== 1)
     label(
       r.kind === "erosion"
@@ -1746,7 +1769,7 @@ function drawScene() {
       0.3,
       33,
     );
-    button("Explore again", 0, -0.64, start, 1.2);
+    takeawayActions(-0.64);
 
     return;
   }
