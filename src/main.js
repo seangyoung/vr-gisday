@@ -734,59 +734,54 @@ function drawScanUI() {
     drawScanChooserUI();
     return;
   }
-  if (s.stage === 1) {
-    label(
-      `${s.sceneInfo.prompt}\n${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
-      0, -0.84, 2.3, 0.24, 29, "#d8eae8", "#0b2430",
-    );
-  } else {
+  if (s.stage === 2) {
     lessonCard(s.sceneInfo.takeaway.title, s.sceneInfo.takeaway.body);
     label(
-      `${s.hideVegetation ? "Vegetation hidden · Ground gaps remain" : "Cyan: ground · Gold: structure · Green: vegetation"}\n${s.sceneInfo.name} · ${s.records.length.toLocaleString()} / 18,000 points · First-hit model`,
-      0, -0.96, 2.3, 0.17, 25, "#d8eae8", "#0b2430",
+      `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} sampled points · First-hit model`,
+      0, GUIDED_INFO_Y, 2.3, 0.12, 27, "#d8eae8", "#0b2430",
     );
+    takeawayActions(GUIDED_ACTION_Y);
+    foregroundTakeaway();
+    return;
   }
-  const actionY = s.stage === 2 ? -1.17 : GUIDED_ACTION_Y;
+  label(
+    `${s.sceneInfo.prompt}\nGrip to move · stick while gripping: 45° turns\n${s.records.length.toLocaleString()} points · ${s.hideVegetation ? "Plants hidden" : "Cyan ground · Gold structures · Green plants"}`,
+    0, -0.84, 2.3, 0.3, 27, "#d8eae8", "#0b2430",
+  );
   button(
-    s.reveal ? "Cloud only" : "Compare surfaces",
+    s.reveal ? "Cloud only" : "Show scene",
     -0.84,
-    actionY,
+    GUIDED_ACTION_Y,
     () => s.toggleReveal(),
     0.52,
   );
   button(
     s.hideVegetation ? "All points" : "Hide plants",
     -0.28,
-    actionY,
+    GUIDED_ACTION_Y,
     () => s.toggleVegetation(),
     0.52,
   );
   button(
-    s.stage === 2 ? "Re-scan" : "Clear scan",
+    "Clear scan",
     0.28,
-    actionY,
+    GUIDED_ACTION_Y,
     () => {
       stopRainInput();
-      if (s.stage === 2) startScan(s.sceneInfo, true);
-      else s.clearScan();
+      s.clearScan();
     },
     0.52,
   );
   button(
-    s.stage === 2 ? "Next scene" : "Takeaways",
+    "Takeaways",
     0.84,
-    actionY,
+    GUIDED_ACTION_Y,
     () => {
       stopRainInput();
-      if (s.stage === 2) startScan(undefined, true);
-      else s.finish();
+      s.finish();
     },
     0.52,
   );
-  if (s.stage === 2) {
-    takeawayActions(-1.39);
-    foregroundTakeaway();
-  }
 }
 function drawScanChoiceCard(kind, x, title, subtitle, action) {
   const card = new THREE.Mesh(
@@ -800,6 +795,7 @@ function drawScanChoiceCard(kind, x, title, subtitle, action) {
     action();
   };
   card.userData.label = title;
+  card.userData.hoverColor = 0x477b91;
   buttons.push(card);
   uiParent.add(card);
   const thumbnail = scanThumbnail(kind);
@@ -1966,7 +1962,7 @@ for (let i = 0; i < 2; i++) {
   controllers.push({ c, grip, beam, guide, id: i });
 }
 function scanHit(c) {
-  if (!scan || (!scan.room && scan.stage === 0)) return null;
+  if (!scan || (!scan.room && scan.stage !== 1)) return null;
   intersect(c);
   return scan.hit(raycaster);
 }
@@ -2236,10 +2232,19 @@ renderer.setAnimationLoop((time, frame) => {
       grab?.update(poses);
       rain?.grab.update(poses);
       scan?.grab.update(poses);
+      if (scan && !scan.room && scan.stage === 1 && !soundMenuOpen)
+        for (const { c, id } of controllers) {
+          const pad = c.userData.xrInput?.gamepad;
+          scan.rotateWithStick(id,
+            pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0,
+            pad?.mapping === "xr-standard" ? pad.axes[3] ?? 0 : 0,
+            renderer.xr.getCamera());
+        }
     } else {
       grab?.cancel();
       rain?.grab.cancel();
       scan?.grab.cancel();
+      scan?.stickReady?.clear();
     }
     for (const b of soundMenuOpen ? soundButtons : buttons) {
       b.userData.baseColor ??= b.material.color.clone();
@@ -2270,7 +2275,7 @@ renderer.setAnimationLoop((time, frame) => {
             ? 0xffffff
             : 0xa6f5d9,
       );
-      if (hit) hit.object.material.color.set(0xffda8b);
+      if (hit) hit.object.material.color.set(hit.object.userData.hoverColor ?? 0xffda8b);
     }
   }
   if (devPreview && (pixels || viewshed || layers) && !renderer.xr.isPresenting) {

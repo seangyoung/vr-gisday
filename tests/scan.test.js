@@ -90,3 +90,43 @@ test("synthetic scan starts below eye level and its empty outline can be grabbed
   assert.ok(s.handNear(target));
   s.dispose();
 });
+
+test("gripped stick turns the scene once per 45-degree deflection", () => {
+  const s = new ScanExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  const hand = new THREE.Matrix4();
+  s.explore();
+  assert.equal(s.rotateWithStick(0, 1, 0, camera), false);
+  s.grab.begin(0, hand);
+  const center = s.group.localToWorld(new THREE.Vector3(0, 0.5, 0));
+  assert.equal(s.rotateWithStick(0, 1, 0, camera), true);
+  assert.ok(Math.abs(s.group.rotation.y - Math.PI / 4) < 1e-8);
+  assert.ok(s.group.localToWorld(new THREE.Vector3(0, 0.5, 0))
+    .distanceTo(center) < 1e-8);
+  assert.equal(s.rotateWithStick(0, 1, 0, camera), false);
+  s.grab.update(new Map([[0, hand]]));
+  assert.ok(Math.abs(s.group.rotation.y - Math.PI / 4) < 1e-8);
+  s.rotateWithStick(0, 0, 0, camera);
+  assert.equal(s.rotateWithStick(0, 0, -1, camera), true);
+  s.grab.release(0);
+  assert.equal(s.rotateWithStick(0, -1, 0, camera), false);
+  s.dispose();
+});
+
+test("scene comparison has textured materials and takeaway hides the model", () => {
+  const s = new ScanExperience(new THREE.Scene(), () => {});
+  assert.ok(s.targets.some((target) => target.userData.finish === "bark"));
+  assert.ok(s.targets.some((target) => target.userData.finish === "leaves"));
+  assert.ok(s.targets.every((target) => target.material.map?.image?.data));
+  s.explore();
+  s.toggleReveal();
+  assert.ok(s.targets.some((target) => target.visible));
+  assert.equal(s.points.visible, false);
+  s.toggleReveal();
+  assert.equal(s.points.visible, true);
+  assert.ok(s.targets.every((target) => !target.visible));
+  s.finish();
+  assert.equal(s.stage, 2);
+  assert.equal(s.group.visible, false);
+  s.dispose();
+});

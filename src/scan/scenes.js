@@ -80,24 +80,33 @@ export function createSceneRotation(random = Math.random) {
 }
 
 export function buildScanScene(id, mesh) {
-  const box = (size, p, kind = "structure") =>
-    mesh(new THREE.BoxGeometry(...size), p, kind);
+  const defaultFinish = {
+    ruins: "stone", bridge: "timber", village: "plaster",
+    terraces: "stone", canopy: "timber", courtyard: "stone",
+    tower: "metal",
+  }[id];
+  const box = (size, p, kind = "structure", finish =
+    kind === "ground" ? "earth" : defaultFinish) =>
+    mesh(new THREE.BoxGeometry(...size), p, kind, finish);
   const tree = (x, z, y = 0, scale = 1) => {
     mesh(
       new THREE.CylinderGeometry(0.035 * scale, 0.05 * scale, 0.65 * scale, 8),
       [x, y + 0.325 * scale, z],
       "vegetation",
+      "bark",
     );
     mesh(
       new THREE.SphereGeometry(0.29 * scale, 24, 16),
       [x, y + 0.69 * scale, z],
       "vegetation",
+      "leaves",
     );
     for (const side of [-1, 1])
       mesh(
         new THREE.IcosahedronGeometry(0.13 * scale, 1),
         [x + side * 0.17 * scale, y + 0.59 * scale, z + side * 0.08 * scale],
         "vegetation",
+        "leaves",
       );
   };
   box([2, 0.04, 1.6], [0, -0.02, 0], "ground");
@@ -112,7 +121,7 @@ export function buildScanScene(id, mesh) {
   } else if (id === "bridge") {
     for (const x of [-0.76, 0.76]) {
       box([0.48, 0.25, 1.6], [x, 0.125, 0], "ground");
-      box([0.13, 0.44, 0.52], [x * 0.65, 0.22, 0]);
+      box([0.13, 0.44, 0.52], [x * 0.65, 0.22, 0], "structure", "stone");
     }
     box([1.8, 0.09, 0.5], [0, 0.465, 0]);
     for (const x of [-0.6, -0.3, 0, 0.3, 0.6])
@@ -142,9 +151,11 @@ export function buildScanScene(id, mesh) {
         new THREE.ExtrudeGeometry(roof, { depth: 0.5, bevelEnabled: false }),
         [x, y + h, z - 0.25],
         "structure",
+        "roof",
       );
       for (const side of [-1, 1])
-        box([0.09, 0.1, 0.012], [x + side * 0.13, y + h * 0.58, z + 0.217]);
+        box([0.09, 0.1, 0.012], [x + side * 0.13, y + h * 0.58, z + 0.217],
+          "structure", "timber");
     }
     tree(-0.7, -0.45, 0, 0.85);
     tree(0.79, 0.53, 0, 0.55);

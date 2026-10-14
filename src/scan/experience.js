@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
 import { modelBoundsHit, handInsideModel } from "../model-target.js";
 import { buildScanScene, SCAN_SCENES } from "./scenes.js";
+import { scanMaterials } from "./appearance.js";
 const COLORS = { ground: 0x65cfd1, structure: 0xffd39b, vegetation: 0x99eb91 };
 const WHITE = new THREE.Color(0xffffff);
 export class ScanExperience {
@@ -20,21 +21,25 @@ export class ScanExperience {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
+    this.stickReady = new Map();
+    this.materials = scanMaterials();
+    this.group.add(new THREE.HemisphereLight(0xe3f3ff, 0x3f4d39, 2.15));
+    const sun = new THREE.DirectionalLight(0xffead0, 2.1);
+    sun.position.set(-1.5, 2.8, 3);
+    this.group.add(sun);
     this.grabBounds = new THREE.Box3(
       new THREE.Vector3(-1.12, -0.1, -0.91),
       new THREE.Vector3(1.12, 1.17, 0.91),
     );
     this.targets = [];
-    const mesh = (geometry, position, kind) => {
+    const mesh = (geometry, position, kind, finish) => {
       const m = new THREE.Mesh(
         geometry,
-        new THREE.MeshBasicMaterial({
-          color: COLORS[kind],
-          side: THREE.DoubleSide,
-        }),
+        this.materials[finish ?? (kind === "ground" ? "earth" : "stone")],
       );
       m.position.set(...position);
       m.userData.kind = kind;
+      m.userData.finish = finish;
       m.visible = false;
       this.targets.push(m);
       this.group.add(m);
@@ -110,7 +115,37 @@ export class ScanExperience {
   finish() {
     this.stage = 2;
     this.grab.cancel();
+    this.stickReady.clear();
+    this.group.visible = false;
     this.onChange();
+  }
+  rotateWithStick(id, horizontal, vertical, camera) {
+    if (this.stage !== 1 || !this.grab.hands.has(id)) {
+      this.stickReady.delete(id);
+      return false;
+    }
+    if (Math.hypot(horizontal, vertical) < 0.3) {
+      this.stickReady.set(id, true);
+      return false;
+    }
+    if (this.stickReady.get(id) === false ||
+        Math.max(Math.abs(horizontal), Math.abs(vertical)) < 0.75) return false;
+    this.stickReady.set(id, false);
+    const sideways = Math.abs(horizontal) >= Math.abs(vertical);
+    const axis = sideways ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(1, 0, 0).applyQuaternion(
+        camera.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
+    if (axis.lengthSq() < 0.01) axis.set(1, 0, 0);
+    const turn = new THREE.Quaternion().setFromAxisAngle(axis,
+      Math.sign(sideways ? horizontal : vertical) * Math.PI / 4);
+    this.group.updateWorldMatrix(true, false);
+    const before = this.group.localToWorld(new THREE.Vector3(0, 0.5, 0));
+    this.group.quaternion.premultiply(turn);
+    this.group.updateWorldMatrix(true, false);
+    const after = this.group.localToWorld(new THREE.Vector3(0, 0.5, 0));
+    this.group.position.add(before.sub(after));
+    this.grab.rebase();
+    return true;
   }
   update(dt) {
     if (this.highlightAge > 0) {
@@ -224,6 +259,7 @@ export class ScanExperience {
     this.onChange();
   }
   applyVisibility() {
+    this.points.visible = !this.reveal;
     for (const m of this.targets)
       m.visible =
         this.reveal &&
@@ -242,9 +278,15 @@ export class ScanExperience {
   dispose() {
     this.grab.cancel();
     this.group.removeFromParent();
+    const shared = new Set(Object.values(this.materials));
     this.group.traverse((n) => {
       n.geometry?.dispose();
-      n.material?.dispose();
+      if (n.material && !shared.has(n.material))
+        n.material.dispose();
     });
+    for (const material of shared) {
+      material.map.dispose();
+      material.dispose();
+    }
   }
 }
