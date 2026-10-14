@@ -1191,15 +1191,16 @@ function drawShowcaseUI() {
       exhibit.projection === "mercator");
     button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7,
       exhibit.projection === "equalArea");
-    button(exhibit.flat ? "Wrap" : "Flatten", -0.55, -0.79,
-      () => exhibit.transitionTo(!exhibit.flat), 0.7);
-    if (exhibit.projection === "equalArea")
-      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.55, -0.79,
+    const equalArea = exhibit.projection === "equalArea";
+    button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.78 : -0.52, -0.79,
+      () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.7 : 0.85);
+    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? 0 : 0.52, -0.79,
+      () => exhibit.setTissot(!exhibit.tissot), equalArea ? 0.78 : 0.95, exhibit.tissot);
+    if (equalArea)
+      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.78, -0.79,
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
-    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", -0.82, -1.0,
-      () => exhibit.setTissot(!exhibit.tissot), 0.72, exhibit.tissot);
     label(`Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
-      0.37, -1.0, 1.55, 0.12, 25, "#b6d1d9", "#0b2430");
+      0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);
   }
 }
