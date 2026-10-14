@@ -81,7 +81,7 @@ export function initRecommendedVideos(app) {
         <div class="video-player"><iframe title="${video.title} — 360° preview" src="https://www.youtube-nocookie.com/embed/${video.id}?rel=0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
         <p class="video-question">${video.prompt}</p>
         <div class="video-actions"><a class="video-primary" href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer">Open video on YouTube ↗</a>${video.source ? `<a class="video-secondary" href="${video.source}" target="_blank" rel="noopener noreferrer">View on ${video.publisher} ↗</a>` : ""}</div>
-        <p class="video-help">For a full 360° view on Quest, play this clip in YouTube VR and switch to immersive mode after any ad. The link may open in Quest Browser; a web page cannot force YouTube VR to launch. You can search for the video’s exact title in YouTube VR.</p>
+        <p class="video-help">For a full 360° view on Quest, play this clip in YouTube VR and switch to immersive mode after any ad. The link may open in Quest Browser; a web page cannot force YouTube VR to launch. If needed, search YouTube VR by place and publisher.</p>
         <p class="video-credit">Video by ${video.publisher} · Hosted by YouTube. Playback and availability depend on those services.</p>`;
     } else {
       content.innerHTML = `<nav class="video-breadcrumb"><a href="#">← Back to main page</a></nav>
