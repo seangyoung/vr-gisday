@@ -1035,7 +1035,7 @@ function drawShowcaseUI() {
         "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot's circles show where shape and area stretch.",
         "Flatten the globe"],
       change: ["What Changed?",
-        "Landsat revisits places, measuring visible and infrared light.\nFalse color assigns infrared measurements to display colors.\nDrag between dates, mark a change, and choose an explanation.",
+        "Landsat revisits places, measuring visible and infrared light.\nFalse color assigns infrared measurements to display colors.\nDrag between dates and choose what changed most.",
         "Compare images"],
     };
     const [title, body, action] = introductions[exhibit.kind];
@@ -1089,8 +1089,8 @@ function drawShowcaseUI() {
       0, 0.98, 2.45, 0.17, 43, "#e6f4f5", "#0b2430");
     label(`${caseInfo.sensor} · USGS Earthshots`,
       0, 0.79, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
-    label("Drag the white line · Tap the image to mark a change",
-      -0.42, -0.75, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
+    label("Drag the white line to compare dates",
+      -0.47, -0.84, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
     label(caseInfo.question, 0.91, 0.67, 1.06, 0.16, 33,
       "#e6f4f5", "#0b2430");
     if (exhibit.error) {
@@ -1102,8 +1102,6 @@ function drawShowcaseUI() {
       caseInfo.options.forEach((option, index) =>
         button(option, 0.91, 0.40 - index * 0.24,
           () => exhibit.chooseAnswer(index), 1.05));
-      label(exhibit.marker ? "Observation pin placed" : "Place an observation pin",
-        0.91, -0.43, 1.06, 0.15, 25, "#d8f3e6", "#0b2430");
     } else {
       label(exhibit.selectedOption === caseInfo.answer
         ? "Good observation" : `Look for: ${caseInfo.options[caseInfo.answer]}`,
@@ -1115,7 +1113,6 @@ function drawShowcaseUI() {
       button(exhibit.sceneIndex === 2 ? "Show Takeaway" : "Next place",
         0.91, -0.66, () => exhibit.nextScene(), 1.05);
     }
-    button("Takeaway", 0.91, -0.93, () => exhibit.finish(), 1.05);
   } else if (exhibit.kind === "spectral") {
     const modeText = {
       natural: "Natural color: visible red, green, and blue bands",

@@ -39,7 +39,6 @@ export class ChangeExperience extends TimedExhibit {
     this.kind = "change";
     this.sceneIndex = 0;
     this.split = 0.5;
-    this.marker = null;
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -50,7 +49,9 @@ export class ChangeExperience extends TimedExhibit {
     this.canvas.width = CHANGE_SCENES[0].width;
     this.canvas.height = CHANGE_SCENES[0].height;
     blank(this.canvas, "Loading Landsat images…");
-    this.image = canvasPanel(this.canvas, 1.65, 1.42, -0.42, 0.05);
+    this.image = canvasPanel(this.canvas, 1.65, 1.42, -0.47, -0.03);
+    // The image and answer controls share a plane in front of the visitor.
+    this.image.position.z = 0.115;
     this.group.add(this.image);
     this.loadScene();
   }
@@ -78,7 +79,6 @@ export class ChangeExperience extends TimedExhibit {
     const ticket = this.loadTicket = (this.loadTicket || 0) + 1;
     this.draggingBy = null;
     this.split = 0.5;
-    this.marker = null;
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -140,18 +140,6 @@ export class ChangeExperience extends TimedExhibit {
     ctx.stroke();
     dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
     dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right");
-    if (this.marker) {
-      const x = this.marker.u * width, y = this.marker.v * height;
-      ctx.strokeStyle = "#ffdf85";
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.arc(x, y, 17, 0, Math.PI * 2);
-      ctx.moveTo(x - 30, y); ctx.lineTo(x - 20, y);
-      ctx.moveTo(x + 20, y); ctx.lineTo(x + 30, y);
-      ctx.moveTo(x, y - 30); ctx.lineTo(x, y - 20);
-      ctx.moveTo(x, y + 20); ctx.lineTo(x, y + 30);
-      ctx.stroke();
-    }
     if (this.revealed) {
       const { u, v, rx, ry } = this.sceneInfo.focus;
       ctx.strokeStyle = "#fff9bb";
@@ -177,7 +165,6 @@ export class ChangeExperience extends TimedExhibit {
     if (!hit?.uv) return false;
     this.draggingBy = id;
     this.startU = hit.uv.x;
-    this.lastUV = { u: hit.uv.x, v: 1 - hit.uv.y };
     this.moved = false;
     return true;
   }
@@ -187,7 +174,6 @@ export class ChangeExperience extends TimedExhibit {
     const hit = this.imageHit(raycaster);
     if (!hit?.uv) return false;
     const u = Math.max(0.02, Math.min(0.98, hit.uv.x));
-    this.lastUV = { u, v: 1 - hit.uv.y };
     if (Math.abs(u - this.startU) > 0.025) this.moved = true;
     if (this.moved && Math.abs(u - this.split) > 0.001) {
       this.split = u;
@@ -199,17 +185,6 @@ export class ChangeExperience extends TimedExhibit {
   endInteraction(id) {
     if (this.draggingBy !== id) return false;
     this.draggingBy = null;
-    if (!this.moved && !this.revealed) {
-      this.marker = this.lastUV;
-      this.refresh();
-      this.onChange();
-    }
-    return true;
-  }
-
-  selectFromRay(raycaster) {
-    if (!this.beginInteraction(raycaster, "tap")) return false;
-    this.endInteraction("tap");
     return true;
   }
 
