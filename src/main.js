@@ -1125,9 +1125,12 @@ function drawShowcaseUI() {
       "#d8f3e6", "#0b2430");
     label(modeText[exhibit.mode], 0, -0.58, 2.4, 0.12, 27,
       "#e6f4f5", "#0b2430");
-    button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"), 0.72);
-    button("False color", 0, -0.75, () => exhibit.setMode("false"), 0.72);
-    button("NIR only", 0.78, -0.75, () => exhibit.setMode("nir"), 0.72);
+    button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"),
+      0.72, exhibit.mode === "natural");
+    button("False color", 0, -0.75, () => exhibit.setMode("false"),
+      0.72, exhibit.mode === "false");
+    button("NIR only", 0.78, -0.75, () => exhibit.setMode("nir"),
+      0.72, exhibit.mode === "nir");
     button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {
