@@ -107,6 +107,9 @@ let lastUIKey = "";
 let clusterReadout = null;
 let soundMenuOpen = false;
 let soundButtons = [];
+let soundHiddenVisuals = [];
+let soundPreviousBackground = null;
+let soundBackgroundSaved = false;
 const isSpatial = () => step >= 4 && step < stages.length;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
@@ -329,6 +332,26 @@ function closeSoundMenu() {
   soundMenuOpen = false;
   clearSoundPanel();
   soundPanel.visible = false;
+  for (const { object, visible } of soundHiddenVisuals) object.visible = visible;
+  soundHiddenVisuals = [];
+  if (soundBackgroundSaved) scene.background = soundPreviousBackground;
+  soundPreviousBackground = null;
+  soundBackgroundSaved = false;
+}
+function hideVisualsForSoundMenu() {
+  const visualRoots = [
+    root, floatingModel, rain?.group, scan?.group,
+    ...(scan?.reticles?.flat() ?? []),
+    ...[layers, viewshed, pixels].flatMap((demo) =>
+      demo ? [demo.group, demo.clipboard] : []),
+  ];
+  soundHiddenVisuals = visualRoots.filter(Boolean).map((object) => ({
+    object, visible: object.visible,
+  }));
+  for (const { object } of soundHiddenVisuals) object.visible = false;
+  soundPreviousBackground = scene.background;
+  soundBackgroundSaved = true;
+  if (scene.background !== null) scene.background = new THREE.Color(0x071820);
 }
 function drawSoundMenu() {
   clearSoundPanel();
@@ -398,6 +421,7 @@ function toggleSoundMenu() {
   soundPanel.lookAt(eye);
   soundPanel.visible = true;
   soundMenuOpen = true;
+  hideVisualsForSoundMenu();
   drawSoundMenu();
 }
 function line(points, color, opacity = 1) {
@@ -2231,7 +2255,8 @@ renderer.setAnimationLoop((time, frame) => {
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
       if (visible && !soundMenuOpen)
         landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
-      landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
+      if (!soundMenuOpen)
+        landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
     }
     if (rain && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
@@ -2337,17 +2362,20 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(hit.object.userData.hoverColor ?? 0xffda8b);
     }
   }
-  if (devPreview && (pixels || viewshed || layers) && !renderer.xr.isPresenting) {
+  if (devPreview && (pixels || viewshed || layers) && !renderer.xr.isPresenting &&
+      !soundMenuOpen) {
     const landscapeDemo = pixels ?? viewshed ?? layers;
     landscapeDemo.update(dt);
     landscapeDemo.updateClipboard(null, camera, true);
   }
-  if (devPreview && showcase && !renderer.xr.isPresenting) showcase.update(dt);
-  if (devPreview && rain && !renderer.xr.isPresenting) {
+  if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
+    showcase.update(dt);
+  if (devPreview && rain && !renderer.xr.isPresenting && !soundMenuOpen) {
     rain.update(dt, previewRaining);
     if (previewRaining || rain.pouring) waterSoundUntil = time + 350;
   }
-  if (devPreview && scan && !renderer.xr.isPresenting) scan.update(dt);
+  if (devPreview && scan && !renderer.xr.isPresenting && !soundMenuOpen)
+    scan.update(dt);
   if (previewGuide && !renderer.xr.isPresenting)
     for (const { grip, id } of controllers) {
       grip.visible = true;
