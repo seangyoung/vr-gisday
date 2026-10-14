@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createTray, ErosionWater, EROSION_MAX_CUT } from "../src/rain/erosion.js";
+import { createTray, ErosionWater, EROSION_MAX_CUT, paintVegetation } from "../src/rain/erosion.js";
 import { SIZE, cellAt, cellPoint } from "../src/rain/terrain.js";
 
 test("dry tray is stable and initial roughness is reproducible", () => {
@@ -12,6 +12,35 @@ test("dry tray is stable and initial roughness is reproducible", () => {
   assert.deepEqual(h, createTray());
   assert.equal(water.eroded, 0);
   assert.equal(water.suspended, 0);
+});
+test("painting protects a local patch while runoff still crosses planted ground", () => {
+  const size = 65;
+  const cover = new Float32Array(size * size);
+  assert.equal(paintVegetation(cover, 0, 0), true);
+  assert.ok(cover[cellAt(0, 0)] > 0);
+  assert.equal(cover[cellAt(0.5, 0.5)], 0);
+  for (let i = 0; i < size; i++)
+    for (const rim of [i, (size - 1) * size + i, i * size, i * size + size - 1])
+      assert.equal(cover[rim], 0);
+
+  const bareBed = createTray(), plantedBed = createTray();
+  cover.fill(1);
+  const bare = new ErosionWater(bareBed);
+  const planted = new ErosionWater(plantedBed, cover);
+  const source = cellAt(0, -0.8);
+  for (let i = 0; i < 500; i++) {
+    if (i % 5 === 0) {
+      bare.add(source, 0.00035);
+      planted.add(source, 0.00035);
+    }
+    bare.update(0.02);
+    planted.update(0.02);
+  }
+  assert.ok(bare.eroded > 0.05);
+  assert.ok(planted.eroded < bare.eroded * 0.25);
+  assert.ok(planted.drained > 0);
+  assert.ok(Math.abs(planted.stored + planted.drained - planted.added) < 1e-8);
+  assert.ok(Math.abs(planted.eroded - planted.deposited - planted.exported - planted.suspended) < 1e-8);
 });
 test("pouring cuts the bed, deposits sediment, and conserves water and sediment", () => {
   const h = createTray(),

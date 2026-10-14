@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
 import { modelBoundsHit, handInsideModel } from "../model-target.js";
-import { createTray, ErosionWater, EROSION_SIZE } from "./erosion.js";
+import { createTray, ErosionWater, EROSION_SIZE, paintVegetation, VEGETATION_BRUSH_RADIUS } from "./erosion.js";
 import { WaterSurface } from "./water-surface.js";
 import { SurfaceWater } from "./water.js";
 import {
@@ -32,9 +32,11 @@ export class RainExperience {
     this.stage = 0;
     this.heights =
       this.kind === "erosion" ? createTray(this.size) : createHeights();
+    this.vegetation = this.kind === "erosion" ? new Float32Array(this.heights.length) : null;
+    this.brushTool = "earth";
     this.water =
       this.kind === "erosion"
-        ? new ErosionWater(this.heights)
+        ? new ErosionWater(this.heights, this.vegetation)
         : new SurfaceWater(this.heights);
     this.mode = "rain";
     this.edited = false;
@@ -51,6 +53,7 @@ export class RainExperience {
     this.time = 0;
     this.statusTime = 0;
     this.replayFrames = this.kind === "erosion" ? [this.heights.slice()] : [];
+    this.replayVegetationFrames = this.kind === "erosion" ? [this.vegetation.slice()] : [];
     this.replayCaptureTime = 0;
     this.replayTime = -1;
     this.replayFrameIndex = -1;
@@ -384,7 +387,7 @@ export class RainExperience {
     this.endStroke();
     this.pouring = false;
     if (this.kind === "erosion" && this.mode === "sculpt" && mode === "rain") {
-      this.water = new ErosionWater(this.heights);
+      this.water = new ErosionWater(this.heights, this.vegetation);
       this.refreshOriginalBed();
     }
     this.mode = mode;
@@ -404,7 +407,7 @@ export class RainExperience {
     this.onChange();
   }
   clearWater() {
-    if (this.kind === "erosion") this.water = new ErosionWater(this.heights);
+    if (this.kind === "erosion") this.water = new ErosionWater(this.heights, this.vegetation);
     else this.water.clear();
     this.ponds.count = 0;
     if (this.waterSurface) this.waterSurface.mesh.visible = false;
@@ -506,7 +509,7 @@ export class RainExperience {
     }
     if (handedness === "right" && worldHand) {
       this.beginStroke(id, worldHit, worldHand);
-      return this.stroke?.id === id ? "sculpt" : null;
+      return this.stroke?.id === id ? this.brushTool === "vegetation" ? "plant" : "sculpt" : null;
     }
     return null;
   }
@@ -520,10 +523,24 @@ export class RainExperience {
       handZ: worldHand.z,
       lastHeight: hand.y,
       center: hit,
+      tool: this.brushTool,
+      lastPaint: null,
     };
+    if (this.kind === "erosion" && this.stroke.tool === "vegetation")
+      this.movePlantBrush(hit.x, hit.z);
   }
-  moveStroke(id, worldHand) {
+  moveStroke(id, worldHand, worldHit = null) {
     if (this.stroke?.id !== id) return;
+    if (this.kind === "erosion" && this.stroke.tool === "vegetation") {
+      if (!worldHit) {
+        this.stroke.lastPaint = null;
+        this.brush.visible = false;
+        return;
+      }
+      const hit = this.group.worldToLocal(worldHit.clone());
+      this.movePlantBrush(hit.x, hit.z);
+      return;
+    }
     const verticalHand = new THREE.Vector3(
       this.stroke.handX, worldHand.y, this.stroke.handZ,
     );
@@ -531,6 +548,43 @@ export class RainExperience {
     const delta = THREE.MathUtils.clamp(height - this.stroke.lastHeight, -0.08, 0.08);
     this.stroke.lastHeight = height;
     this.applyBrush(this.stroke.center.x, this.stroke.center.z, delta);
+  }
+  setBrushTool(tool) {
+    if (this.kind !== "erosion" || !["earth", "vegetation"].includes(tool)) return;
+    this.endStroke();
+    this.brushTool = tool;
+    this.brush.material.color.setHex(tool === "vegetation" ? 0x73e076 : 0xffcd85);
+    this.brush.scale.set(
+      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
+      0.22,
+      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
+    );
+    this.onChange();
+  }
+  movePlantBrush(x, z) {
+    if (x < -1 || x > 1 || z < -1 || z > 1) {
+      this.brush.visible = false;
+      this.stroke.lastPaint = null;
+      return;
+    }
+    const previous = this.stroke.lastPaint;
+    const length = previous ? Math.hypot(x - previous.x, z - previous.z) : 0;
+    const steps = Math.max(1, Math.ceil(length / (VEGETATION_BRUSH_RADIUS * 0.5)));
+    let changed = false;
+    for (let step = 1; step <= steps; step++) {
+      const amount = step / steps;
+      changed = paintVegetation(this.vegetation,
+        previous ? previous.x + (x - previous.x) * amount : x,
+        previous ? previous.z + (z - previous.z) * amount : z,
+        0.28) || changed;
+    }
+    this.stroke.lastPaint = { x, z };
+    this.brush.position.set(x, cellPoint(this.cellAt(x, z), this.heights).y + 0.015, z);
+    this.brush.visible = true;
+    if (changed) {
+      this.edited = true;
+      this.paint();
+    }
   }
   applyBrush(x, z, delta) {
     if (this.stage !== 1 || this.grab.hands.size) return;
@@ -601,13 +655,18 @@ export class RainExperience {
     this.overflowAnnounced = false;
     this.grab.cancel();
     this.stroke = null;
+    this.brushTool = "earth";
+    this.brush.material.color.setHex(0xffcd85);
+    this.brush.scale.set(1, 0.22, 1);
     this.heights =
       this.kind === "erosion" ? createTray(this.size) : createHeights();
+    if (this.vegetation) this.vegetation.fill(0);
     this.water =
       this.kind === "erosion"
-        ? new ErosionWater(this.heights)
+        ? new ErosionWater(this.heights, this.vegetation)
         : new SurfaceWater(this.heights);
     this.replayFrames = this.kind === "erosion" ? [this.heights.slice()] : [];
+    this.replayVegetationFrames = this.kind === "erosion" ? [this.vegetation.slice()] : [];
     this.replayCaptureTime = 0;
     this.replayTime = -1;
     this.replayFrameIndex = -1;
@@ -665,7 +724,7 @@ export class RainExperience {
     this.group.add(obj);
     return obj;
   }
-  paint(displayHeights = this.heights) {
+  paint(displayHeights = this.heights, displayVegetation = this.vegetation) {
     const attr = this.terrain.geometry.getAttribute("color");
     const low = new THREE.Color(this.kind === "erosion" ? 0x805331 : 0x396d4b),
       high = new THREE.Color(this.kind === "erosion" ? 0xe8c78b : 0xb8bd75);
@@ -684,6 +743,11 @@ export class RainExperience {
           new THREE.Color(change < 0 ? 0x452819 : 0xffe6aa),
           Math.min(0.85, Math.abs(change) * 14),
         );
+        const cover = displayVegetation[id];
+        if (cover > 0) {
+          const green = new THREE.Color(id % 7 < 3 ? 0x397a37 : 0x599246);
+          c.lerp(green, Math.min(0.88, cover * 0.88));
+        }
       }
       attr.setXYZ(id, c.r, c.g, c.b);
     }
@@ -792,13 +856,13 @@ export class RainExperience {
     }
     return { cut, deposit, changed };
   }
-  showReplayFrame(frame) {
+  showReplayFrame(frame, cover = this.vegetation) {
     const positions = this.terrain.geometry.attributes.position;
     for (let i = 0; i < frame.length; i++) positions.setY(i, frame[i]);
     positions.needsUpdate = true;
     this.terrain.geometry.computeVertexNormals();
     this.terrain.geometry.computeBoundingSphere();
-    this.paint(frame);
+    this.paint(frame, cover);
   }
   startReplay() {
     if (this.kind !== "erosion" || this.stage !== 1 || this.replayFrames.length < 2) return false;
@@ -882,7 +946,7 @@ export class RainExperience {
         Math.floor((this.replayTime / 4) * this.replayFrames.length));
       if (index !== this.replayFrameIndex) {
         this.replayFrameIndex = index;
-        this.showReplayFrame(this.replayFrames[index]);
+        this.showReplayFrame(this.replayFrames[index], this.replayVegetationFrames[index]);
       }
       if (this.replayTime >= 4) this.endReplay();
       return;
@@ -941,7 +1005,10 @@ export class RainExperience {
       this.replayCaptureTime += dt;
       if (this.replayCaptureTime >= 1.5 && this.replayFrames.length < 160) {
         this.replayCaptureTime = 0;
-        if (this.water.eroded > 0) this.replayFrames.push(this.heights.slice());
+        if (this.water.eroded > 0) {
+          this.replayFrames.push(this.heights.slice());
+          this.replayVegetationFrames.push(this.vegetation.slice());
+        }
       }
     }
     this.particles.count = count;

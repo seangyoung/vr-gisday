@@ -3,6 +3,33 @@ import { SIZE, cellPoint } from "./terrain.js";
 
 export const EROSION_SIZE = 65;
 export const EROSION_MAX_CUT = 0.4;
+export const VEGETATION_BRUSH_RADIUS = 0.14;
+
+// Coverage is a 0–1 field over the bed. Keep the tray rim bare and anchored.
+export function paintVegetation(coverage, x, z, strength = 0.28) {
+  if (![x, z, strength].every(Number.isFinite) || strength <= 0) return false;
+  const size = Math.sqrt(coverage.length);
+  if (!Number.isInteger(size) || x < -1 || x > 1 || z < -1 || z > 1) return false;
+  const spacing = 2 / (size - 1);
+  const minRow = Math.max(1, Math.floor((z - VEGETATION_BRUSH_RADIUS + 1) / spacing));
+  const maxRow = Math.min(size - 2, Math.ceil((z + VEGETATION_BRUSH_RADIUS + 1) / spacing));
+  const minCol = Math.max(1, Math.floor((x - VEGETATION_BRUSH_RADIUS + 1) / spacing));
+  const maxCol = Math.min(size - 2, Math.ceil((x + VEGETATION_BRUSH_RADIUS + 1) / spacing));
+  let changed = false;
+  for (let row = minRow; row <= maxRow; row++)
+    for (let col = minCol; col <= maxCol; col++) {
+      const distance = Math.hypot(col * spacing - 1 - x, row * spacing - 1 - z);
+      if (distance >= VEGETATION_BRUSH_RADIUS) continue;
+      const id = row * size + col;
+      const next = Math.min(1, coverage[id] + strength *
+        (1 - distance / VEGETATION_BRUSH_RADIUS));
+      if (next > coverage[id]) {
+        coverage[id] = next;
+        changed = true;
+      }
+    }
+  return changed;
+}
 export function createTray(size = SIZE) {
   return Float64Array.from({ length: size * size }, (_, id) => {
     const { x, z } = cellPoint(id, undefined, size);
@@ -19,7 +46,7 @@ export function createTray(size = SIZE) {
 // Educational erosion: carrying capacity grows with local flow and slope.
 // Suspended sediment follows the same conservative transfers as water.
 export class ErosionWater extends SurfaceWater {
-  constructor(heights) {
+  constructor(heights, vegetation = new Float32Array(heights.length)) {
     super(
       heights,
       Math.sqrt(heights.length),
@@ -28,6 +55,8 @@ export class ErosionWater extends SurfaceWater {
     this.spacing = 2 / (this.size - 1);
     this.preferSteep = true;
     this.initial = heights.slice();
+    if (vegetation.length !== heights.length) throw new RangeError("Vegetation grid must match the bed");
+    this.vegetation = vegetation;
     this.sediment = new Float64Array(heights.length);
     this.sedimentChange = new Float64Array(heights.length);
     this.before = new Float64Array(heights.length);
@@ -93,9 +122,12 @@ export class ErosionWater extends SurfaceWater {
       const capacity = this.flow[id] * Math.min(2, this.slope[id]) * 10;
       const difference = capacity - this.sediment[id];
       if (difference > 0 && this.flow[id] > 0.00001) {
+        // Plants resist detachment; water still crosses covered cells and
+        // transports sediment from upstream. Full cover leaves 6% of bare cut.
+        const resistance = 1 - 0.94 * Math.min(1, Math.max(0, this.vegetation[id]));
         const removed = Math.min(
-          difference * 0.18,
-          0.0015,
+          difference * 0.18 * resistance,
+          0.0015 * resistance,
           Math.max(
             0,
             this.heights[id] - Math.max(0.015, this.initial[id] - EROSION_MAX_CUT),
@@ -134,8 +166,9 @@ export class ErosionWater extends SurfaceWater {
           const excess =
             this.heights[from] - this.heights[to] - this.spacing * 1.2;
           if (excess <= 0) continue;
+          const resistance = 1 - 0.94 * Math.min(1, Math.max(0, this.vegetation[from]));
           const amount = Math.min(
-            excess * 0.075,
+            excess * 0.075 * resistance,
             Math.max(
               0,
               this.heights[from] +

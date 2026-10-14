@@ -112,6 +112,37 @@ test("erosion tray resets to a forward pitch above a deeper physical base", () =
   r.dispose();
 });
 
+test("erosion tray paints vegetation with the right trigger while rain stays available", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  r.explore();
+  const originalBed = r.heights.slice();
+  const water = r.water;
+  r.setBrushTool("vegetation");
+  const start = new THREE.Vector3(-0.3, r.heights[r.cellAt(-0.3, -0.4)], -0.4);
+  const hand = new THREE.Vector3(-0.3, 1, -0.4);
+  assert.equal(r.beginTrigger("right", 0, start, hand), "plant");
+  assert.equal(r.beginTrigger("left", 1, start, hand), "rain");
+  const end = new THREE.Vector3(0.3, r.heights[r.cellAt(0.3, -0.4)], -0.4);
+  r.moveStroke(0, hand, end);
+  assert.ok(r.vegetation[r.cellAt(-0.3, -0.4)] > 0);
+  assert.ok(r.vegetation[r.cellAt(0, -0.4)] > 0, "a sweep covers the cells between ray samples");
+  assert.ok(r.vegetation[r.cellAt(0.3, -0.4)] > 0);
+  assert.equal(r.vegetation[r.cellAt(0.7, 0.4)], 0);
+  assert.deepEqual(r.heights, originalBed);
+  assert.equal(r.water, water);
+  r.moveStroke(0, hand, null);
+  assert.equal(r.brush.visible, false);
+  r.endStroke(0);
+  r.setBrushTool("earth");
+  assert.ok(r.vegetation[r.cellAt(0, -0.4)] > 0);
+  assert.equal(r.water, water);
+  r.restore();
+  assert.equal(r.brushTool, "earth");
+  assert.ok(r.vegetation.every((value) => value === 0));
+  assert.equal(r.water.vegetation, r.vegetation);
+  r.dispose();
+});
+
 test("a sculpted pond announces real overflow only after water crosses its divide", () => {
   const events = [];
   const r = new RainExperience(new THREE.Scene(), () => {}, "drainage", (event) => events.push(event));

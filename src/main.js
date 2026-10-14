@@ -1245,7 +1245,7 @@ function drawRainUI() {
         ? "Shape the land. Watch water reshape it."
         : "Shape the land. Follow the water.",
       r.kind === "erosion"
-        ? "Runoff cuts loose soil; slower water deposits sediment.\nShape a slope and watch channels form."
+        ? "Rain cuts channels in loose soil. Paint green cover to protect a patch,\nthen compare its erosion with bare ground beside it."
         : "Runoff follows slope toward an outlet; ridges form divides.\nRain the slopes, sculpt the land, and watch paths change.",
     ],
     [
@@ -1270,27 +1270,30 @@ function drawRainUI() {
     ];
   if (r.kind === "erosion") {
     copy[4] = [
-      "Water shapes its own path.",
-      "Fast flow lifts loose material and carries it downhill.\nChannels merge; slower water deposits some sediment.\nThe tray speeds up these changes so you can see them happen.",
+      "Plants help hold soil in place.",
+      "Fast runoff cuts bare soil and carries sediment downhill.\nVegetation slows soil detachment and stabilizes wet banks; water still flows across it.\nCompare green and bare patches. This short simulation speeds up erosion.",
     ];
   }
   const [title, body] = copy[r.stage];
   if (r.stage === 1)
     label(
-      `Left trigger: rain · Right trigger: sculpt · Grips: move/size\n${r.kind === "erosion"
-        ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Runoff cuts channels and deposits sediment."
+      `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"} · Grips: move/size\n${r.kind === "erosion"
+        ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Green cover protects soil; bare patches erode faster."
         : r.overlay ? "Blue and gold mark the two drainage basins." : "Runoff follows slope; ridges divide basins."}`,
       0, GUIDED_INFO_Y, 2.3, 0.2, 32, "#e6f4f5", "#0b2430",
     );
   else lessonCard(title, body);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
-      button("Reset", -0.78, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.48);
-      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.26, GUIDED_ACTION_Y,
-        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.48);
-      button(r.replayTime >= 0 ? "Live" : "Replay", 0.26, GUIDED_ACTION_Y,
-        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.48);
-      button("Takeaways", 0.78, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.48);
+      button("Reset", -0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.42);
+      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.44, GUIDED_ACTION_Y,
+        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.42);
+      button(r.replayTime >= 0 ? "Live" : "Replay", 0, GUIDED_ACTION_Y,
+        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.42);
+      button("Plants", 0.44, GUIDED_ACTION_Y,
+        () => r.setBrushTool(r.brushTool === "vegetation" ? "earth" : "vegetation"),
+        0.42, r.brushTool === "vegetation");
+      button("Takeaway", 0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.42);
     } else {
       button("Reset terrain", -0.59, GUIDED_ACTION_Y,
         () => { stopRainInput(); r.restore(); }, 0.66);
@@ -1685,7 +1688,8 @@ function controllerGuideContext(hand) {
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR"
     : "Exit";
   if (rain?.stage === 1) {
-    return [hand === "left" ? "Rain" : "Sculpt", "Move/size", onMenu, exitLabel];
+    return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
+      "Move/size", onMenu, exitLabel];
   }
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
@@ -2281,6 +2285,7 @@ renderer.setAnimationLoop((time, frame) => {
           rain.moveStroke(
             held.id,
             held.grip.getWorldPosition(new THREE.Vector3()),
+            rain.stroke.tool === "vegetation" ? rainHit(held.c)?.point : null,
           );
         } else rain.endStroke();
       }
