@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import { ModelGrab } from "../manipulation.js";
 
+const HEIGHT_LOW = new THREE.Color(0x2fb574);
+const HEIGHT_HIGH = new THREE.Color(0xf4dc55);
+const RANGE_NEAR = new THREE.Color(0x377df0);
+const RANGE_FAR = new THREE.Color(0xed554d);
+
 // A modest horizontal fan widens each sweep without inventing surface points.
 // Extra WebXR sources are optional: the center ray remains usable on its own.
 const FAN_OFFSETS = [-0.075, 0.075];
@@ -235,16 +240,16 @@ export class RoomScan {
     const geo = this.points.geometry;
     if (full) this.uploadedCount = 0;
     const color = new THREE.Color();
+    const heightMode = this.colorMode === "height";
     for (let i = this.uploadedCount; i < this.records.length; i++) {
       const { p, distance } = this.records[i];
       const local = this.frozen ? p.clone().sub(this.center) : p;
       geo.attributes.position.setXYZ(i, local.x, local.y, local.z);
-      const value = this.colorMode === "height" ? (p.y + 1) / 3 : distance / 8;
-      color.setHSL(
-        0.65 - THREE.MathUtils.clamp(value, 0, 1) * 0.55,
-        0.85,
-        0.65,
-      );
+      // Height is relative to the XR origin; range is the capture distance.
+      const value = heightMode ? (p.y + 1) / 3 : (distance - 0.2) / 7.8;
+      color.lerpColors(heightMode ? HEIGHT_LOW : RANGE_NEAR,
+        heightMode ? HEIGHT_HIGH : RANGE_FAR,
+        THREE.MathUtils.clamp(value, 0, 1));
       geo.attributes.color.setXYZ(i, color.r, color.g, color.b);
     }
     this.uploadedCount = this.records.length;

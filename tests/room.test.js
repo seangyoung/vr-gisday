@@ -52,6 +52,29 @@ test("bad, duplicate, out-of-range points and cap are rejected without fabricate
   assert.equal(r.record({ x: 2, y: 0, z: -1 }, origin), false);
   r.dispose();
 });
+test("height and capture range use distinct color ramps without moving points", () => {
+  const r = make();
+  assert.equal(r.record({ x: 0, y: -1, z: 0 }, new THREE.Vector3(0, -1, 0.25)), true);
+  assert.equal(r.record({ x: 0, y: 2, z: 0 }, new THREE.Vector3(0, 2, 7.9)), true);
+  const colors = r.points.geometry.attributes.color;
+  const positions = r.points.geometry.attributes.position;
+  const rgb = (i) => [colors.getX(i), colors.getY(i), colors.getZ(i)];
+  r.refreshPoints();
+  const lowHeight = rgb(0), highHeight = rgb(1);
+  assert.ok(lowHeight[1] > lowHeight[0] && lowHeight[1] > lowHeight[2]);
+  assert.ok(highHeight[0] > highHeight[2] && highHeight[1] > highHeight[2]);
+  r.toggleColor();
+  const nearRange = rgb(0), farRange = rgb(1);
+  assert.equal(r.colorMode, "range");
+  assert.ok(nearRange[2] > nearRange[0] && nearRange[2] > nearRange[1]);
+  assert.ok(farRange[0] > farRange[1] && farRange[0] > farRange[2]);
+  assert.notDeepEqual(nearRange, lowHeight);
+  assert.equal(positions.getY(0), -1);
+  assert.equal(positions.getY(1), 2);
+  r.toggleColor();
+  assert.deepEqual(rgb(0), lowHeight);
+  r.dispose();
+});
 test("source rejection is bounded until retry; pending sources cancel after disposal", async () => {
   let requests = 0;
   const input = { targetRaySpace: {} };

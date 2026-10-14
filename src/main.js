@@ -693,6 +693,9 @@ async function switchToRoomScan() {
 function drawRoomUI() {
   const s = scan;
   const intro = s.stage === 0;
+  const colorGuide = s.colorMode === "height"
+    ? "Height: green low → yellow high"
+    : "Range: blue near → red far";
   const title =
     s.stage === 0
       ? "Scan your room · Quest 3S"
@@ -714,7 +717,7 @@ function drawRoomUI() {
     label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
   } else if (s.stage === 2) {
     lessonCard(title, body);
-    label(`${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+    label(`${s.records.length} points · ${colorGuide}`,
       0, GUIDED_INFO_Y, 2.3, 0.12, 27, "#d8eae8", "#0b2430");
     takeawayActions(GUIDED_ACTION_Y);
     foregroundTakeaway();
@@ -722,9 +725,9 @@ function drawRoomUI() {
   } else lessonCard(title, body);
   if (intro) {
     label(s.message, 0, -0.5, 2.3, 0.14, 27, "#e6f4f5", "#0b2430");
-    label(`${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+    label(`${s.records.length} points · ${colorGuide}`,
       0, -0.64, 2.3, 0.09, 24, "#b6d1d9", "#0b2430");
-  } else label(`${s.message}\n${s.records.length} points · WebXR surface estimates · Color: ${s.colorMode}`,
+  } else label(`${s.message}\n${s.records.length} WebXR points · ${colorGuide}`,
     0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430");
   if (s.stage === 0) {
     if (s.status !== "unavailable")
