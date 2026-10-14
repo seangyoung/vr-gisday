@@ -60,6 +60,15 @@ The expanded landscape and visibility overlay use original synthetic geometry an
 
 The app uses original synthetic colors and known model categories, averaged over fixed square ground areas. It illustrates ground pixel size and mixing; it does not simulate a particular satellite, spectral response, image sharpness, or physical radiance measurement.
 
+## What Changed? — checked 2026-10-14
+
+- USGS Earthshots, [Illinois/Indiana flood](https://eros.usgs.gov/earthshots/illinoisindiana-usa): Landsat 5 path/row 22/33 on June 9, 2007 and June 11, 2008. Both source PNGs use TM bands 5/4/3 (shortwave infrared, near infrared, red) and cover the same 1000 × 873-pixel footprint. USGS describes the June 2008 flood, heavy rain, and saturated antecedent conditions.
+- USGS Earthshots, [Fire and Recovery](https://eros.usgs.gov/earthshots/fire-and-recovery): Landsat 5 path/row 38/29 on September 22, 1987 and October 10, 1988. Both 1000 × 973-pixel source PNGs use the same shortwave infrared / near infrared / red composite. USGS identifies dark-red burn scars after the 1988 Yellowstone fires and shows later recovery in the longer series.
+- USGS Earthshots, [Rapid Suburban Expansion](https://eros.usgs.gov/earthshots/rapid-suburban-expansion): northeastern Dallas, March 22, 1989 (Landsat 5 bands 4/3/2) and March 4, 2023 (Landsat 8 bands 5/4/3). Both are near infrared / red / green composites, at 1000 × 745 and 1000 × 744 pixels. The app normalizes the latter's one-pixel height difference on the display canvas. USGS describes expansion around Plano, Allen, and McKinney.
+- USGS, [Landsat data-use guidance](https://www.usgs.gov/faqs/are-there-any-restrictions-use-or-redistribution-landsat-data): USGS Landsat data and images may be redistributed, with a requested source credit. The app credits USGS Earthshots in the lesson and links these pages here.
+
+The six bundled `src/change/data/*.jpg` images were transcoded directly from the Earthshots source PNGs to quality-88 JPEG with macOS `sips`; they were not redrawn or semantically altered. Original source PNG SHA-256 prefixes, in scene before/after order: flood `570c2008a686002a` / `be5fb18834721195`; fire `83f011c88532baa0` / `809874f4b130b44f`; Dallas `ad20bc265a0ef803` / `0f9cca519f36b9a3`. The hand-drawn oval after each answer identifies one example area of visible change, not a mapped boundary. The images are display-stretched false-color composites, so their pixel values are not calibrated reflectance or a quantitative change map. The flood and fire pairs use the same Landsat 5 sensor; the Dallas pair spans Landsat 5 and 8 and is used for qualitative interpretation.
+
 ## Candidate demos — checked 2026-10-12
 
 ### See the Invisible

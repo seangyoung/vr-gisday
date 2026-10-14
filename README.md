@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with nine short experiences in one immersive selection gallery: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, **How Big Is a Pixel?**, **See the Invisible**, **Where Did the Cluster Go?**, and **Make the World Flat**. The three-by-three gallery curves gently toward the viewer; a controller ray and trigger open any demo directly.
+Quest-focused WebXR app with ten short experiences in one immersive selection gallery: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, **How Big Is a Pixel?**, **See the Invisible**, **Where Did the Cluster Go?**, **Make the World Flat**, and **What Changed?**. The four-column gallery curves gently toward the viewer; a controller ray and trigger open any demo directly.
 
 ## Run
 
@@ -13,7 +13,7 @@ npm test
 npm run build
 ```
 
-Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a laptop's LAN address for immersive WebXR. GitHub Pages supplies HTTPS. The nine demos need no runtime API keys or external asset requests; the separate recommended-video gallery loads YouTube thumbnails and embedded videos from YouTube when opened. Dependencies are bundled by Vite.
+Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a laptop's LAN address for immersive WebXR. GitHub Pages supplies HTTPS. The ten demos need no runtime API keys or external asset requests; the separate recommended-video gallery loads YouTube thumbnails and embedded videos from YouTube when opened. Dependencies are bundled by Vite.
 
 ## Recommended Videos
 
@@ -112,7 +112,13 @@ The **Takeaway** button opens a summary at any point, and the same screen appear
 
 The ninth experience displays a slowly rotating globe beside the same public-domain Natural Earth land outlines on a surface that unfolds into a flat map. Visitors can discover that holding a controller trigger on the globe spins or tilts it; vertical drag stays screen-consistent as the Pacific side comes into view, and a swipe coasts before the gentle default spin resumes. The visitor can choose **Plate Carrée** (equirectangular), **Mercator**, or **Cylindrical equal-area**; **Wrap/Flatten** animates the transformation. Dragging the flat map left or right moves the central meridian continuously; in equal-area mode the standard parallel can be switched between 0° and 30°. The equator and Prime Meridian are emphasized on both views. **Tissot circles** overlays equal-size small circles on the source globe and their projected shapes on the map. Six longitude columns are evenly spaced at 60° intervals, including the Pacific seam. A trigger tap on a circle highlights the same geographic circle on globe and map; tapping elsewhere clears the selection, while dragging the globe spins it. The active projection button is highlighted. Roundness indicates local shape distortion and relative size indicates local area distortion. These finite 8°-radius symbols approximate the infinitesimal indicatrix. Each projection is fit with a uniform display scale to avoid adding artificial shape distortion. A readout compares each projection's local map-area scale at 60° N with the equator: approximately 2×, 4×, and 1×, respectively. The projection mesh has about 4,700 vertices and updates locally in the browser, so the interactive choices require no server or runtime download. The **Takeaway** button opens a dedicated summary of distortion and projection choices at any time; it also appears after four minutes with **Restart** and **Exit to Menu**. This is a teaching comparison of three cylindrical projections, not a general-purpose projection editor. Development preview: `?preview&demo=projection`; use the mouse to spin the globe, recenter the map, and select Tissot circles there.
 
-Each of these experiences starts its four-minute timer only after its introduction button is pressed. **X** restarts it, **Y** recenters the display, **A** opens the existing sound menu, and **B** returns to the nine-demo gallery. On Quest, check gallery readability and targeting as well as the demos' frame rate and transitions.
+Each of these experiences starts its four-minute timer only after its introduction button is pressed. **X** restarts it, **Y** recenters the display, **A** opens the existing sound menu, and **B** returns to the ten-demo gallery. On Quest, check gallery readability and targeting as well as the demos' frame rate and transitions.
+
+## What Changed?
+
+The tenth experience uses three real USGS Earthshots Landsat pairs: the June 2007–June 2008 Illinois/Indiana flood, Yellowstone before and after the 1988 fires, and northeastern Dallas in March 1989 and March 2023. The same scene fills a floating image panel; drag the white divider to compare dates, then tap a location to mark one observed change. Choose an interpretation to reveal a highlighted example area, a brief explanation, and the next place. The final **Takeaway** connects the exercise to change detection, aligned images, matching season and bands, and corroborating records. **Restart** and **Exit to Menu** are visible there. Each scene and the takeaway can be reached within the four-minute lesson; **Takeaway** is available early. Development preview: `?preview&demo=change`.
+
+The JPEGs are locally bundled encodings of the original USGS Earthshots PNGs. The two frames in each case are shown at the same extent without generated pixels. The Dallas source frames differ by one pixel in height and are normalized on the display canvas. Colors come from each source's infrared composite; the lesson asks visitors to recognize visible patterns, while the short interpretation relies on the USGS event description. These rendered images are for visual interpretation rather than calibrated pixel-by-pixel change measurement. See SOURCES.md for dates, bands, image provenance, and reuse terms.
 
 ## Scan the Hidden World
 
@@ -162,11 +168,11 @@ Automated geometry tests check planar and 3D ambiguity and uncertainty-set inclu
 - Each dedicated takeaway shows **Restart** and **Exit to Menu**; both actions work from the panel. During the MR room scan, **Takeaways** opens its summary before the timer ends.
 - In each landscape demo, walk onto the road from either bank, cross the bridge at deck height, and approach along the river to pass underneath without rising onto the deck. Inspect shoulders for visible gaps above the terrain.
 - Repeat several visitors and check comfort and frame rate.
-- In the nine-demo gallery, verify that all cards are legible and selectable from seated and standing height. Check that B returns from each demo to the same gallery. In the three newest demos, verify spectral sampling in all three real scenes and the Takeaways screen, all five Snow views, and the globe-to-map transition and Tissot overlay.
+- In the ten-demo gallery, verify that all cards are legible and selectable from seated and standing height. Check that B returns from each demo to the same gallery. In the three newest demos, verify spectral sampling in all three real scenes and the Takeaways screen, all five Snow views, and the globe-to-map transition and Tissot overlay. In What Changed?, check all three before/after pairs, divider drag, observation pin, answer feedback, and the final takeaway.
 
 ## Assets
 
-The lesson diagrams and scene assets are generated in code. Controller models are third-party, bundled from `@webxr-input-profiles/assets@1.0.20` under MIT terms; see `public/controller-profiles/LICENSE.md` and THIRD_PARTY_NOTICES.md. No third-party educational illustrations are included. Three.js is MIT licensed. Licensing of original project content has not yet been selected by the owner.
+Most lesson diagrams and scene assets are generated in code; What Changed? bundles six credited USGS Landsat image encodings. Controller models are third-party, bundled from `@webxr-input-profiles/assets@1.0.20` under MIT terms; see `public/controller-profiles/LICENSE.md` and THIRD_PARTY_NOTICES.md. The USGS image provenance and reuse terms are recorded in SOURCES.md. Three.js is MIT licensed. Licensing of original project content has not yet been selected by the owner.
 
 ## Web app installation metadata
 

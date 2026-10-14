@@ -35,6 +35,7 @@ import { PixelExperience } from "./pixels/experience.js";
 import { PIXEL_EXTENT } from "./pixels/model.js";
 import { SpectralExperience } from "./showcase/spectral-experience.js";
 import { ClusterExperience } from "./showcase/cluster-experience.js";
+import { ChangeExperience } from "./change/experience.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { ControllerGuide } from "./controller-guide.js";
@@ -44,7 +45,7 @@ const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
-app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Nine short, hands-on discoveries in virtual and mixed reality.<br>Enter the VR lab, scan your room in mixed reality, or explore short 360° videos.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button><button id="videos" class="secondary">Recommended Videos</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Rain on a watershed to see where water drains, or shape an erosion tray and watch flowing water carve channels.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Build a point cloud from a model or your room. Change viewpoints to reveal surfaces hidden from the first scan.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>Change pixel size in an overhead view of the landscape. See when a river, road, and forest blend into mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of three places in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Unfold a globe into three projections and reveal distortion with Tissot circles.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR and MR experiences + 360° video gallery</footer>`;
+app.innerHTML = `<header><div class="brand">◈ &nbsp; SPATIAL DISCOVERY LAB</div><div class="tag">GIS Day · Immersive explorations</div></header><section class="intro"><div class="eyebrow">A different way to see where you are</div><h1>Your world.<br>A new dimension.</h1><p>Ten short, hands-on discoveries in virtual and mixed reality.<br>Enter the VR lab, scan your room in mixed reality, or explore short 360° videos.</p><div class="launch-actions"><button id="vr" disabled>Checking VR…</button><button id="ar" class="secondary" disabled>Checking room scan…</button><button id="videos" class="secondary">Recommended Videos</button></div><p class="small">Quest controllers · About 4 minutes per experience · Seated or standing</p></section><section class="grid"><article class="card"><div class="art" aria-hidden="true"><i class="ring"></i><i class="ring"></i><i class="ring"></i><i class="dot"></i></div><div class="eyebrow">01 / Positioning</div><h2>Find Yourself</h2><p>See how GNSS uses distances to satellites to locate you. Explore the idea with circles, floating shells, and a model you can grab.</p></article><article class="card"><div class="rain-art" aria-hidden="true">☁<span>╲ ╲ ╲ ╲ ╲</span><div>⌁ &nbsp; ▲ &nbsp; ⌁</div></div><div class="eyebrow">02 / Watersheds</div><h2>Make It Rain</h2><p>Rain on a watershed to see where water drains, or shape an erosion tray and watch flowing water carve channels.</p></article><article class="card"><div class="rain-art" aria-hidden="true">✧ ⋮ ✧<div>⠿ ⠿ ⠿</div></div><div class="eyebrow">03 / Remote sensing</div><h2>Scan the Hidden World</h2><p>Build a point cloud from a model or your room. Change viewpoints to reveal surfaces hidden from the first scan.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▤</span><span>≈</span><span>♧</span></div><div class="eyebrow">04 / Data layers</div><h2>Stand Inside the Layers</h2><p>Build a landscape around you, one geographic layer at a time. Explore terrain, trees, rivers, roads, floodplains, and political boundaries.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>▲</span><span>◌</span></div><div class="eyebrow">05 / Visibility</div><h2>Can You See It?</h2><p>Move an observer across the same landscape and compare what is visible from eye level or a tower. Reveal the terrain hidden behind ridges.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>▩</span><span>▣</span></div><div class="eyebrow">06 / Spatial resolution</div><h2>How Big Is a Pixel?</h2><p>Change pixel size in an overhead view of the landscape. See when a river, road, and forest blend into mixed pixels.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◉</span><span>✦</span><span>☼</span></div><div class="eyebrow">07 / Spectral sensing</div><h2>See the Invisible</h2><p>Compare real Landsat views of three places in visible and near-infrared color, then sample places to see what false color reveals.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>▦</span><span>●</span><span>▥</span></div><div class="eyebrow">08 / Aggregation</div><h2>Where Did the Cluster Go?</h2><p>Group Soho housing blocks into different hypothetical wards and see how street-bounded administrative zones change the apparent cluster.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>→</span><span>▤</span></div><div class="eyebrow">09 / Projections</div><h2>Make the World Flat</h2><p>Unfold a globe into three projections and reveal distortion with Tissot circles.</p></article><article class="card"><div class="layers-art" aria-hidden="true"><span>◐</span><span>⇄</span><span>◑</span></div><div class="eyebrow">10 / Change detection</div><h2>What Changed?</h2><p>Compare real Landsat images of a flood, a wildfire, and Dallas-area growth. Find visible changes and interpret the evidence.</p></article></section><p id="status" role="status" aria-live="polite"></p><footer>Quest-first prototype · VR and MR experiences + 360° video gallery</footer>`;
 initRecommendedVideos(app);
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -256,7 +257,7 @@ function foregroundTakeaway() {
     mesh.material.depthWrite = false;
   }
 }
-function menuCard({ title, lines, category, glyph, color, action }, index) {
+function menuCard({ title, lines, category, glyph, color, action }, index, total) {
   const canvas = document.createElement("canvas");
   canvas.width = 720;
   canvas.height = 350;
@@ -290,7 +291,7 @@ function menuCard({ title, lines, category, glyph, color, action }, index) {
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.02, 0.5),
+    new THREE.PlaneGeometry(0.80, 0.39),
     new THREE.MeshBasicMaterial({
       map: texture, side: THREE.DoubleSide,
       transparent: uiFadeAge < 0.45,
@@ -298,11 +299,12 @@ function menuCard({ title, lines, category, glyph, color, action }, index) {
     }),
   );
   if (uiFadeAge < 0.45) uiFadeMeshes.push(mesh);
-  const column = index % 3 - 1;
-  const row = Math.floor(index / 3);
-  mesh.position.set(column * 1.12, 0.48 - row * 0.58,
-    0.08 + 0.13 * Math.abs(column));
-  mesh.rotation.y = -column * 0.25;
+  const row = Math.floor(index / 4);
+  const rowCount = Math.min(4, total - row * 4);
+  const column = index % 4 - (rowCount - 1) / 2;
+  mesh.position.set(column * 0.90, 0.56 - row * 0.54,
+    0.08 + 0.08 * Math.abs(column));
+  mesh.rotation.y = -column * 0.17;
   mesh.userData.action = () => { sound.click(); action(); };
   mesh.userData.label = title;
   content.add(mesh);
@@ -447,6 +449,7 @@ function openMenu() {
   pixels = null;
   showcase?.dispose();
   showcase = null;
+  root.scale.setScalar(1);
   rain?.dispose();
   rain = null;
   preservePose = null;
@@ -613,15 +616,20 @@ function startShowcase(kind) {
   viewshed?.dispose(); viewshed = null;
   pixels?.dispose(); pixels = null;
   showcase?.dispose();
+  root.scale.setScalar(kind === "change" ? 1.25 : 1);
   const Constructor = {
     spectral: SpectralExperience,
     cluster: ClusterExperience,
     projection: ProjectionExperience,
+    change: ChangeExperience,
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
   showcase = new Constructor(root, (reason) => {
     if (reason === "selection") updateClusterReadout();
-    else draw();
+    else {
+      if (["correct", "blocked", "reveal"].includes(reason)) sound.cue(reason);
+      draw();
+    }
   });
   draw();
 }
@@ -1026,6 +1034,9 @@ function drawShowcaseUI() {
       projection: ["Make the World Flat",
         "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot's circles show where shape and area stretch.",
         "Flatten the globe"],
+      change: ["What Changed?",
+        "Landsat revisits places, measuring visible and infrared light.\nFalse color assigns infrared measurements to display colors.\nDrag between dates, mark a change, and choose an explanation.",
+        "Compare images"],
     };
     const [title, body, action] = introductions[exhibit.kind];
     lessonCard(title, body, 0.13);
@@ -1046,6 +1057,14 @@ function drawShowcaseUI() {
     takeawayActions(exhibit.finished ? -0.72 : -0.96);
     return;
   }
+  if (exhibit.kind === "change" && exhibit.finished) {
+    lessonCard("Images turn change into evidence",
+      "Change detection compares images of the same ground over time.\nMatching location, season, and infrared bands makes patterns clearer.\nOther records help explain why a visible change happened.", -0.05);
+    label("USGS Landsat views · flood, fire, and Dallas-area growth",
+      0, -0.43, 2.4, 0.13, 25, "#b6d1d9", "#0b2430");
+    takeawayActions(-0.64);
+    return;
+  }
   if (exhibit.finished) {
     const takeaways = {
       cluster: ["Same deaths, new boundaries",
@@ -1064,7 +1083,40 @@ function drawShowcaseUI() {
     takeawayActions(-0.62);
     return;
   }
-  if (exhibit.kind === "spectral") {
+  if (exhibit.kind === "change") {
+    const caseInfo = exhibit.sceneInfo;
+    label(`Case ${exhibit.sceneIndex + 1}/3 · ${caseInfo.place}`,
+      0, 0.98, 2.45, 0.17, 43, "#e6f4f5", "#0b2430");
+    label(`${caseInfo.sensor} · USGS Earthshots`,
+      0, 0.79, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Drag the white line · Tap the image to mark a change",
+      -0.42, -0.75, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
+    label(caseInfo.question, 0.91, 0.67, 1.06, 0.16, 33,
+      "#e6f4f5", "#0b2430");
+    if (exhibit.error) {
+      label("Image could not load", 0.91, 0.16, 1.05, 0.16, 28);
+      button("Retry", 0.91, -0.18, () => exhibit.loadScene(), 0.95);
+    } else if (!exhibit.ready) {
+      label("Loading images…", 0.91, 0.16, 1.05, 0.16, 28);
+    } else if (!exhibit.revealed) {
+      caseInfo.options.forEach((option, index) =>
+        button(option, 0.91, 0.40 - index * 0.24,
+          () => exhibit.chooseAnswer(index), 1.05));
+      label(exhibit.marker ? "Observation pin placed" : "Place an observation pin",
+        0.91, -0.43, 1.06, 0.15, 25, "#d8f3e6", "#0b2430");
+    } else {
+      label(exhibit.selectedOption === caseInfo.answer
+        ? "Good observation" : `Look for: ${caseInfo.options[caseInfo.answer]}`,
+      0.91, 0.37, 1.06, 0.16, 28, "#ffdf85", "#0b2430");
+      label(caseInfo.observation, 0.91, 0.12, 1.06, 0.24, 26,
+        "#e6f4f5", "#0b2430");
+      label(caseInfo.explanation, 0.91, -0.28, 1.06, 0.38, 22,
+        "#b6d1d9", "#0b2430");
+      button(exhibit.sceneIndex === 2 ? "Show Takeaway" : "Next place",
+        0.91, -0.66, () => exhibit.nextScene(), 1.05);
+    }
+    button("Takeaway", 0.91, -0.93, () => exhibit.finish(), 1.05);
+  } else if (exhibit.kind === "spectral") {
     const modeText = {
       natural: "Natural color: visible red, green, and blue bands",
       false: "False color: NIR → red, red → green, green → blue",
@@ -1764,9 +1816,12 @@ function drawScene() {
       { title: "Make the World Flat", lines: ["Make the", "World Flat"],
         category: "Projections", glyph: "◐", color: "#9adad1",
         action: () => startShowcase("projection") },
-    ].forEach(menuCard);
+      { title: "What Changed?", lines: ["What Changed?"],
+        category: "Change detection", glyph: "⇄", color: "#f5dc91",
+        action: () => startShowcase("change") },
+    ].forEach((item, index, all) => menuCard(item, index, all.length));
     label("Point and press trigger · A sound · B exit VR",
-      0, -1.12, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
+      0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
     return;
   }
@@ -1890,7 +1945,8 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (showcase) {
-      if (showcase.kind === "projection" && showcase.beginInteraction(raycaster, i))
+      if (["projection", "change"].includes(showcase.kind) &&
+          showcase.beginInteraction(raycaster, i))
         return;
       showcase.selectFromRay?.(raycaster);
       return;
@@ -2140,7 +2196,8 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     const landscapeDemo = pixels ?? viewshed ?? layers;
-    if (showcase?.kind === "projection" && showcase.draggingBy !== null) {
+    if (["projection", "change"].includes(showcase?.kind) &&
+        showcase.draggingBy !== null) {
       const active = controllers.find(({ id }) => id === showcase.draggingBy);
       if (!visibleSession || !active?.c.visible || soundMenuOpen)
         showcase.endInteraction(showcase.draggingBy);
@@ -2356,7 +2413,7 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
     camera.position.y = 1.6;
     startPixels();
-  } else if (["spectral", "cluster", "projection"].includes(
+  } else if (["spectral", "cluster", "projection", "change"].includes(
     new URLSearchParams(location.search).get("demo"))) {
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
@@ -2405,7 +2462,7 @@ if (
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (showcase) {
-      if (showcase.kind === "projection" &&
+      if (["projection", "change"].includes(showcase.kind) &&
           showcase.beginInteraction(raycaster, "preview")) {
         previewSpinPointer = e.pointerId;
         previewSpinTime = e.timeStamp;
