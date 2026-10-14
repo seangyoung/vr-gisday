@@ -9,7 +9,8 @@ import {
   aggregationFor, blockAt,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, TISSOT_LONGITUDES, indicatrixAxes, projectMetric, projectNormalized,
+  GlobeSpin, TISSOT_LONGITUDES, nearestTissotCircle,
+  indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale,
 } from "../src/showcase/projection-model.js";
 import { orientGlobe } from "../src/showcase/projection-experience.js";
@@ -88,6 +89,16 @@ test("Tissot axes reflect shape and area without display stretching", () => {
     const edge = projection === "mercator" ? 85 : 90;
     assert.ok(Math.abs(projectMetric(0, edge, projection).y * scale) <= 0.530001);
   }
+});
+
+test("Tissot circle selection follows geographic locations across the map seam", () => {
+  assert.deepEqual(nearestTissotCircle(1, 29),
+    { longitude: 0, latitude: 30 });
+  assert.deepEqual(nearestTissotCircle(179, -31),
+    { longitude: -180, latitude: -30 });
+  assert.deepEqual(nearestTissotCircle(-179, -31),
+    { longitude: -180, latitude: -30 });
+  assert.equal(nearestTissotCircle(34, 15), null);
 });
 
 test("globe swipe coasts, settles, and resumes its default spin", () => {

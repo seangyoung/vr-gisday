@@ -231,8 +231,9 @@ function lessonCard(title, body, y = GUIDED_CARD_Y) {
   uiParent.add(card);
   return card;
 }
-function button(text, x, y, action, w = 0.75) {
-  const m = label(text, x, y, w, 0.16, 48, "#08241e", "#a6f5d9");
+function button(text, x, y, action, w = 0.75, selected = false) {
+  const m = label(text, x, y, w, 0.16, 48,
+    selected ? "#251a08" : "#08241e", selected ? "#ffdc83" : "#a6f5d9");
   m.position.z = 0.08;
   m.userData.action = () => {
     sound.click();
@@ -1093,25 +1094,28 @@ function drawShowcaseUI() {
     button("Takeaway", 0, -1.21, () => exhibit.finish(), 1.1);
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
-    label(exhibit.tissot
-      ? "Tissot's circles: compare their size and shape across the map."
+    label(exhibit.selectedCircle
+      ? `Selected circle: ${Math.abs(exhibit.selectedCircle.latitude)}° ${exhibit.selectedCircle.latitude < 0 ? "S" : "N"}, ${Math.abs(exhibit.selectedCircle.longitude)}° ${exhibit.selectedCircle.longitude < 0 ? "W" : "E"} · compare globe and map`
+      : exhibit.tissot
+      ? "Tissot's circles: select one to compare globe and map."
       : `${exhibit.projection === "equalArea" ? "Equal-area" :
       exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"}: equal land area at 60° N looks ${exhibit.areaAt60}× equator`,
     0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
     button("Plate Carrée", -0.8, -0.57,
-      () => exhibit.setProjection("equirectangular"), 0.7);
-    button("Mercator", 0, -0.57, () => exhibit.setProjection("mercator"), 0.7);
-    button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7);
-    button(exhibit.flat ? "Wrap" : "Flatten", -0.9, -0.79,
-      () => exhibit.transitionTo(!exhibit.flat), 0.5);
-    button("Center ◀", -0.33, -0.79, () => exhibit.turnCenter(-30), 0.5);
-    button("Center ▶", 0.24, -0.79, () => exhibit.turnCenter(30), 0.5);
+      () => exhibit.setProjection("equirectangular"), 0.7,
+      exhibit.projection === "equirectangular");
+    button("Mercator", 0, -0.57, () => exhibit.setProjection("mercator"), 0.7,
+      exhibit.projection === "mercator");
+    button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7,
+      exhibit.projection === "equalArea");
+    button(exhibit.flat ? "Wrap" : "Flatten", -0.55, -0.79,
+      () => exhibit.transitionTo(!exhibit.flat), 0.7);
     if (exhibit.projection === "equalArea")
-      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.85, -0.79,
-        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.56);
+      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.55, -0.79,
+        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
     button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", -0.82, -1.0,
-      () => exhibit.setTissot(!exhibit.tissot), 0.72);
-    label(`Center ${exhibit.centralMeridian}° · ${exhibit.projection === "equalArea" ? `true-scale latitude ${exhibit.standardParallel}°` : "Center shifts the map seam"}`,
+      () => exhibit.setTissot(!exhibit.tissot), 0.72, exhibit.tissot);
+    label(`Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
       0.37, -1.0, 1.55, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);
   }
@@ -1882,7 +1886,7 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (showcase) {
-      if (showcase.kind === "projection" && showcase.beginSpin(raycaster, i))
+      if (showcase.kind === "projection" && showcase.beginInteraction(raycaster, i))
         return;
       showcase.selectFromRay?.(raycaster);
       return;
@@ -1893,7 +1897,7 @@ for (let i = 0; i < 2; i++) {
     }
   });
   c.addEventListener("selectend", () => {
-    showcase?.endSpin?.(i);
+    showcase?.endInteraction?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -2132,13 +2136,13 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     const landscapeDemo = pixels ?? viewshed ?? layers;
-    if (showcase?.kind === "projection" && showcase.spinningBy !== null) {
-      const active = controllers.find(({ id }) => id === showcase.spinningBy);
+    if (showcase?.kind === "projection" && showcase.draggingBy !== null) {
+      const active = controllers.find(({ id }) => id === showcase.draggingBy);
       if (!visibleSession || !active?.c.visible || soundMenuOpen)
-        showcase.endSpin(showcase.spinningBy);
+        showcase.endInteraction(showcase.draggingBy);
       else {
         intersect(active.c);
-        showcase.dragSpin(raycaster, active.id, dt);
+        showcase.dragInteraction(raycaster, active.id, dt);
       }
     }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
@@ -2246,7 +2250,7 @@ renderer.setAnimationLoop((time, frame) => {
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id) &&
-        showcase?.spinningBy !== id;
+        showcase?.draggingBy !== id;
       beam.scale.z = hit ? hit.distance : model ? model.distance :
         ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
       beam.material.color.set(
@@ -2389,7 +2393,7 @@ if (
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (showcase) {
       if (showcase.kind === "projection" &&
-          showcase.beginSpin(raycaster, "preview")) {
+          showcase.beginInteraction(raycaster, "preview")) {
         previewSpinPointer = e.pointerId;
         previewSpinTime = e.timeStamp;
         renderer.domElement.setPointerCapture(e.pointerId);
@@ -2410,13 +2414,13 @@ if (devPreview) {
   window.addEventListener("pointerup", (e) => {
     previewRaining = false;
     if (e.pointerId === previewSpinPointer) {
-      showcase?.endSpin?.("preview");
+      showcase?.endInteraction?.("preview");
       previewSpinPointer = null;
     }
   });
   window.addEventListener("pointercancel", (e) => {
     if (e.pointerId === previewSpinPointer) {
-      showcase?.endSpin?.("preview");
+      showcase?.endInteraction?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -2430,7 +2434,7 @@ if (devPreview) {
       camera,
     );
     if (e.pointerId === previewSpinPointer) {
-      showcase?.dragSpin?.(raycaster, "preview",
+      showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       previewSpinTime = e.timeStamp;
       return;

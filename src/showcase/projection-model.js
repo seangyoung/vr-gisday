@@ -7,6 +7,27 @@ export const PROJECTIONS = Object.freeze({
 // The two edge entries are one meridian shown on both sides of the texture;
 // together they complete the sixth circle column across the Pacific seam.
 export const TISSOT_LONGITUDES = Object.freeze([-180, -120, -60, 0, 60, 120, 180]);
+export const TISSOT_LATITUDES = Object.freeze([-60, -30, 0, 30, 60]);
+
+export function nearestTissotCircle(longitude, latitude) {
+  let nearest = null;
+  let best = Infinity;
+  for (const lat of TISSOT_LATITUDES)
+    for (const lon of TISSOT_LONGITUDES.slice(0, -1)) {
+      const delta = Math.atan2(Math.sin((longitude - lon) * Math.PI / 180),
+        Math.cos((longitude - lon) * Math.PI / 180));
+      const phi = latitude * Math.PI / 180;
+      const phi0 = lat * Math.PI / 180;
+      const haversine = Math.sin((phi - phi0) / 2) ** 2 +
+        Math.cos(phi) * Math.cos(phi0) * Math.sin(delta / 2) ** 2;
+      const distance = 2 * Math.asin(Math.min(1, Math.sqrt(haversine)));
+      if (distance < best) {
+        best = distance;
+        nearest = { longitude: lon, latitude: lat };
+      }
+    }
+  return best <= 9 * Math.PI / 180 ? nearest : null;
+}
 
 const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));

@@ -2,17 +2,20 @@ import * as THREE from "three";
 import land from "./data/ne_110m_land.json" with { type: "json" };
 import { TimedExhibit } from "./exhibit.js";
 import {
-  GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, projectMetric,
+  GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, TISSOT_LATITUDES,
+  nearestTissotCircle, projectMetric,
   projectionFitScale, relativeAreaScale,
 } from "./projection-model.js";
 
-function drawTissot(ctx, canvas) {
+function drawTissot(ctx, canvas, selectedCircle) {
   const radians = Math.PI / 180;
   const radius = 8 * radians;
   const x = (lon) => (lon + 180) / 360 * canvas.width;
   const y = (lat) => (90 - lat) / 180 * canvas.height;
-  for (const latitude of [-60, -30, 0, 30, 60])
+  for (const latitude of TISSOT_LATITUDES)
     for (const longitude of TISSOT_LONGITUDES) {
+      const selected = selectedCircle?.latitude === latitude &&
+        selectedCircle.longitude === (longitude === 180 ? -180 : longitude);
       const lat = latitude * radians;
       const lon = longitude * radians;
       ctx.beginPath();
@@ -28,14 +31,14 @@ function drawTissot(ctx, canvas) {
         else ctx.lineTo(px, py);
       }
       ctx.closePath();
-      ctx.fillStyle = "#ffe08355";
+      ctx.fillStyle = selected ? "#49f5e399" : "#ffe08355";
       ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#fff3b9";
+      ctx.lineWidth = selected ? 6 : 3;
+      ctx.strokeStyle = selected ? "#64ffed" : "#fff3b9";
       ctx.stroke();
       ctx.beginPath();
-      ctx.arc(x(longitude), y(latitude), 3, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff9de";
+      ctx.arc(x(longitude), y(latitude), selected ? 6 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = selected ? "#ffffff" : "#fff9de";
       ctx.fill();
     }
 }
@@ -82,6 +85,14 @@ function earthCanvas() {
     ctx.lineTo(canvas.width, y(lat));
     ctx.stroke();
   }
+  ctx.strokeStyle = "#d7faf0cc";
+  ctx.lineWidth = 2.8;
+  ctx.beginPath();
+  ctx.moveTo(x(0), 0);
+  ctx.lineTo(x(0), canvas.height);
+  ctx.moveTo(0, y(0));
+  ctx.lineTo(canvas.width, y(0));
+  ctx.stroke();
   return canvas;
 }
 
@@ -133,7 +144,9 @@ export class ProjectionExperience extends TimedExhibit {
     this.centralMeridian = 0;
     this.flat = false;
     this.tissot = false;
-    this.spinningBy = null;
+    this.selectedCircle = null;
+    this.draggingBy = null;
+    this.interaction = null;
     this.spin = new GlobeSpin();
     this.visualAge = 0;
     this.transitionAge = 1;
@@ -161,7 +174,8 @@ export class ProjectionExperience extends TimedExhibit {
   }
   finish() {
     if (!this.started || this.finished) return;
-    this.spinningBy = null;
+    this.draggingBy = null;
+    this.interaction = null;
     this.spin.end();
     this.group.visible = false;
     super.finish();
@@ -170,13 +184,14 @@ export class ProjectionExperience extends TimedExhibit {
     const ctx = this.displayCanvas.getContext("2d");
     ctx.clearRect(0, 0, this.displayCanvas.width, this.displayCanvas.height);
     ctx.drawImage(this.baseCanvas, 0, 0);
-    if (this.tissot) drawTissot(ctx, this.displayCanvas);
+    if (this.tissot) drawTissot(ctx, this.displayCanvas, this.selectedCircle);
     if (this.globe) this.globe.material.map.needsUpdate = true;
     if (this.map) this.map.material.map.needsUpdate = true;
   }
   setTissot(enabled) {
     if (!this.started || this.finished) return;
     this.tissot = enabled;
+    if (!enabled) this.selectedCircle = null;
     this.paintTexture();
     this.onChange();
   }
@@ -187,24 +202,68 @@ export class ProjectionExperience extends TimedExhibit {
     return [Math.atan2(direction.x, -direction.z),
       Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1))];
   }
-  beginSpin(raycaster, source) {
-    if (!this.started || this.finished || this.spinningBy !== null) return false;
-    this.globe.updateWorldMatrix(true, false);
-    if (!raycaster.intersectObject(this.globe, false).length) return false;
-    this.spinningBy = source;
-    this.spin.begin(...this.rayAngles(raycaster));
+  mapRayX(raycaster) {
+    this.group.updateWorldMatrix(true, false);
+    const inverse = this.group.matrixWorld.clone().invert();
+    const origin = raycaster.ray.origin.clone().applyMatrix4(inverse);
+    const direction = raycaster.ray.direction.clone().transformDirection(inverse);
+    if (Math.abs(direction.z) < 0.001) return null;
+    return origin.x - origin.z * direction.x / direction.z;
+  }
+  beginInteraction(raycaster, source) {
+    if (!this.started || this.finished || this.draggingBy !== null) return false;
+    this.group.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObjects([this.globe, this.map], false)[0];
+    if (!hit) {
+      this.selectCircle(null);
+      return false;
+    }
+    const kind = hit.object === this.globe ? "globe" : "map";
+    this.draggingBy = source;
+    this.interaction = { kind, uv: hit.uv.clone(), moved: false,
+      startX: this.mapRayX(raycaster), lastX: this.mapRayX(raycaster),
+      startAngles: this.rayAngles(raycaster) };
+    if (kind === "globe") this.spin.begin(...this.interaction.startAngles);
     return true;
   }
-  dragSpin(raycaster, source, dt) {
-    if (this.spinningBy !== source) return;
-    const [azimuth, elevation] = this.rayAngles(raycaster);
-    this.spin.drag(azimuth, elevation, dt);
-    orientGlobe(this.globe, this.spin);
+  dragInteraction(raycaster, source, dt) {
+    if (this.draggingBy !== source || !this.interaction) return;
+    const gesture = this.interaction;
+    if (gesture.kind === "globe") {
+      const angles = this.rayAngles(raycaster);
+      if (Math.hypot(angles[0] - gesture.startAngles[0],
+        angles[1] - gesture.startAngles[1]) > 0.015) gesture.moved = true;
+      this.spin.drag(...angles, dt);
+      orientGlobe(this.globe, this.spin);
+    } else {
+      const x = this.mapRayX(raycaster);
+      if (x === null || gesture.lastX === null) return;
+      if (Math.abs(x - gesture.startX) > 0.015) gesture.moved = true;
+      const width = 2 * Math.PI * projectionFitScale(this.projection,
+        this.standardParallel) * (this.projection === "equalArea"
+          ? Math.cos(this.standardParallel * Math.PI / 180) : 1);
+      this.turnCenter(-(x - gesture.lastX) / width * 360, false);
+      gesture.lastX = x;
+    }
   }
-  endSpin(source) {
-    if (this.spinningBy !== source) return;
-    this.spinningBy = null;
-    this.spin.end();
+  endInteraction(source) {
+    if (this.draggingBy !== source || !this.interaction) return;
+    const gesture = this.interaction;
+    this.draggingBy = null;
+    this.interaction = null;
+    if (gesture.kind === "globe") this.spin.end();
+    if (!gesture.moved && this.tissot) {
+      const offset = gesture.kind === "map" ? this.map.material.map.offset.x : 0;
+      const longitude = (((gesture.uv.x + offset) % 1 + 1) % 1) * 360 - 180;
+      const latitude = gesture.uv.y * 180 - 90;
+      this.selectCircle(nearestTissotCircle(longitude, latitude));
+    } else if (gesture.kind === "map") this.onChange();
+  }
+  selectCircle(circle) {
+    if (!this.started || this.finished || !this.tissot) return;
+    this.selectedCircle = circle;
+    this.paintTexture();
+    this.onChange();
   }
   targetVertices(flat, projection = this.projection) {
     const uvs = this.map.geometry.attributes.uv.array;
@@ -247,11 +306,11 @@ export class ProjectionExperience extends TimedExhibit {
     this.standardParallel = parallel;
     this.transitionTo(true);
   }
-  turnCenter(delta) {
+  turnCenter(delta, redraw = true) {
     if (!this.started || this.finished) return;
     this.centralMeridian = ((this.centralMeridian + delta + 540) % 360) - 180;
     this.map.material.map.offset.x = this.centralMeridian / 360;
-    this.onChange();
+    if (redraw) this.onChange();
   }
   update(dt) {
     super.update(dt);
