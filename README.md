@@ -13,7 +13,11 @@ npm test
 npm run build
 ```
 
-Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a laptop's LAN address for immersive WebXR. GitHub Pages supplies HTTPS. There are no runtime API keys or external asset requests. Dependencies are bundled by Vite.
+Production: serve `dist/` over HTTPS. Quest cannot use ordinary HTTP from a laptop's LAN address for immersive WebXR. GitHub Pages supplies HTTPS. The nine demos need no runtime API keys or external asset requests; the separate recommended-video gallery loads YouTube thumbnails and embedded videos from YouTube when opened. Dependencies are bundled by Vite.
+
+## Recommended Videos
+
+The start page offers **Enter VR**, **Open room scan in MR**, and **Recommended Videos**. The last choice opens a browser gallery of five short AirPano 360° scenes: Everest, Bryce Canyon, Times Square, Dutch windmills, and Canaima Lagoon. Each card gives a geospatial observation prompt and opens a YouTube preview. **Open 360° video for immersive viewing** opens the publisher's YouTube watch page in a new tab. On Quest, visitors can use YouTube VR's immersive mode for a full 360° view; the headset decides whether that link opens Browser or the YouTube VR app. If it stays in Browser, the exact title is shown so the visitor can find the clip in YouTube VR. The app does not rehost or decode these streams in WebXR, and external playback requires network access. This handoff still needs validation on the target Quest headset.
 
 A development-only `http://localhost:5173/?preview` view supports mouse selection of the same scene buttons for layout review. Optional `&stage=-2` (introduction), `&stage=-1` (menu), or `&stage=0` through `&stage=8` selects a stage for visual inspection; `&guide` loads simulated Touch Plus controller models and labels (`&hand=right` focuses the right controller). The small development toolbar calls the same actions as XR controls. It is removed from production builds; there is no desktop experience.
 
