@@ -191,9 +191,7 @@ export class ClusterExperience extends TimedExhibit {
     this.selection = null;
     this.selectedText = mode === "points"
       ? "Select a building circle to see its recorded deaths."
-      : mode === "wardB"
-        ? "Still six wards. New boundaries; which zone now looks largest?"
-        : "Same 489 deaths, grouped into hypothetical street-bounded wards.";
+      : "Select a colored block to see its ward's recorded deaths.";
     drawMap(this.mapCanvas, mode);
     this.map.material.map.needsUpdate = true;
     drawSelection(this.selectionCanvas, null);

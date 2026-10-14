@@ -1085,13 +1085,19 @@ function drawShowcaseUI() {
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {
     label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
-    button("Buildings", -0.86, -0.77, () => exhibit.setMode("points"), 0.53);
-    button("6 wards A", -0.28, -0.77, () => exhibit.setMode("wardA"), 0.53);
-    button("6 wards B", 0.29, -0.77, () => exhibit.setMode("wardB"), 0.53);
-    button("5 wards", 0.86, -0.77, () => exhibit.setMode("wardC"), 0.53);
-    clusterReadout = label(exhibit.selectedText, 0, -1.0, 2.35, 0.12,
+    clusterReadout = label(exhibit.selectedText, 0, -0.64, 2.35, 0.12,
       27, "#b6d1d9", "#0b2430");
-    button("Takeaway", 0, -1.21, () => exhibit.finish(), 1.1);
+    button("Buildings", -0.96, -0.84, () => exhibit.setMode("points"),
+      0.45, exhibit.mode === "points");
+    button("Plan A", -0.48, -0.84, () => exhibit.setMode("wardA"),
+      0.43, exhibit.mode === "wardA");
+    button("Plan B", 0, -0.84, () => exhibit.setMode("wardB"),
+      0.43, exhibit.mode === "wardB");
+    button("Plan C", 0.48, -0.84, () => exhibit.setMode("wardC"),
+      0.43, exhibit.mode === "wardC");
+    button("Plan D", 0.96, -0.84, () => exhibit.setMode("wardD"),
+      0.43, exhibit.mode === "wardD");
+    button("Takeaway", 0, -1.08, () => exhibit.finish(), 1.1);
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(exhibit.selectedCircle

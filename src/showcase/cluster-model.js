@@ -15,17 +15,22 @@ export const SNOW_WINDOW = Object.freeze({
 // their shared street corridors, not a square grid, form the visible boundaries.
 export const CLUSTER_MODES = Object.freeze({
   points: { name: "Mapped buildings" },
-  wardA: { name: "Ward plan A · six zones", seeds: [
+  wardA: { name: "Plan A · six wards", seeds: [
     [529240, 181040], [529320, 181220], [529390, 181040],
     [529530, 181195], [529550, 181010], [529420, 180870],
   ] },
-  wardB: { name: "Ward plan B · six zones", seeds: [
+  wardB: { name: "Plan B · six wards", seeds: [
     [529230, 180990], [529355, 181190], [529450, 181065],
     [529610, 181140], [529555, 180945], [529345, 180925],
   ] },
-  wardC: { name: "Larger wards · five zones", seeds: [
+  wardC: { name: "Plan C · five wards", seeds: [
     [529220, 181040], [529350, 181210], [529445, 181065],
     [529570, 181165], [529485, 180915],
+  ] },
+  wardD: { name: "Plan D · seven wards", seeds: [
+    [529225, 181050], [529315, 181225], [529410, 181070],
+    [529495, 181245], [529610, 181120], [529535, 180950],
+    [529325, 180925],
   ] },
 });
 

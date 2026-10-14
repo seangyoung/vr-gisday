@@ -40,7 +40,8 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(SNOW_TOTAL, 489);
   assert.equal(SNOW_BLOCKS.reduce((sum, block) => sum + block.deaths, 0),
     SNOW_TOTAL);
-  for (const [mode, count] of [["wardA", 6], ["wardB", 6], ["wardC", 5]]) {
+  for (const [mode, count] of [["wardA", 6], ["wardB", 6],
+    ["wardC", 5], ["wardD", 7]]) {
     const zones = aggregationFor(mode);
     assert.equal(zones.length, count);
     assert.ok(zones.every((zone) => zone.blocks.length > 0));
@@ -50,6 +51,12 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   }
   assert.notDeepEqual(aggregationFor("wardA").map((zone) => zone.deaths),
     aggregationFor("wardB").map((zone) => zone.deaths));
+  const partitions = ["wardA", "wardB", "wardC", "wardD"].map((mode) => {
+    const zones = aggregationFor(mode);
+    return SNOW_BLOCKS.map((block) => zones.findIndex(
+      (zone) => zone.blocks.includes(block))).join(",");
+  });
+  assert.equal(new Set(partitions).size, 4);
   assert.equal(blockAt(SNOW_BLOCKS[0].x, SNOW_BLOCKS[0].y, 0)?.id,
     SNOW_BLOCKS[0].id);
   assert.equal(blockAt(0, 0), null);
