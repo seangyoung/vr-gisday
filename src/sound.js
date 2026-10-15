@@ -77,6 +77,26 @@ function forestLoop(ctx) {
   return buffer;
 }
 
+function footstepBuffer(ctx, wet, seed) {
+  const length = Math.floor(ctx.sampleRate * (wet ? 0.27 : 0.18));
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const samples = buffer.getChannelData(0);
+  let randomState = seed, low = 0;
+  for (let i = 0; i < length; i++) {
+    randomState = (1664525 * randomState + 1013904223) >>> 0;
+    const noise = randomState / 0x80000000 - 1;
+    low += (noise - low) * 0.09;
+    const t = i / ctx.sampleRate;
+    const thud = Math.sin(2 * Math.PI * (wet ? 78 : 94) * t) * Math.exp(-31 * t);
+    const grit = (noise - low) * Math.exp(-(wet ? 12 : 38) * t);
+    samples[i] = wet
+      ? 0.28 * thud + 0.26 * low * Math.exp(-9 * t) +
+        0.32 * grit * (1 - Math.exp(-75 * t))
+      : 0.38 * thud + 0.26 * low * Math.exp(-25 * t) + 0.13 * grit;
+  }
+  return buffer;
+}
+
 export class LabSound {
   constructor() {
     this.muted = false;
@@ -97,6 +117,10 @@ export class LabSound {
     this.active = true;
     this.lastScan = -Infinity;
     this.lastCue = -Infinity;
+    this.lastFootstep = -Infinity;
+    this.stepDistance = 0;
+    this.walking = false;
+    this.stepSide = 0;
   }
   unlock() {
     try {
@@ -110,6 +134,10 @@ export class LabSound {
         this.effectsBus = ctx.createGain();
         this.effectsBus.gain.value = this.effectsEnabled ? 1 : 0;
         this.effectsBus.connect(this.master);
+        this.footsteps = {
+          dry: [footstepBuffer(ctx, false, 441), footstepBuffer(ctx, false, 832)],
+          wet: [footstepBuffer(ctx, true, 126), footstepBuffer(ctx, true, 592)],
+        };
         const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -181,7 +209,10 @@ export class LabSound {
       now,
       0.025,
     );
-    if (!active) this.setWater(false);
+    if (!active) {
+      this.setWater(false);
+      this.setMovement(0);
+    }
   }
   toggle() {
     this.muted = !this.muted;
@@ -275,6 +306,33 @@ export class LabSound {
   click() {
     this.unlock();
     this.tone(620);
+  }
+  setMovement(distance = 0, wet = false, dt = 0) {
+    if (!this.context || !this.active || !Number.isFinite(distance) ||
+        !Number.isFinite(dt) || dt <= 0 || dt > 0.15 || distance / dt < 0.35) {
+      this.stepDistance = 0;
+      this.walking = false;
+      return;
+    }
+    if (!this.walking) {
+      this.walking = true;
+      this.stepDistance = 0.27;
+    }
+    this.stepDistance += Math.min(distance, 0.4);
+    const now = this.context.currentTime;
+    if (this.stepDistance < 0.72 || now - this.lastFootstep < 0.22) return;
+    this.stepDistance %= 0.72;
+    this.lastFootstep = now;
+    if (this.muted || !this.effectsEnabled || this.volume === 0 ||
+        this.context.state !== "running") return;
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    source.buffer = this.footsteps[wet ? "wet" : "dry"][this.stepSide++ % 2];
+    gain.gain.value = wet ? 0.7 : 0.58;
+    source.connect(gain);
+    gain.connect(this.effectsBus);
+    source.onended = () => { source.disconnect(); gain.disconnect(); };
+    source.start(now);
   }
   scan(distance = 1) {
     if (!this.context) return;

@@ -150,6 +150,35 @@ test("left-stick walking follows the view, terrain, bounds, and clipboard locati
   map.geometry.dispose();
 });
 
+test("walking reports river splashes below a bridge and dry steps on its deck", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  l.place(camera);
+  l.begin();
+  l.selected = new Set(["topography", "hydrology", "roads"]);
+  l.applyVisibility();
+  l.update(1);
+  l.group.rotation.y = 0;
+  const crossing = riverX(highwayZ(0));
+  const z = highwayZ(crossing);
+  l.group.position.set(-crossing, 0, -z);
+  l.visitor.set(crossing, z);
+  const below = l.walk(0, 0, 0.05, camera);
+  assert.equal(l.onRoad, false);
+  assert.equal(below.wet, true);
+  l.onRoad = true;
+  assert.equal(l.walk(0, 0, 0.05, camera).wet, false);
+  l.selected.delete("hydrology");
+  l.applyVisibility();
+  l.update(1);
+  l.onRoad = false;
+  assert.equal(l.walk(0, 0, 0.05, camera).wet, false);
+  const moved = l.walk(0, -1, 0.1, camera);
+  assert.ok(moved.distance > 0);
+  l.dispose();
+});
+
 test("highway shoulders meet the ground while the bridge stays open underneath", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
   const positions = l.variants.raised.roads.children[0].geometry.attributes.position;

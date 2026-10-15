@@ -616,6 +616,7 @@ export class LayerExperience {
   walk(stickX, stickY, dt, camera) {
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const local = this.group.worldToLocal(eye.clone());
+    const startX = this.visitor.x, startZ = this.visitor.y;
     const magnitude = Math.hypot(stickX, stickY);
     if (Number.isFinite(magnitude) && magnitude > 0.18 && dt > 0) {
       const strength = Math.min(1, (magnitude - 0.18) / 0.82);
@@ -653,6 +654,14 @@ export class LayerExperience {
     const relief = this.onRoad ? road : ground;
     this.group.position.y = this.floorY - relief;
     this.updateVisitorMarkers();
+    const waterLevel = (raised ? riverWaterHeight(local.z) : 0.032) * scaleY;
+    const inWater = !this.onRoad && this.selected.has("hydrology") &&
+      variant.hydrology.visible && variant.hydrology.scale.y > 0.95 &&
+      Math.abs(local.x - riverX(local.z)) <= 2.2 && waterLevel > ground + 0.025;
+    return {
+      distance: Math.hypot(local.x - startX, local.z - startZ),
+      wet: inWater,
+    };
   }
   clearVisitorMarkers() {
     this.visitorMarkers.length = 0;

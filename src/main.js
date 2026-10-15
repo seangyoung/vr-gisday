@@ -962,7 +962,7 @@ function drawViewshedUI() {
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
     );
     map.position.set(-0.52, 0.01, 0.06);
-    map.userData.action = (hit) => v.placeFromMap(hit);
+    map.userData.action = (hit) => { sound.click(); v.placeFromMap(hit); };
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
@@ -1025,7 +1025,7 @@ function drawPixelsUI() {
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
     );
     map.position.set(x, -0.07, 0.06);
-    map.userData.action = (hit) => p.placeFromMap(hit);
+    map.userData.action = (hit) => { sound.click(); p.placeFromMap(hit); };
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
@@ -1948,6 +1948,7 @@ for (let i = 0; i < 2; i++) {
           land.point,
           grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null,
         );
+        if (action) sound.click();
         c.userData.raining = action === "rain";
         if (c.userData.raining) {
           rainPointer = i;
@@ -1959,6 +1960,7 @@ for (let i = 0; i < 2; i++) {
     if (scan?.stage === 1 && !scan.room) {
       const model = scan.grabHit(raycaster);
       if (modelBeforeUi(model, hit)) {
+        sound.click();
         c.userData.scanning = true;
         return;
       }
@@ -1969,21 +1971,24 @@ for (let i = 0; i < 2; i++) {
     }
     if (soundMenuOpen) return;
     if (viewshed) {
-      viewshed.placeFromRay(raycaster);
+      if (viewshed.placeFromRay(raycaster)) sound.click();
       return;
     }
     if (pixels) {
-      pixels.placeFromRay(raycaster);
+      if (pixels.placeFromRay(raycaster)) sound.click();
       return;
     }
     if (showcase) {
       if (["projection", "change"].includes(showcase.kind) &&
-          showcase.beginInteraction(raycaster, i))
+          showcase.beginInteraction(raycaster, i)) {
+        sound.click();
         return;
-      showcase.selectFromRay?.(raycaster);
+      }
+      if (showcase.selectFromRay?.(raycaster)) sound.click();
       return;
     }
     if (scan?.stage === 1) {
+      sound.click();
       c.userData.scanning = true;
       return;
     }
@@ -2003,6 +2008,7 @@ for (let i = 0; i < 2; i++) {
       const target = scan.room ? scanHit(c) : scan.grabHit(raycaster);
       const near = !scan.room && scan.handNear(grip.getWorldPosition(new THREE.Vector3()));
       if (scan.grab.hands.size || near || modelBeforeUi(target, ui)) {
+        sound.click();
         for (const { c: controller } of controllers)
           controller.userData.scanning = false;
         scan.grab.begin(i, grip.matrixWorld);
@@ -2015,6 +2021,7 @@ for (let i = 0; i < 2; i++) {
       const target = rain.grabHit(raycaster);
       const near = rain.handNear(grip.getWorldPosition(new THREE.Vector3()));
       if (rain.grab.hands.size || near || modelBeforeUi(target, ui)) {
+        sound.click();
         rain.endStroke();
         for (const { c: controller } of controllers)
           controller.userData.raining = false;
@@ -2030,7 +2037,10 @@ for (let i = 0; i < 2; i++) {
         .distanceTo(floatingModel.position) <
       floatingModel.userData.radius * floatingModel.scale.x + 0.08;
     // Once one hand holds the assembly, the other can join from anywhere.
-    if (grab.hands.size || near || modelHit(c)) grab.begin(i, grip.matrixWorld);
+    if (grab.hands.size || near || modelHit(c)) {
+      sound.click();
+      grab.begin(i, grip.matrixWorld);
+    }
   });
   c.addEventListener("squeezeend", () => {
     grab?.release(i);
@@ -2200,6 +2210,7 @@ renderer.setAnimationLoop((time, frame) => {
   updateRangeAnimations(dt);
   updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
+  let landscapeMovement = null;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     const visibleSession = renderer.xr.getSession().visibilityState === "visible";
@@ -2262,7 +2273,7 @@ renderer.setAnimationLoop((time, frame) => {
       const leftX = leftPad?.mapping === "xr-standard" ? leftPad.axes[2] ?? 0 : 0;
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
       if (visible && !soundMenuOpen)
-        landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
+        landscapeMovement = landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       if (!soundMenuOpen)
         landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
     }
@@ -2403,9 +2414,12 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
+  const landscapeAudioDemo = pixels ?? viewshed ?? layers;
+  sound.setMovement(audible && landscapeAudioDemo?.started &&
+    !landscapeAudioDemo.finished ? landscapeMovement?.distance : 0,
+    landscapeMovement?.wet, dt);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
-  const landscapeAudioDemo = pixels ?? viewshed ?? layers;
   const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
     ? THREE.MathUtils.clamp(
         1 - Math.abs(landscapeAudioDemo.visitor.x -
