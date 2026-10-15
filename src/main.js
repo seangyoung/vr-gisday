@@ -1593,7 +1593,7 @@ function spatial() {
 }
 function draw() {
   drawScene();
-  sound.setMenuMusic(isMenu() && renderer.xr.isPresenting);
+  sound.setMenuMusic((isMenu() || step === -3) && renderer.xr.isPresenting);
   for (const { guide } of controllers)
     guide.setContext(...controllerGuideContext(guide.handedness));
   if (devPreview) {
