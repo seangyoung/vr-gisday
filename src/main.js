@@ -41,6 +41,7 @@ import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { ControllerGuide } from "./controller-guide.js";
+import { addControllerIllustrations } from "./controller-splash.js";
 import { initRecommendedVideos } from "./videos.js";
 const nextScanScene = createSceneRotation();
 const devPreview =
@@ -499,7 +500,7 @@ function runControllerShortcut(action) {
     else openMenu();
     return;
   }
-  if (action === "restart" && isMenu()) return;
+  if (action === "restart" && (isMenu() || step === -3)) return;
   sound.click();
   if (action === "restart") start();
   else if (action === "reset") resetView();
@@ -1674,9 +1675,9 @@ function draw() {
       panel.append(b);
     }
     for (const [name, action] of [
-      ...(!isMenu() ? [["X · Restart", "restart"]] : []),
+      ...(!isMenu() && step !== -3 ? [["X · Restart", "restart"]] : []),
       ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
-      [isMenu() ? "B · Exit XR" : "B · Exit demo", "exit"],
+      [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Exit demo", "exit"],
     ]) {
       const b = document.createElement("button");
       b.textContent = name;
@@ -1686,10 +1687,9 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
-  const onMenu = isMenu();
-  const exitLabel = onMenu
-    ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR"
-    : "Exit";
+  const onMenu = isMenu() || step === -3;
+  const exitLabel = step === -3 ? "Skip guide" : onMenu
+    ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
   if (rain?.stage === 1) {
     return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
       "Move/size", onMenu, exitLabel];
@@ -1698,6 +1698,7 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (showcase) return [showcase.kind === "projection" ? "Drag globe" : "Select",
     null, onMenu, exitLabel];
+  if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
 }
@@ -1778,6 +1779,27 @@ function drawScene() {
     );
     back.position.set(0, -0.03, -1.15);
     content.add(back);
+  }
+  if (step === -3) {
+    label("YOUR QUEST CONTROLS", 0, 0.97, 2.5, 0.17, 50, "#a6f5d9");
+    label("Point at Continue and press either trigger to begin", 0, 0.76,
+      2.75, 0.17, 34);
+    addControllerIllustrations(content, import.meta.env.BASE_URL);
+    label("LEFT CONTROLLER", -0.72, 0.55, 1.2, 0.14, 34, "#80cfe6");
+    label("RIGHT CONTROLLER", 0.72, 0.55, 1.2, 0.14, 34, "#ffdc83");
+    label("X · Restart", -0.72, -0.23, 1.35, 0.15, 42);
+    label("Y · Reset view", -0.72, -0.40, 1.35, 0.15, 42);
+    label("A · Sound menu", 0.72, -0.23, 1.35, 0.15, 42);
+    label("B · Back / exit", 0.72, -0.40, 1.35, 0.15, 42);
+    label("Trigger · Point / select", -0.75, -0.59, 1.45, 0.14, 36);
+    label("Grip · Grab / resize", 0.75, -0.59, 1.45, 0.14, 36);
+    label("Sticks · Walk and turn in landscape demos", 0, -0.74,
+      2.6, 0.13, 30, "#b6d1d9");
+    button("Continue to experiences", 0, -0.96, () => {
+      step = -1;
+      draw();
+    }, 2.0);
+    return;
   }
   if (step === -2) {
     label("HOW SATELLITES FIND YOU", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
@@ -2130,7 +2152,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
     rain?.dispose();
     rain = null;
     stopRainInput();
-    step = -1;
+    step = mode === "immersive-vr" ? -3 : -1;
     elapsed = 0;
     session.addEventListener("visibilitychange", () => {
       sound.setActive(session.visibilityState === "visible");
@@ -2451,7 +2473,7 @@ if (
   );
   if (
     Number.isInteger(requestedStep) &&
-    requestedStep >= -2 &&
+    requestedStep >= -3 &&
     requestedStep <= stages.length
   )
     step = requestedStep;

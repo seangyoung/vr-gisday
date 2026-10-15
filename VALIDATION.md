@@ -1,5 +1,10 @@
 # Prototype validation — 2026-10-02
 
+## 2026-10-15 — First-entry controller guide
+
+- Entering VR now opens a one-screen guide with the project's bundled Quest Touch Plus models and the common X/Y/A/B, trigger, grip, and landscape-stick controls. Either trigger selects Continue; B skips to the gallery. Returning from a demo does not repeat the guide. Mixed-reality room scan still starts directly.
+- Browser preview at `?preview&stage=-3` confirmed the models, label layout, Continue transition to the ten-demo gallery, and no console errors. All 104 tests and the production build passed. Real Quest review remains needed for stereo legibility and controller-ray targeting of Continue.
+
 ## 2026-10-10 — Button-label pairing refinement
 
 - Replaced viewer-relative sideways badge offsets with offsets derived from each controller model's paired button positions. A/B, X/Y, and trigger/grip labels stay on the outside of their own pair as the controller rotates; nearly edge-on pairs hide because their assignment would be visually ambiguous.
