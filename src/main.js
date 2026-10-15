@@ -267,41 +267,53 @@ function foregroundTakeaway() {
     mesh.material.depthWrite = false;
   }
 }
-function menuCard({ title, lines, category, glyph, color, action }, index, total) {
+function menuCard({ title, lines, category, preview, glyph, color, action }, index, total) {
   const canvas = document.createElement("canvas");
   canvas.width = 720;
-  canvas.height = 350;
+  canvas.height = 360;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#173440";
-  ctx.fillRect(0, 0, 720, 350);
+  ctx.fillRect(0, 0, 720, 360);
   ctx.fillStyle = color;
-  ctx.fillRect(0, 0, 9, 350);
+  ctx.fillRect(0, 0, 9, 360);
   ctx.strokeStyle = color;
   ctx.lineWidth = 3;
-  ctx.strokeRect(2, 2, 716, 346);
+  ctx.strokeRect(2, 2, 716, 356);
   ctx.fillStyle = "#294954";
-  ctx.fillRect(22, 68, 135, 204);
+  ctx.fillRect(22, 62, 135, 231);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = color;
-  ctx.font = "600 97px system-ui, sans-serif";
-  ctx.fillText(glyph, 90, 174, 115);
+  ctx.font = "600 91px system-ui, sans-serif";
+  ctx.fillText(glyph, 90, 177, 115);
   ctx.font = "600 31px system-ui, sans-serif";
-  ctx.fillText(String(index + 1).padStart(2, "0"), 90, 305);
+  ctx.fillText(String(index + 1).padStart(2, "0"), 90, 321);
   ctx.textAlign = "left";
-  ctx.font = "600 31px system-ui, sans-serif";
-  ctx.fillText(category.toUpperCase(), 181, 75, 510);
+  ctx.font = "600 27px system-ui, sans-serif";
+  ctx.fillText(category.toUpperCase(), 181, 53, 510);
   ctx.fillStyle = "#f1fbf6";
-  ctx.font = "650 58px system-ui, sans-serif";
+  ctx.font = "650 48px system-ui, sans-serif";
   lines.forEach((line, lineIndex) =>
-    ctx.fillText(line, 181, lines.length === 1 ? 188 : 155 + lineIndex * 69, 510));
+    ctx.fillText(line, 181, lines.length === 1 ? 133 : 105 + lineIndex * 55, 510));
   ctx.fillStyle = "#c3d9d9";
   ctx.font = "500 29px system-ui, sans-serif";
-  ctx.fillText("SELECT  ›", 181, 302);
+  const previewLines = [];
+  let currentLine = "";
+  for (const word of preview.split(" ")) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (currentLine && ctx.measureText(candidate).width > 505) {
+      previewLines.push(currentLine);
+      currentLine = word;
+    } else currentLine = candidate;
+  }
+  if (currentLine) previewLines.push(currentLine);
+  previewLines.forEach((line, lineIndex) => ctx.fillText(line, 181, 230 + lineIndex * 35, 510));
+  ctx.font = "600 24px system-ui, sans-serif";
+  ctx.fillText("SELECT  ›", 181, 333);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.80, 0.39),
+    new THREE.PlaneGeometry(0.86, 0.43),
     new THREE.MeshBasicMaterial({
       map: texture, side: THREE.DoubleSide,
       transparent: uiFadeAge < 0.45,
@@ -312,7 +324,7 @@ function menuCard({ title, lines, category, glyph, color, action }, index, total
   const row = Math.floor(index / 4);
   const rowCount = Math.min(4, total - row * 4);
   const column = index % 4 - (rowCount - 1) / 2;
-  mesh.position.set(column * 0.90, 0.56 - row * 0.54,
+  mesh.position.set(column * 0.93, 0.53 - row * 0.52,
     0.08 + 0.08 * Math.abs(column));
   mesh.rotation.y = -column * 0.17;
   mesh.userData.action = () => { sound.click(); action(); };
@@ -1977,31 +1989,42 @@ function drawScene() {
     label("Choose an experience", 0, 0.83, 2.5, 0.17, 52);
     [
       { title: "Find Yourself", lines: ["Find Yourself"],
-        category: "Positioning", glyph: "◎", color: "#71e3c9", action: start },
+        category: "Positioning", preview: "Narrow your location with satellite distances.",
+        glyph: "◎", color: "#71e3c9", action: start },
       { title: "Make It Rain", lines: ["Make It Rain"],
-        category: "Watersheds", glyph: "≈", color: "#80cfe6", action: startRain },
+        category: "Watersheds", preview: "Shape terrain and watch water carve new paths.",
+        glyph: "≈", color: "#80cfe6", action: startRain },
       { title: "Scan the Hidden World", lines: ["Scan the", "Hidden World"],
-        category: "Point clouds", glyph: "✦", color: "#b2ddf1", action: startScan },
+        category: "Point clouds", preview: "Sweep a scene to reveal a 3D point cloud.",
+        glyph: "✦", color: "#b2ddf1", action: startScan },
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
-        category: "GIS layers", glyph: "▤", color: "#a8d995", action: startLayers },
+        category: "GIS layers", preview: "Build a landscape by switching GIS layers on.",
+        glyph: "▤", color: "#a8d995", action: startLayers },
       { title: "Can You See It?", lines: ["Can You See It?"],
-        category: "Viewsheds", glyph: "◉", color: "#f7ce87", action: startViewshed },
+        category: "Viewsheds", preview: "Test what a tower can see across the terrain.",
+        glyph: "◉", color: "#f7ce87", action: startViewshed },
       { title: "How Big Is a Pixel?", lines: ["How Big Is", "a Pixel?"],
-        category: "Resolution", glyph: "▦", color: "#c1b6f5", action: startPixels },
+        category: "Resolution", preview: "Compare what coarse and fine pixels reveal.",
+        glyph: "▦", color: "#c1b6f5", action: startPixels },
       { title: "See the Invisible", lines: ["See the", "Invisible"],
-        category: "Spectral data", glyph: "◒", color: "#f4aece",
+        category: "Spectral data", preview: "Reveal vegetation with near-infrared imagery.",
+        glyph: "◒", color: "#f4aece",
         action: () => startShowcase("spectral") },
       { title: "Where Did the Cluster Go?", lines: ["Where Did the", "Cluster Go?"],
-        category: "Aggregation", glyph: "⁙", color: "#f2b694",
+        category: "Aggregation", preview: "Switch zoning plans and watch patterns shift.",
+        glyph: "⁙", color: "#f2b694",
         action: () => startShowcase("cluster") },
       { title: "Make the World Flat", lines: ["Make the", "World Flat"],
-        category: "Projections", glyph: "◐", color: "#9adad1",
+        category: "Projections", preview: "Flatten a globe and explore map distortion.",
+        glyph: "◐", color: "#9adad1",
         action: () => startShowcase("projection") },
       { title: "What Changed?", lines: ["What Changed?"],
-        category: "Change detection", glyph: "⇄", color: "#f5dc91",
+        category: "Change detection", preview: "Compare real satellite images across time.",
+        glyph: "⇄", color: "#f5dc91",
         action: () => startShowcase("change") },
       { title: "Between the Rain Gauges", lines: ["Between the", "Rain Gauges"],
-        category: "Interpolation", glyph: "⌁", color: "#81d6c8",
+        category: "Interpolation", preview: "Estimate rainfall between measured locations.",
+        glyph: "⌁", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",

@@ -1,6 +1,6 @@
 # Spatial Discovery Lab — GIS Day
 
-Quest-focused WebXR app with eleven short experiences in one immersive selection gallery: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, **How Big Is a Pixel?**, **See the Invisible**, **Where Did the Cluster Go?**, **Make the World Flat**, **What Changed?**, and **Between the Rain Gauges**. The four-column gallery curves gently toward the viewer; a controller ray and trigger open any demo directly.
+Quest-focused WebXR app with eleven short experiences in one immersive selection gallery: **Find Yourself**, **Make It Rain**, **Scan the Hidden World**, **Stand Inside the Layers**, **Can You See It?**, **How Big Is a Pixel?**, **See the Invisible**, **Where Did the Cluster Go?**, **Make the World Flat**, **What Changed?**, and **Between the Rain Gauges**. The four-column gallery curves gently toward the viewer. Each card gives a one-sentence preview; a controller ray and trigger open any demo directly.
 
 ## Run
 
