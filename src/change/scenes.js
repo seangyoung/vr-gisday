@@ -1,5 +1,5 @@
-// Images are JPEG encodings of the matching Landsat image pairs published by
-// USGS Earthshots. Each pair depicts the same footprint and band combination.
+// Cropped JPEG encodings of USGS Landsat image pairs. Each pair covers the
+// same place; source scenes and processing notes are documented in SOURCES.md.
 export const CHANGE_SCENES = [
   {
     id: "flood",
@@ -51,5 +51,39 @@ export const CHANGE_SCENES = [
     explanation: "Street grids spread into former fields.\nBoth sensors captured comparable bands.",
     focus: { u: 0.29, v: 0.20, rx: 0.22, ry: 0.17 },
     source: "https://eros.usgs.gov/earthshots/rapid-suburban-expansion",
+  },
+  {
+    id: "helens",
+    place: "Mount St. Helens",
+    beforeDate: "Sept. 15, 1973",
+    afterDate: "May 22, 1983",
+    sensor: "Landsat 1 → 4 · infrared false color",
+    before: new URL("./data/helens-before.jpg", import.meta.url).href,
+    after: new URL("./data/helens-after.jpg", import.meta.url).href,
+    width: 600, height: 500,
+    question: "What changed most?",
+    options: ["Volcanic eruption", "City growth", "River flood"],
+    answer: 0,
+    observation: "A gray blast zone surrounds the changed summit.",
+    explanation: "The 1980 eruption removed the summit and damaged forest.\nSnow varies by season; look for the gray blast zone.",
+    focus: { u: 0.43, v: 0.33, rx: 0.28, ry: 0.29 },
+    source: "https://eros.usgs.gov/earthshots/mount-st-helens",
+  },
+  {
+    id: "joplin",
+    place: "Joplin, Missouri",
+    beforeDate: "May 7, 2011",
+    afterDate: "June 8, 2011",
+    sensor: "Landsat 7 · natural color",
+    before: new URL("./data/joplin-before.jpg", import.meta.url).href,
+    after: new URL("./data/joplin-after.jpg", import.meta.url).href,
+    width: 1000, height: 700,
+    question: "What changed most?",
+    options: ["Tornado damage path", "Lake drained", "Volcanic eruption"],
+    answer: 0,
+    observation: "A pale west-to-east band crosses southern Joplin.",
+    explanation: "The May 22 tornado cut a path through Joplin.\nGround surveys document the damage within it.",
+    focus: { u: 0.47, v: 0.57, rx: 0.38, ry: 0.13 },
+    source: "https://eros.usgs.gov/media-gallery/image-of-the-week/joplin-missouri-one-year-later",
   },
 ];
