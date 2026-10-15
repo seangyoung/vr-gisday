@@ -39,6 +39,7 @@ import { ClusterExperience } from "./showcase/cluster-experience.js";
 import { ChangeExperience } from "./change/experience.js";
 import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
+import { InterpolationExperience } from "./interpolation/experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { ControllerGuide } from "./controller-guide.js";
 import { addControllerIllustrations } from "./controller-splash.js";
@@ -342,8 +343,9 @@ function closeSoundMenu() {
   soundBackgroundSaved = false;
 }
 function hideVisualsForSoundMenu() {
+  showcase?.grab?.cancel();
   const visualRoots = [
-    root, floatingModel, rain?.group, scan?.group,
+    root, floatingModel, rain?.group, scan?.group, showcase?.model,
     ...(scan?.reticles?.flat() ?? []),
     ...[layers, viewshed, pixels].flatMap((demo) =>
       demo ? [demo.group, demo.clipboard] : []),
@@ -649,15 +651,17 @@ function startShowcase(kind) {
     cluster: ClusterExperience,
     projection: ProjectionExperience,
     change: ChangeExperience,
+    interpolation: InterpolationExperience,
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
   showcase = new Constructor(root, (reason) => {
-    if (reason === "selection") updateClusterReadout();
+    if (reason === "selection" && showcase?.kind === "cluster") updateClusterReadout();
     else {
       if (["correct", "blocked", "reveal"].includes(reason)) sound.cue(reason);
       draw();
     }
-  });
+  }, scene);
+  showcase.place?.(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
 function startRoomScan() {
@@ -1067,6 +1071,9 @@ function drawShowcaseUI() {
       change: ["What Changed?",
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
         "Compare images"],
+      interpolation: ["Between the Rain Gauges",
+        "Each white post shows measured rainfall in millimeters.\nCompare three surfaces fitted to the same gauges.\nChoose a new spot and follow an IDW estimate.",
+        "Fit the surfaces"],
     };
     const [title, body, action] = introductions[exhibit.kind];
     lessonCard(title, body, 0.13);
@@ -1101,6 +1108,8 @@ function drawShowcaseUI() {
         "Administrative ward totals can hide a street-level concentration.\nChanging boundaries changes the shading around the same mapped deaths.\nThis zoning effect is part of MAUP: the modifiable areal unit problem."],
       projection: ["Every flat map makes a choice",
         "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nMercator keeps local shape; equal-area keeps relative area."],
+      interpolation: ["One set of stations, three answers",
+        "IDW passes through readings; nearby gauges weigh more.\nA smooth trend can sit above or below measured points.\nNearest zones make steps. Check predictions at held-out gauges."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
@@ -1110,10 +1119,46 @@ function drawShowcaseUI() {
     if (exhibit.kind === "projection")
       label("Choose a projection that supports what your map needs to compare.",
         0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
+    if (exhibit.kind === "interpolation")
+      label("These rainfall readings are synthetic. Fewer gauges mean more uncertainty between them.",
+        0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
     takeawayActions(-0.62);
     return;
   }
-  if (exhibit.kind === "change") {
+  if (exhibit.kind === "interpolation") {
+    const explanations = {
+      samples: "White posts = readings · gold points = 3 nearest · ? = estimate",
+      idw: "IDW: nearer gauges carry more weight; the surface meets each reading.",
+      smooth: "Smooth trend: a wider average shows the regional pattern.",
+      zones: "Nearest station: every zone takes its closest gauge's value.",
+    };
+    label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
+      "#e6f4f5", "#0b2430");
+    if (exhibit.showWeights) {
+      const terms = exhibit.estimate.neighbors.map(({ station, weight }) =>
+        `${station.value}×${Math.round(weight * 100)}%`).join(" + ");
+      label(`IDW weights = 1/d² for the 3 nearest gauges\n${terms} ≈ ${exhibit.estimate.value.toFixed(1)} mm`,
+        0, -0.66, 2.48, 0.18, 26, "#ffdd91", "#0b2430");
+    } else label(`Point at the model to move ? · ${exhibit.mode === "smooth" ? "smooth" :
+      exhibit.mode === "zones" ? "nearest" : "IDW"} estimate ${exhibit.displayValue.toFixed(1)} mm`,
+      0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
+    button("Readings", -0.91, -0.84, () => exhibit.setMode("samples"),
+      0.55, exhibit.mode === "samples");
+    button("IDW", -0.32, -0.84, () => exhibit.setMode("idw"),
+      0.52, exhibit.mode === "idw");
+    button("Smooth", 0.30, -0.84, () => exhibit.setMode("smooth"),
+      0.58, exhibit.mode === "smooth");
+    button("Zones", 0.92, -0.84, () => exhibit.setMode("zones"),
+      0.54, exhibit.mode === "zones");
+    button(exhibit.showWeights ? "Hide IDW math" : "Explain IDW", -0.60, -1.07,
+      () => {
+        if (!exhibit.showWeights) exhibit.setMode("idw");
+        exhibit.showWeights = !exhibit.showWeights;
+        draw();
+      }, 1.05,
+      !!exhibit.showWeights);
+    button("Takeaway", 0.60, -1.07, () => exhibit.finish(), 1.05);
+  } else if (exhibit.kind === "change") {
     const caseInfo = exhibit.sceneInfo;
     label(`Case ${exhibit.sceneIndex + 1}/${CHANGE_SCENES.length} · ${caseInfo.place}`,
       0, 0.98, 2.45, 0.17, 43, "#e6f4f5", "#0b2430");
@@ -1696,8 +1741,9 @@ function controllerGuideContext(hand) {
   }
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
-  if (showcase) return [showcase.kind === "projection" ? "Drag globe" : "Select",
-    null, onMenu, exitLabel];
+  if (showcase) return [showcase.kind === "projection" ? "Drag globe" :
+    showcase.kind === "interpolation" ? "Place estimate" : "Select",
+    showcase.kind === "interpolation" ? "Move/size" : null, onMenu, exitLabel];
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
@@ -1875,6 +1921,9 @@ function drawScene() {
       { title: "What Changed?", lines: ["What Changed?"],
         category: "Change detection", glyph: "⇄", color: "#f5dc91",
         action: () => startShowcase("change") },
+      { title: "Between the Rain Gauges", lines: ["Between the", "Rain Gauges"],
+        category: "Interpolation", glyph: "⌁", color: "#81d6c8",
+        action: () => startShowcase("interpolation") },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
@@ -1937,6 +1986,7 @@ function place() {
   layers?.place(cam);
   viewshed?.place(cam);
   pixels?.place(cam);
+  showcase?.place?.(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -1960,7 +2010,8 @@ for (let i = 0; i < 2; i++) {
     guide.setContext(...controllerGuideContext(guide.handedness));
   });
   c.addEventListener("selectstart", () => {
-    if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size)
+    if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
+        showcase?.grab?.hands.size)
       return;
     const hit = intersect(c);
     if (rain?.stage === 1 && !soundMenuOpen) {
@@ -1986,6 +2037,13 @@ for (let i = 0; i < 2; i++) {
       if (modelBeforeUi(model, hit)) {
         sound.click();
         c.userData.scanning = true;
+        return;
+      }
+    }
+    if (showcase?.kind === "interpolation" && !soundMenuOpen) {
+      const model = showcase.grabHit(raycaster);
+      if (modelBeforeUi(model, hit) && showcase.selectFromRay(raycaster)) {
+        sound.click();
         return;
       }
     }
@@ -2053,6 +2111,18 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
+    if (showcase?.kind === "interpolation" && showcase.started &&
+        !showcase.finished && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      const ui = intersect(c);
+      const target = showcase.grabHit(raycaster);
+      const near = showcase.handNear(grip.getWorldPosition(new THREE.Vector3()));
+      if (showcase.grab.hands.size || near || modelBeforeUi(target, ui)) {
+        sound.click();
+        showcase.grab.begin(i, grip.matrixWorld);
+      }
+      return;
+    }
     if (!floatingModel || !grip.visible) return;
     grip.updateWorldMatrix(true, false);
     const near =
@@ -2070,6 +2140,7 @@ for (let i = 0; i < 2; i++) {
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
+    showcase?.grab?.release(i);
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
@@ -2079,6 +2150,7 @@ for (let i = 0; i < 2; i++) {
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
+    showcase?.grab?.release(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -2360,6 +2432,7 @@ renderer.setAnimationLoop((time, frame) => {
       grab?.update(poses);
       rain?.grab.update(poses);
       scan?.grab.update(poses);
+      showcase?.grab?.update(poses);
       if (scan && !scan.room && scan.stage === 1 && !soundMenuOpen)
         for (const { c, id } of controllers) {
           const pad = c.userData.xrInput?.gamepad;
@@ -2372,6 +2445,7 @@ renderer.setAnimationLoop((time, frame) => {
       grab?.cancel();
       rain?.grab.cancel();
       scan?.grab.cancel();
+      showcase?.grab?.cancel();
       scan?.stickReady?.clear();
     }
     for (const b of soundMenuOpen ? soundButtons : buttons) {
@@ -2380,15 +2454,18 @@ renderer.setAnimationLoop((time, frame) => {
     }
     for (const { c, beam, id } of controllers) {
       const hit = intersect(c);
-      const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) || scanHit(c);
+      const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) ||
+        scanHit(c) || showcase?.grabHit?.(raycaster);
       const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
-      const exhibitPanel = hit || soundMenuOpen || !showcase?.started ? null :
+      const exhibitPanel = hit || soundMenuOpen || !showcase?.started ||
+        showcase.kind === "interpolation" ? null :
         raycaster.intersectObjects(showcase.kind === "projection"
           ? [showcase.globe, showcase.map] : [showcase.image ?? showcase.map], false)[0];
       beam.visible =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id) &&
+        !showcase?.grab?.hands.has(id) &&
         showcase?.draggingBy !== id;
       beam.scale.z = hit ? hit.distance : model ? model.distance :
         ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
@@ -2396,6 +2473,7 @@ renderer.setAnimationLoop((time, frame) => {
         grab?.hands.has(id) ||
           scan?.grab.hands.has(id) ||
           rain?.grab.hands.has(id) ||
+          showcase?.grab?.hands.has(id) ||
           rain?.stroke?.id === id
           ? 0xffca83
           : model
@@ -2488,7 +2566,7 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
     camera.position.y = 1.6;
     startPixels();
-  } else if (["spectral", "cluster", "projection", "change"].includes(
+  } else if (["spectral", "cluster", "projection", "change", "interpolation"].includes(
     new URLSearchParams(location.search).get("demo"))) {
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")

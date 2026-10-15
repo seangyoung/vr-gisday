@@ -101,3 +101,10 @@ Each scene samples blue, green, and red **display brightness** from its natural-
 - [Natural Earth vector data](https://github.com/nvkelso/natural-earth-vector), public domain. `src/showcase/data/ne_110m_land.json` is the project's 1:110m land GeoJSON as fetched on 2026-10-12; SHA-256 prefix `9e0729ee253ca7d7`. Coordinates are rendered into an original canvas texture at runtime.
 
 The three cylindrical projection formulas, local area-scale comparison, indicatrix axis ratios, and uniform display fit are in `src/showcase/projection-model.js`. Mercator is capped at 85° latitude for finite display; this intentional display limit is not a geographic boundary. Coastline detail comes from the 1:110m generalized source, not a high-resolution global atlas.
+
+### Between the Rain Gauges
+
+- Esri, [*How inverse distance weighted interpolation works*](https://pro.arcgis.com/en/pro-app/3.6/help/analysis/geostatistical-analyst/how-inverse-distance-weighted-interpolation-works.htm) — closer observations receive more weight; power 2 gives inverse-distance-squared weighting, the neighborhood can be limited, and IDW is exact at observations. The demo fixes the neighborhood at the three nearest stations and normalizes their weights to sum to one.
+- Esri, [*How Spline works*](https://pro.arcgis.com/en/pro-app/3.4/tool-reference/3d-analyst/how-spline-works.htm) — a minimum-curvature spline also passes exactly through observations. The demo's deliberately non-exact broad trend is therefore labeled a Gaussian-smoothed average rather than a spline.
+
+All 12 rainfall readings, station positions, and surfaces are generated locally from original synthetic teaching data in `src/interpolation/model.js`. The two horizontal coordinates are dimensionless model positions; rainfall values are millimeters. Display heights are exaggerated for readability. Neither the synthetic gauges nor the surfaces represent an actual storm.
