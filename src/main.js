@@ -41,6 +41,7 @@ import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
+import { hasQuestShortcuts } from "./input-layout.js";
 import { ControllerGuide } from "./controller-guide.js";
 import { addControllerIllustrations } from "./controller-splash.js";
 import { initRecommendedVideos } from "./videos.js";
@@ -94,6 +95,8 @@ let xrMode = null;
 let pendingRoomHandoff = false;
 let rightTurnReady = true;
 const controllerShortcuts = new ControllerShortcuts();
+const fallbackPreview = devPreview && new URLSearchParams(location.search).has("fallback");
+let showFallbackControls = fallbackPreview;
 let rain = null,
   rainPointer = 0,
   previewRaining = false;
@@ -381,7 +384,8 @@ function drawSoundMenu() {
     };
     soundButtons.push(mesh);
   };
-  label("SOUND · A TO CLOSE", 0, 0.33, 0.72, 0.09, 36, "#a6f5d9");
+  label(showFallbackControls ? "SOUND · SELECT CLOSE" : "SOUND · A TO CLOSE",
+    0, 0.33, 0.72, 0.09, 36, "#a6f5d9");
   control(`All sound: ${sound.muted ? "Off" : "On"}`, 0, 0.22, 0.69,
     () => sound.toggle());
   control("−", -0.29, 0.11, 0.11, () => sound.setVolume(sound.volume - 0.25));
@@ -506,6 +510,13 @@ function runControllerShortcut(action) {
   sound.click();
   if (action === "restart") start();
   else if (action === "reset") resetView();
+}
+function refreshInputLayout(session) {
+  const fallback = !hasQuestShortcuts(navigator.userAgent, session?.inputSources);
+  if (showFallbackControls === fallback) return;
+  showFallbackControls = fallback;
+  controllerShortcuts.reset();
+  draw();
 }
 function start() {
   closeSoundMenu();
@@ -705,7 +716,7 @@ function drawRoomUI() {
     : "Range: blue near → red far";
   const title =
     s.stage === 0
-      ? "Scan your room · Quest 3S"
+      ? "Scan your room · MR"
       : s.stage === 2
         ? "Your surroundings, sampled."
         : s.frozen
@@ -713,9 +724,9 @@ function drawRoomUI() {
           : "Sweep across real surfaces";
   const body =
     s.stage === 0
-      ? "Quest Browser estimates surfaces in your real room.\nMove your controller to collect points in mixed reality.\nThe points stay in this session and clear when you exit."
+      ? "Your browser estimates surfaces in your real room.\nMove your controller to collect points in mixed reality.\nThe points stay in this session and clear when you exit."
       : s.stage === 2
-        ? "Quest Browser estimated these surfaces in your room.\nGaps show where another viewpoint could add samples.\nLidar builds point clouds from timed laser returns."
+        ? "Your browser estimated these surfaces in your room.\nGaps show where another viewpoint could add samples.\nLidar builds point clouds from timed laser returns."
         : s.frozen
           ? "Move the frozen point cloud to inspect gaps.\nResume returns points to their real-world positions.\nKeep passthrough visible as you explore."
           : "Aim at real surfaces and sweep.\nUp to three green dots mark actual surface returns.\nFreeze to inspect the point cloud you collected.";
@@ -739,7 +750,7 @@ function drawRoomUI() {
   if (s.stage === 0) {
     if (s.status !== "unavailable")
       button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
-    label("Raise either controller into view for button shortcuts",
+    if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
       0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
@@ -857,7 +868,7 @@ function drawScanChooserUI() {
     scan.explore();
   });
   drawScanChoiceCard("room", 0.61, "Room scan · MR", "Sample real surfaces", switchToRoomScan);
-  label("Raise either controller into view for button shortcuts",
+  if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawLayersUI() {
@@ -869,7 +880,9 @@ function drawLayersUI() {
       0.13,
     );
     button("Start building", 0, -0.43, () => l.begin(), 1.5);
-    label("After starting, raise your left hand to see the map and layer list.",
+    label(showFallbackControls
+      ? "The map and layer list appear on the left-hand clipboard."
+      : "After starting, raise your left hand to see the map and layer list.",
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
@@ -939,7 +952,9 @@ function drawViewshedUI() {
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
-    label("After starting, raise your left hand to see the map and controls.",
+    label(showFallbackControls
+      ? "The map and controls appear on the left-hand clipboard."
+      : "After starting, raise your left hand to see the map and controls.",
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
@@ -997,7 +1012,9 @@ function drawPixelsUI() {
       0.13,
     );
     button("Compare pixels", 0, -0.43, () => p.begin(), 1.5);
-    label("After starting, raise your left hand to see the images and controls.",
+    label(showFallbackControls
+      ? "The images and controls appear on the left-hand clipboard."
+      : "After starting, raise your left hand to see the images and controls.",
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
@@ -1078,7 +1095,9 @@ function drawShowcaseUI() {
     const [title, body, action] = introductions[exhibit.kind];
     lessonCard(title, body, 0.13);
     button(action, 0, -0.43, () => exhibit.begin(), 1.6);
-    label("About four minutes · Raise a controller to see its button labels.",
+    label(showFallbackControls
+      ? "About four minutes · Use the action buttons below."
+      : "About four minutes · Raise a controller to see its button labels.",
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
@@ -1278,7 +1297,7 @@ function drawRainChooserUI() {
     0, 0.69, 2.3, 0.2, 31, "#b6d1d9", "#0b2430");
   drawRainChoiceCard("drainage", -0.61, "Drainage sandbox", "Follow runoff and ponds");
   drawRainChoiceCard("erosion", 0.61, "Erosion tray", "Watch channels form");
-  label("Raise either controller into view for button shortcuts",
+  if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
 function drawRainUI() {
@@ -1636,8 +1655,48 @@ function spatial() {
     preservePose = null;
   }
 }
+function drawFallbackToolbar() {
+  if (!showFallbackControls || soundMenuOpen) return;
+  const onClipboard = uiParent !== content;
+  const actions = [
+    ...(!isMenu() && step !== -3 ? [["Restart", "restart"]] : []),
+    ["Reset", "reset"], ["Sound", "sound"],
+    [isMenu() ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" :
+      step === -3 ? "Skip" : "Exit", "exit"],
+  ];
+  let y;
+  if (onClipboard) {
+    const backing = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.50, 0.36),
+      new THREE.MeshBasicMaterial({ color: 0x143441, side: THREE.DoubleSide }),
+    );
+    backing.position.set(0, -1.28, -0.04);
+    uiParent.add(backing);
+    y = -1.30;
+  } else {
+    const lowest = buttons.length ? Math.min(...buttons.map((mesh) => mesh.position.y)) : -0.5;
+    y = isMenu() ? -1.02 : Math.min(-0.99, lowest - 0.25);
+    content.position.y = y < -1.24 ? 0.18 : 0;
+  }
+  const pitch = actions.length === 4 ? 0.60 : 0.74;
+  const width = actions.length === 4 ? 0.55 : 0.67;
+  actions.forEach(([name, action], index) => {
+    const x = (index - (actions.length - 1) / 2) * pitch;
+    const control = label(name, x, y, width, 0.16, 48, "#08241e", "#a6f5d9");
+    control.position.z = 0.10;
+    control.userData.action = () => runControllerShortcut(action);
+    control.userData.label = name;
+    control.userData.fallbackAction = true;
+    control.material.depthTest = false;
+    control.material.depthWrite = false;
+    control.renderOrder = 30;
+    buttons.push(control);
+  });
+}
 function draw() {
+  content.position.y = 0;
   drawScene();
+  drawFallbackToolbar();
   sound.setMenuMusic((isMenu() || step === -3) && renderer.xr.isPresenting);
   for (const { guide } of controllers)
     guide.setContext(...controllerGuideContext(guide.handedness));
@@ -1719,15 +1778,17 @@ function draw() {
       b.onclick = mesh.userData.action;
       panel.append(b);
     }
-    for (const [name, action] of [
-      ...(!isMenu() && step !== -3 ? [["X · Restart", "restart"]] : []),
-      ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
-      [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Exit demo", "exit"],
-    ]) {
-      const b = document.createElement("button");
-      b.textContent = name;
-      b.onclick = () => runControllerShortcut(action);
-      panel.append(b);
+    if (!showFallbackControls) {
+      for (const [name, action] of [
+        ...(!isMenu() && step !== -3 ? [["X · Restart", "restart"]] : []),
+        ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
+        [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Exit demo", "exit"],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => runControllerShortcut(action);
+        panel.append(b);
+      }
     }
   }
 }
@@ -1749,6 +1810,10 @@ function controllerGuideContext(hand) {
   return [null, null, onMenu, exitLabel];
 }
 function updateControllerGuides(cam, tracked, dt) {
+  if (showFallbackControls) {
+    for (const { guide } of controllers) guide.setVisible(false);
+    return;
+  }
   let closest = null;
   let best = -Infinity;
   for (const { guide, grip } of controllers) {
@@ -1827,6 +1892,17 @@ function drawScene() {
     content.add(back);
   }
   if (step === -3) {
+    if (showFallbackControls) {
+      label("YOUR VR CONTROLS", 0, 0.74, 2.5, 0.18, 52, "#a6f5d9");
+      label("Point and press a trigger to select", 0, 0.37, 2.6, 0.18, 42);
+      label("Use Reset, Sound, or Skip below.\nGrip to move models; sticks move and turn in landscapes.",
+        0, 0.03, 2.55, 0.26, 33, "#e6f4f5", "#0b2430");
+      button("Continue to experiences", 0, -0.50, () => {
+        step = -1;
+        draw();
+      }, 2.0);
+      return;
+    }
     label("YOUR QUEST CONTROLS", 0, 0.97, 2.5, 0.17, 50, "#a6f5d9");
     label("Point at Continue and press either trigger to begin", 0, 0.76,
       2.75, 0.17, 34);
@@ -1877,7 +1953,7 @@ function drawScene() {
       },
       1.8,
     );
-    label("Raise either controller into view for button shortcuts",
+    if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
       0, -1.04, 2.3, 0.13, 27, "#b6d1d9", "#0b2430");
 
     return;
@@ -1886,10 +1962,13 @@ function drawScene() {
     if (xrMode === "immersive-ar") {
       label("SPATIAL DISCOVERY LAB", 0, 0.78, 2, 0.16, 48, "#a6f5d9");
       label("Mixed reality", 0, 0.5, 2, 0.2, 58);
-      label("Explore a point cloud of your surroundings.\nB exits mixed reality from this menu.",
+      label(showFallbackControls
+        ? "Explore a point cloud of your surroundings.\nUse Exit below to leave mixed reality."
+        : "Explore a point cloud of your surroundings.\nB exits mixed reality from this menu.",
         0, 0.12, 2.1, 0.28, 36);
       button("Scan your room", 0, -0.25, startRoomScan, 1.75);
-      label("A opens sound menu · Point and press the trigger",
+      label(showFallbackControls ? "Point and press the trigger to select" :
+        "A opens sound menu · Point and press the trigger",
         0, -0.62, 2.1, 0.13, 29, "#b6d1d9", "#0b2430");
       return;
     }
@@ -1925,7 +2004,7 @@ function drawScene() {
         category: "Interpolation", glyph: "⌁", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
-    label("Point and press trigger · A sound · B exit VR",
+    if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
     return;
@@ -2008,12 +2087,17 @@ for (let i = 0; i < 2; i++) {
     c.userData.xrInput = event.data;
     guide.setHandedness(event.data.handedness);
     guide.setContext(...controllerGuideContext(guide.handedness));
+    if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
         showcase?.grab?.hands.size)
       return;
     const hit = intersect(c);
+    if (hit?.object.userData.fallbackAction) {
+      hit.object.userData.action(hit);
+      return;
+    }
     if (rain?.stage === 1 && !soundMenuOpen) {
       const land = rainHit(c);
       if (modelBeforeUi(land, hit)) {
@@ -2202,6 +2286,8 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
     scene.background =
       mode === "immersive-ar" ? null : new THREE.Color(0x071820);
     await renderer.xr.setSession(session);
+    showFallbackControls = !hasQuestShortcuts(navigator.userAgent, session.inputSources);
+    session.addEventListener("inputsourceschange", () => refreshInputLayout(session));
     renderer.xr.getReferenceSpace()?.addEventListener("reset", () => {
       if (scan?.room) {
         stopRainInput();
@@ -2250,6 +2336,7 @@ renderer.xr.addEventListener("sessionend", () => {
   sound.setMenuMusic(false);
   sound.setActive(false);
   controllerShortcuts.reset();
+  showFallbackControls = fallbackPreview;
   rightTurnReady = true;
   layers?.dispose();
   layers = null;
@@ -2286,7 +2373,7 @@ for (const [id, mode, name] of [
     b.textContent = name;
     b.disabled = true;
     status.textContent =
-      "Open this HTTPS site in Meta Quest Browser to enter an immersive experience.";
+      "Open this HTTPS site in a browser with immersive WebXR support.";
   } else
     navigator.xr
       .isSessionSupported(mode)
@@ -2297,7 +2384,7 @@ for (const [id, mode, name] of [
       .catch(() => {
         b.textContent = `${name} unavailable`;
         status.textContent =
-          "XR availability could not be checked. Reload in Quest Browser.";
+          "XR availability could not be checked. Reload in a WebXR browser.";
       });
 }
 renderer.setAnimationLoop((time, frame) => {
@@ -2309,8 +2396,10 @@ renderer.setAnimationLoop((time, frame) => {
   let landscapeMovement = null;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
-    const visibleSession = renderer.xr.getSession().visibilityState === "visible";
-    if (visibleSession) {
+    const session = renderer.xr.getSession();
+    refreshInputLayout(session);
+    const visibleSession = session.visibilityState === "visible";
+    if (visibleSession && !showFallbackControls) {
       const actions = controllerShortcuts.update(
         controllers.map(({ c }) => c.userData.xrInput).filter(Boolean),
       );
@@ -2371,7 +2460,8 @@ renderer.setAnimationLoop((time, frame) => {
       if (visible && !soundMenuOpen)
         landscapeMovement = landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       if (!soundMenuOpen)
-        landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera());
+        landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera(), false,
+          showFallbackControls);
     }
     if (rain && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
@@ -2488,7 +2578,7 @@ renderer.setAnimationLoop((time, frame) => {
       !soundMenuOpen) {
     const landscapeDemo = pixels ?? viewshed ?? layers;
     landscapeDemo.update(dt);
-    landscapeDemo.updateClipboard(null, camera, true);
+    landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
     showcase.update(dt);

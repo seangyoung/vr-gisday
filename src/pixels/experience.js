@@ -79,7 +79,8 @@ export class PixelExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}) {
     super(scene, onChange);
     this.onEvent = onEvent;
-    this.clipboard.scale.setScalar(0.26);
+    this.clipboardBaseScale = 0.26;
+    this.clipboard.scale.setScalar(this.clipboardBaseScale);
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.model = new PixelModel();

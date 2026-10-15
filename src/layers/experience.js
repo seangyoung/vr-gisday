@@ -531,7 +531,8 @@ export class LayerExperience {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.clipboard = new THREE.Group();
-    this.clipboard.scale.setScalar(0.24);
+    this.clipboardBaseScale = 0.24;
+    this.clipboard.scale.setScalar(this.clipboardBaseScale);
     this.clipboard.visible = false;
     scene.add(this.clipboard);
     const board = new THREE.Mesh(
@@ -697,24 +698,32 @@ export class LayerExperience {
       marker.position.y = -(this.visitor.y / mapExtent) * width / 2;
     }
   }
-  updateClipboard(leftGrip, camera, preview = false) {
+  updateClipboard(leftGrip, camera, preview = false, fallback = false) {
     if (!this.started) {
       this.clipboard.visible = false;
       return;
     }
-    if (!leftGrip && !preview) {
+    if (!leftGrip && !preview && !fallback) {
       this.clipboard.visible = false;
       return;
     }
+    this.clipboard.scale.setScalar(this.clipboardBaseScale * (fallback ? 1.15 : 1));
     if (preview) {
       camera.updateWorldMatrix(true, false);
       this.clipboard.position.copy(
-        camera.localToWorld(new THREE.Vector3(0, -0.2, -1.3)),
+        camera.localToWorld(fallback
+          ? new THREE.Vector3(-0.48, -0.22, -1.05)
+          : new THREE.Vector3(0, -0.2, -1.3)),
       );
-    } else {
+    } else if (leftGrip) {
       leftGrip.updateWorldMatrix(true, false);
       this.clipboard.position.copy(
         leftGrip.localToWorld(new THREE.Vector3(-0.08, 0.02, -0.18)),
+      );
+    } else {
+      camera.updateWorldMatrix(true, false);
+      this.clipboard.position.copy(
+        camera.localToWorld(new THREE.Vector3(-0.48, -0.22, -1.05)),
       );
     }
     camera.getWorldPosition(this._viewPosition ??= new THREE.Vector3());
