@@ -64,3 +64,22 @@ test("answer highlight is drawn for local changes but not flood or fire", () => 
   }
   assert.equal(outlines, 1);
 });
+
+test("Mount St. Helens slider draws the same source footprint in both frames", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  const draws = [];
+  const ctx = new Proxy({
+    drawImage: (...args) => draws.push(args),
+    measureText: () => ({ width: 100 }),
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+  exhibit.sceneIndex = CHANGE_SCENES.findIndex((scene) => scene.id === "helens");
+  exhibit.canvas = { width: 580, height: 500, getContext: () => ctx };
+  exhibit.image = { material: { map: { needsUpdate: false } } };
+  exhibit.pair = [{}, {}];
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.split = 0.5;
+  exhibit.refresh();
+  assert.deepEqual(draws[0].slice(1), [20, 0, 580, 500, 0, 0, 580, 500]);
+  assert.deepEqual(draws[1].slice(1), [0, 0, 580, 500, 0, 0, 580, 500]);
+});

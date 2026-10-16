@@ -114,12 +114,15 @@ export class ChangeExperience extends TimedExhibit {
     const { width, height } = this.canvas;
     const ctx = this.canvas.getContext("2d");
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(this.pair[0], 0, 0, width, height);
+    const crop = this.sceneInfo.crop;
+    if (crop) ctx.drawImage(this.pair[0], ...crop.before, 0, 0, width, height);
+    else ctx.drawImage(this.pair[0], 0, 0, width, height);
     ctx.save();
     ctx.beginPath();
     ctx.rect(this.split * width, 0, width * (1 - this.split), height);
     ctx.clip();
-    ctx.drawImage(this.pair[1], 0, 0, width, height);
+    if (crop) ctx.drawImage(this.pair[1], ...crop.after, 0, 0, width, height);
+    else ctx.drawImage(this.pair[1], 0, 0, width, height);
     ctx.restore();
     const splitX = this.split * width;
     ctx.strokeStyle = "#ffffff";

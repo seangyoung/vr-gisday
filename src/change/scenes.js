@@ -58,7 +58,9 @@ export const CHANGE_SCENES = [
     sensor: "Landsat 1 → 4 · infrared false color",
     before: new URL("./data/helens-before.jpg", import.meta.url).href,
     after: new URL("./data/helens-after.jpg", import.meta.url).href,
-    width: 600, height: 500,
+    width: 580, height: 500,
+    // The saved 600px frames start 20 source pixels apart. Show their common footprint.
+    crop: { before: [20, 0, 580, 500], after: [0, 0, 580, 500] },
     question: "What changed most?",
     options: ["Volcanic eruption", "City growth", "River flood"],
     answer: 0,
