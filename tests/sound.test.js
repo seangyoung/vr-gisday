@@ -56,52 +56,6 @@ class Context {
     return new Node();
   }
 }
-test("walking uses dry steps, water splashes, and stops quietly with movement and effects", () => {
-  const old = globalThis.AudioContext;
-  globalThis.AudioContext = Context;
-  try {
-    const sound = new LabSound();
-    sound.unlock();
-    const ctx = sound.context;
-    const baseline = ctx.sources.length;
-    for (let i = 0; i < 5; i++) {
-      ctx.currentTime += 0.05;
-      sound.setMovement(0.14, false, 0.05);
-    }
-    assert.ok(ctx.sources.length > baseline);
-    assert.ok(ctx.sources.at(-1).started);
-    assert.ok(sound.footsteps.dry[0].getChannelData(0).some((sample) => sample !== 0));
-    assert.ok(sound.footsteps.wet[0].getChannelData(0).some((sample) => sample !== 0));
-    assert.ok(sound.footsteps.dry.includes(ctx.sources.at(-1).buffer));
-    for (let i = 0; i < 7; i++) {
-      ctx.currentTime += 0.05;
-      sound.setMovement(0.14, true, 0.05);
-    }
-    assert.ok(sound.footsteps.wet.includes(ctx.sources.at(-1).buffer));
-    const count = ctx.sources.length;
-    sound.setMovement(0, true, 0.05);
-    sound.setCategory("effects", false);
-    for (let i = 0; i < 7; i++) {
-      ctx.currentTime += 0.05;
-      sound.setMovement(0.14, true, 0.05);
-    }
-    assert.equal(ctx.sources.length, count);
-    sound.setCategory("effects", true);
-    sound.muted = true;
-    sound.setMovement(0, false, 0.05);
-    for (let i = 0; i < 7; i++) {
-      ctx.currentTime += 0.05;
-      sound.setMovement(0.14, false, 0.05);
-    }
-    assert.equal(ctx.sources.length, count);
-    sound.setActive(false);
-    assert.equal(sound.walking, false);
-    sound.setMovement(0.14, false, 0.05);
-    assert.equal(ctx.sources.length, count);
-  } finally {
-    globalThis.AudioContext = old;
-  }
-});
 test("rain sound begins at input time and fades when pouring stops", () => {
   const old = globalThis.AudioContext;
   globalThis.AudioContext = Context;

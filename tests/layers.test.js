@@ -150,7 +150,7 @@ test("left-stick walking follows the view, terrain, bounds, and clipboard locati
   map.geometry.dispose();
 });
 
-test("walking reports river splashes below a bridge and dry steps on its deck", () => {
+test("walking detects river water below a bridge and dry road on its deck", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);

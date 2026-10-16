@@ -2426,7 +2426,6 @@ renderer.setAnimationLoop((time, frame) => {
   updateRangeAnimations(dt);
   updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
-  let landscapeMovement = null;
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     const session = renderer.xr.getSession();
@@ -2491,7 +2490,7 @@ renderer.setAnimationLoop((time, frame) => {
       const leftX = leftPad?.mapping === "xr-standard" ? leftPad.axes[2] ?? 0 : 0;
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
       if (visible && !soundMenuOpen)
-        landscapeMovement = landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
+        landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       if (!soundMenuOpen)
         landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera(), false,
           showFallbackControls);
@@ -2640,9 +2639,6 @@ renderer.setAnimationLoop((time, frame) => {
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
   const landscapeAudioDemo = pixels ?? viewshed ?? layers;
-  sound.setMovement(audible && landscapeAudioDemo?.started &&
-    !landscapeAudioDemo.finished ? landscapeMovement?.distance : 0,
-    landscapeMovement?.wet, dt);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
   const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
