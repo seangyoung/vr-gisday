@@ -11,7 +11,7 @@ import {
 import {
   GlobeSpin, TISSOT_LONGITUDES, nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
-  projectionFitScale, relativeAreaScale,
+  projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "../src/showcase/projection-model.js";
 import { orientGlobe } from "../src/showcase/projection-experience.js";
 
@@ -96,6 +96,22 @@ test("Tissot axes reflect shape and area without display stretching", () => {
     const edge = projection === "mercator" ? 85 : 90;
     assert.ok(Math.abs(projectMetric(0, edge, projection).y * scale) <= 0.530001);
   }
+});
+
+test("selected Tissot readouts distinguish shape from relative area", () => {
+  const plate = tissotDistortion("equirectangular", 60);
+  assert.ok(Math.abs(plate.shapeRatio - 2) < 1e-12);
+  assert.equal(plate.longerAxis, "east-west");
+  assert.ok(Math.abs(plate.relativeArea - 2) < 1e-12);
+  const mercator = tissotDistortion("mercator", 60);
+  assert.equal(mercator.shapeRatio, 1);
+  assert.ok(Math.abs(mercator.relativeArea - 4) < 1e-12);
+  const equalArea = tissotDistortion("equalArea", 60);
+  assert.ok(Math.abs(equalArea.shapeRatio - 4) < 1e-12);
+  assert.equal(equalArea.relativeArea, 1);
+  const shifted = tissotDistortion("equalArea", 0, 30);
+  assert.equal(shifted.longerAxis, "north-south");
+  assert.ok(Math.abs(shifted.shapeRatio - 4 / 3) < 1e-12);
 });
 
 test("Tissot circle selection follows geographic locations across the map seam", () => {

@@ -4,7 +4,7 @@ import { TimedExhibit } from "./exhibit.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, TISSOT_LATITUDES,
   nearestTissotCircle, projectMetric,
-  projectionFitScale, relativeAreaScale,
+  projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "./projection-model.js";
 
 function drawTissot(ctx, canvas, selectedCircle) {
@@ -165,6 +165,24 @@ export class ProjectionExperience extends TimedExhibit {
     }));
     this.map.position.set(0.66, 0.25, 0);
     this.group.add(this.map);
+    this.tooltipCanvas = document.createElement("canvas");
+    this.tooltipCanvas.width = 1024;
+    this.tooltipCanvas.height = 500;
+    const tooltipTexture = textureFor(this.tooltipCanvas);
+    this.tooltip = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 0.46),
+      new THREE.MeshBasicMaterial({ map: tooltipTexture, side: THREE.DoubleSide,
+        depthTest: false, depthWrite: false }));
+    this.tooltip.visible = false;
+    this.tooltip.renderOrder = 5;
+    this.group.add(this.tooltip);
+    this.tooltipLeader = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(), new THREE.Vector3(),
+    ]), new THREE.LineBasicMaterial({ color: 0x64ffed, depthTest: false,
+      depthWrite: false }));
+    this.tooltipLeader.visible = false;
+    this.tooltipLeader.renderOrder = 4;
+    this.tooltipLeader.frustumCulled = false;
+    this.group.add(this.tooltipLeader);
     this.from = this.map.geometry.attributes.position.array.slice();
     this.to = this.from.slice();
   }
@@ -193,6 +211,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.tissot = enabled;
     if (!enabled) this.selectedCircle = null;
     this.paintTexture();
+    this.updateTooltip();
     this.onChange();
   }
   rayAngles(raycaster) {
@@ -263,7 +282,72 @@ export class ProjectionExperience extends TimedExhibit {
     if (!this.started || this.finished || !this.tissot) return;
     this.selectedCircle = circle;
     this.paintTexture();
+    this.updateTooltip();
     this.onChange();
+  }
+  updateTooltip() {
+    const circle = this.selectedCircle;
+    if (!this.tissot || !circle) {
+      this.tooltip.visible = false;
+      this.tooltipLeader.visible = false;
+      return;
+    }
+    const { shapeRatio, longerAxis, relativeArea } = tissotDistortion(
+      this.projection, circle.latitude, this.standardParallel);
+    const ctx = this.tooltipCanvas.getContext("2d");
+    ctx.fillStyle = "#0b2430";
+    ctx.fillRect(0, 0, 1024, 500);
+    ctx.strokeStyle = "#64ffed";
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, 1016, 492);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#64ffed";
+    ctx.font = "600 61px system-ui, sans-serif";
+    const latitude = circle.latitude === 0 ? "EQUATOR" :
+      `${Math.abs(circle.latitude)}° ${circle.latitude < 0 ? "S" : "N"}`;
+    ctx.fillText(`TISSOT · ${latitude}`,
+      46, 82, 930);
+    ctx.fillStyle = "#e6f4f5";
+    ctx.font = "500 57px system-ui, sans-serif";
+    const shape = shapeRatio < 1.05 ? "round · local shape kept" :
+      `≈${shapeRatio.toFixed(1)}× ${longerAxis === "east-west" ? "wider" : "taller"}`;
+    ctx.fillText(`Shape: ${shape}`, 46, 190, 930);
+    ctx.fillText(relativeArea === 1 ? "Area: preserved (1.0× equator)" :
+      `Area: ≈${relativeArea.toFixed(1)}× map area at equator`,
+      46, 290, 930);
+    ctx.fillStyle = "#b6d1d9";
+    ctx.font = "500 42px system-ui, sans-serif";
+    ctx.fillText("Equal-size ground circles reveal map distortion.",
+      46, 410, 930);
+    this.tooltip.material.map.needsUpdate = true;
+    this.positionTooltip();
+  }
+  positionTooltip() {
+    const circle = this.selectedCircle;
+    const visible = !!(this.tissot && circle && this.flat &&
+      this.transitionAge >= 1);
+    this.tooltip.visible = visible;
+    this.tooltipLeader.visible = visible;
+    if (!visible) return;
+    const offset = this.centralMeridian / 360;
+    const geographicU = (circle.longitude + 180) / 360;
+    const u = ((geographicU - offset) % 1 + 1) % 1;
+    const longitude = u * 360 - 180;
+    const scale = projectionFitScale(this.projection, this.standardParallel);
+    const projected = projectMetric(longitude, circle.latitude,
+      this.projection, this.standardParallel);
+    const anchorX = this.map.position.x + projected.x * scale;
+    const anchorY = this.map.position.y + projected.y * scale;
+    const side = anchorX > 1.1 ? -1 : 1;
+    const cardX = anchorX + side * 0.53;
+    const cardY = anchorY + (anchorY > 0.32 ? -0.26 : 0.26);
+    this.tooltip.position.set(cardX, cardY, 0.15);
+    const points = this.tooltipLeader.geometry.attributes.position;
+    points.setXYZ(0, anchorX, anchorY, 0.14);
+    points.setXYZ(1, cardX - side * 0.47,
+      THREE.MathUtils.clamp(anchorY, cardY - 0.23, cardY + 0.23), 0.14);
+    points.needsUpdate = true;
   }
   targetVertices(flat, projection = this.projection) {
     const uvs = this.map.geometry.attributes.uv.array;
@@ -293,6 +377,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.from = this.map.geometry.attributes.position.array.slice();
     this.to = this.targetVertices(flat);
     this.transitionAge = 0;
+    this.updateTooltip();
     this.onChange();
   }
   setProjection(projection) {
@@ -310,6 +395,7 @@ export class ProjectionExperience extends TimedExhibit {
     if (!this.started || this.finished) return;
     this.centralMeridian = ((this.centralMeridian + delta + 540) % 360) - 180;
     this.map.material.map.offset.x = this.centralMeridian / 360;
+    this.positionTooltip();
     if (redraw) this.onChange();
   }
   update(dt) {
@@ -325,6 +411,7 @@ export class ProjectionExperience extends TimedExhibit {
       position.array[i] = this.from[i] + (this.to[i] - this.from[i]) * ease;
     position.needsUpdate = true;
     this.map.geometry.computeBoundingSphere();
+    if (this.transitionAge >= 1) this.positionTooltip();
   }
   get areaAt60() {
     return relativeAreaScale(this.projection, 60).toFixed(1);

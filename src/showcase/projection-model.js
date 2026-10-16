@@ -68,6 +68,21 @@ export function indicatrixAxes(projection, latitudeDegrees,
   return { horizontal: 1 / cosine, vertical: 1 };
 }
 
+// A Tissot circle starts as a small circle of fixed ground size. Its axis
+// ratio describes local shape change; area is compared with the same circle
+// at the equator, so the readout does not depend on display zoom.
+export function tissotDistortion(projection, latitudeDegrees,
+  standardParallel = 0) {
+  const { horizontal, vertical } = indicatrixAxes(projection,
+    latitudeDegrees, standardParallel);
+  return {
+    shapeRatio: Math.max(horizontal, vertical) / Math.min(horizontal, vertical),
+    longerAxis: horizontal > vertical ? "east-west" : vertical > horizontal
+      ? "north-south" : null,
+    relativeArea: relativeAreaScale(projection, latitudeDegrees),
+  };
+}
+
 // Coordinates are normalized for display; all three are cylindrical projections.
 export function projectNormalized(longitudeDegrees, latitudeDegrees,
   projection = "equirectangular", standardParallel = 0) {

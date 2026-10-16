@@ -1257,9 +1257,11 @@ function drawShowcaseUI() {
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(exhibit.selectedCircle
-      ? `Selected circle: ${Math.abs(exhibit.selectedCircle.latitude)}° ${exhibit.selectedCircle.latitude < 0 ? "S" : "N"}, ${Math.abs(exhibit.selectedCircle.longitude)}° ${exhibit.selectedCircle.longitude < 0 ? "W" : "E"} · compare globe and map`
+      ? exhibit.flat
+        ? "The selected circle starts round on Earth. Its map shape and size show distortion."
+        : "Flatten the map to compare the selected circle's shape and area."
       : exhibit.tissot
-      ? "Tissot's circles: select one to compare globe and map."
+      ? "Tissot's circles start equally sized on Earth. Select one to see its distortion."
       : `${exhibit.projection === "equalArea" ? "Equal-area" :
       exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"}: equal land area at 60° N looks ${exhibit.areaAt60}× equator`,
     0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
