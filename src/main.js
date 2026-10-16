@@ -1101,7 +1101,7 @@ function drawShowcaseUI() {
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
         "Compare images"],
       interpolation: ["Between the Rain Gauges",
-        "Each white post shows measured rainfall in millimeters.\nCompare three surfaces fitted to the same gauges.\nChoose a new spot and follow an IDW estimate.",
+        "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare surfaces, then estimate rain at a new spot.",
         "Fit the surfaces"],
     };
     const [title, body, action] = introductions[exhibit.kind];
@@ -1139,8 +1139,8 @@ function drawShowcaseUI() {
         "Administrative ward totals can hide a street-level concentration.\nChanging boundaries changes the shading around the same mapped deaths.\nThis zoning effect is part of MAUP: the modifiable areal unit problem."],
       projection: ["Every flat map makes a choice",
         "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nMercator keeps local shape; equal-area keeps relative area."],
-      interpolation: ["One set of stations, three answers",
-        "IDW passes through readings; nearby gauges weigh more.\nA smooth trend can sit above or below measured points.\nNearest zones make steps. Check predictions at held-out gauges."],
+      interpolation: ["Spatial interpolation fills the gaps",
+        "Spatial interpolation estimates values between gauges.\nIDW favors nearby readings; a smooth trend may miss points.\nNearest-gauge zones make steps. Check held-out gauges."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
@@ -1158,10 +1158,10 @@ function drawShowcaseUI() {
   }
   if (exhibit.kind === "interpolation") {
     const explanations = {
-      samples: "White posts = readings · gold points = 3 nearest · ? = estimate",
-      idw: "IDW: nearer gauges carry more weight; the surface meets each reading.",
-      smooth: "Smooth trend: a wider average shows the regional pattern.",
-      zones: "Nearest station: every zone takes its closest gauge's value.",
+      samples: "Spatial interpolation: estimate between the gauge readings.",
+      idw: "Spatial interpolation · IDW weights nearby gauges more.",
+      smooth: "Spatial interpolation · a smooth trend shows the region.",
+      zones: "Spatial interpolation · nearest-gauge zones make steps.",
     };
     label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
       "#e6f4f5", "#0b2430");
@@ -2116,6 +2116,12 @@ for (let i = 0; i < 2; i++) {
   );
   beam.scale.z = 4;
   c.add(beam);
+  const targetBeam = new THREE.Line(beam.geometry,
+    new THREE.LineBasicMaterial({ color: 0xffd070, transparent: true,
+      depthTest: false, depthWrite: false }));
+  targetBeam.visible = false;
+  targetBeam.renderOrder = 9;
+  c.add(targetBeam);
   c.addEventListener("connected", (event) => {
     c.userData.xrInput = event.data;
     guide.setHandedness(event.data.handedness);
@@ -2272,7 +2278,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.raining = false;
     c.userData.scanning = false;
   });
-  controllers.push({ c, grip, beam, guide, id: i });
+  controllers.push({ c, grip, beam, targetBeam, guide, id: i });
 }
 function scanHit(c) {
   if (!scan || (!scan.room && scan.stage !== 1)) return null;
@@ -2574,22 +2580,32 @@ renderer.setAnimationLoop((time, frame) => {
       b.userData.baseColor ??= b.material.color.clone();
       b.material.color.copy(b.userData.baseColor);
     }
-    for (const { c, beam, id } of controllers) {
+    for (const { c, beam, targetBeam, id } of controllers) {
       const hit = intersect(c);
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) ||
-        scanHit(c) || showcase?.grabHit?.(raycaster);
+        scanHit(c) || (showcase?.kind === "interpolation" ? null :
+          showcase?.grabHit?.(raycaster));
+      const interpolationTarget = hit || soundMenuOpen ||
+        showcase?.kind !== "interpolation" ? null : showcase.targetHit(raycaster);
       const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       const exhibitPanel = hit || soundMenuOpen || !showcase?.started ||
         showcase.kind === "interpolation" ? null :
         raycaster.intersectObjects(showcase.kind === "projection"
           ? [showcase.globe, showcase.map] : [showcase.image ?? showcase.map], false)[0];
-      beam.visible =
+      const pointerAvailable =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id) &&
         !showcase?.grab?.hands.has(id) &&
         showcase?.draggingBy !== id;
-      beam.scale.z = hit ? hit.distance : model ? model.distance :
+      const activeTarget = pointerAvailable && !!interpolationTarget;
+      beam.visible = pointerAvailable && !activeTarget;
+      targetBeam.visible = activeTarget;
+      if (activeTarget) targetBeam.scale.z = interpolationTarget.distance;
+      if (showcase?.kind === "interpolation")
+        showcase.showTarget(id, activeTarget ? interpolationTarget : null);
+      beam.scale.z = hit ? hit.distance : interpolationTarget ? interpolationTarget.distance :
+        model ? model.distance :
         ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
       beam.material.color.set(
         grab?.hands.has(id) ||
@@ -2767,7 +2783,10 @@ if (devPreview) {
     }
   });
   renderer.domElement.addEventListener("pointermove", (e) => {
-    if (e.pointerId !== previewSpinPointer && rain?.stage !== 1) return;
+    const previewInterpolation = showcase?.kind === "interpolation" &&
+      showcase.started && !showcase.finished;
+    if (e.pointerId !== previewSpinPointer && rain?.stage !== 1 &&
+        !previewInterpolation) return;
     raycaster.setFromCamera(
       new THREE.Vector2(
         (e.clientX / innerWidth) * 2 - 1,
@@ -2781,9 +2800,17 @@ if (devPreview) {
       previewSpinTime = e.timeStamp;
       return;
     }
+    if (previewInterpolation) {
+      const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
+      showcase.showTarget(2, ui || soundMenuOpen ? null : showcase.targetHit(raycaster));
+      return;
+    }
     rain.group.updateWorldMatrix(true, true);
     const hit = raycaster.intersectObject(rain.terrain, false)[0];
     if (hit) rain.aim(hit.point);
     // A held press keeps watering its last valid source beyond the terrain edge.
+  });
+  renderer.domElement.addEventListener("pointerleave", () => {
+    if (showcase?.kind === "interpolation") showcase.showTarget(2, null);
   });
 }

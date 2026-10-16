@@ -156,6 +156,18 @@ export class InterpolationExperience extends TimedExhibit {
     this.pickSurface.rotation.x = -Math.PI / 2;
     this.pickSurface.position.y = 0.005;
     this.model.add(this.pickSurface);
+    this.targets = Array.from({ length: 3 }, () => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.045, 0.065, 32),
+        new THREE.MeshBasicMaterial({ color: 0xffd070, side: THREE.DoubleSide,
+          transparent: true, depthTest: false, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.renderOrder = 10;
+      ring.visible = false;
+      this.model.add(ring);
+      return ring;
+    });
     for (let i = -4; i <= 4; i++) {
       const v = i / 4;
       this.model.add(gridLine([
@@ -220,6 +232,7 @@ export class InterpolationExperience extends TimedExhibit {
   finish() {
     this.model.visible = false;
     this.grab.cancel();
+    this.targets.forEach((target) => { target.visible = false; });
     super.finish();
   }
 
@@ -278,11 +291,24 @@ export class InterpolationExperience extends TimedExhibit {
     if (notify) this.onChange("selection");
   }
 
+  targetHit(raycaster) {
+    if (!this.started || this.finished || !this.model.visible) return null;
+    this.pickSurface.updateWorldMatrix(true, false);
+    return raycaster.intersectObject(this.pickSurface, false)[0] ?? null;
+  }
+
+  showTarget(index, hit) {
+    const target = this.targets[index];
+    if (!target) return;
+    target.visible = !!hit;
+    if (!hit) return;
+    const point = this.model.worldToLocal(hit.point.clone());
+    target.position.set(point.x, 0.018, point.z);
+  }
+
   selectFromRay(raycaster) {
-    if (!this.started || this.finished || this.grab.hands.size) return false;
-    const surfaces = Object.entries(this.surfaces)
-      .filter(([name]) => name === this.mode).map(([, mesh]) => mesh);
-    const hit = raycaster.intersectObjects([...surfaces, this.pickSurface], false)[0];
+    if (this.grab.hands.size) return false;
+    const hit = this.targetHit(raycaster);
     if (!hit) return false;
     const point = this.model.worldToLocal(hit.point.clone());
     this.placeProbe(point.x, point.z);
@@ -301,6 +327,7 @@ export class InterpolationExperience extends TimedExhibit {
 
   place(camera) {
     this.grab.cancel();
+    this.targets.forEach((target) => { target.visible = false; });
     const position = new THREE.Vector3();
     const forward = new THREE.Vector3();
     camera.getWorldPosition(position);
