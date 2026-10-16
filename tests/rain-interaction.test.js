@@ -95,7 +95,7 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   r.dispose();
 });
 
-test("erosion tray resets to a forward pitch above a deeper physical base", () => {
+test("erosion tray keeps its forward pitch without opaque side walls or base", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
@@ -105,7 +105,8 @@ test("erosion tray resets to a forward pitch above a deeper physical base", () =
   const base = r.group.children.find(
     (child) => child.geometry?.type === "BoxGeometry" && child.geometry.parameters.width === 2,
   );
-  assert.ok(base.position.y < -0.15);
+  assert.equal(base, undefined);
+  assert.equal(r.group.children.some((child) => child.material?.color?.getHex() === 0x705b46), false);
   r.group.rotation.x = 0;
   r.place(camera);
   assert.ok(r.group.rotation.x > 0.45);
@@ -200,6 +201,26 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   r.update(0.02);
   assert.equal(r.stage, 4);
   assert.equal(r.pouring, false);
+  r.dispose();
+});
+
+test("takeaway replay shows the saved erosion and returns to the takeaway", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  r.explore();
+  const id = r.cellAt(0, 0);
+  const original = r.heights[id];
+  r.heights[id] -= 0.08;
+  r.showReplayFrame(r.heights);
+  r.finish();
+  assert.equal(r.stage, 4);
+  assert.equal(r.replayFrames.length, 2);
+  assert.equal(r.startReplay(), true);
+  r.update(0.01);
+  assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - original) < 1e-6);
+  r.update(4);
+  assert.equal(r.stage, 4);
+  assert.equal(r.replayTime, -1);
+  assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - (original - 0.08)) < 1e-6);
   r.dispose();
 });
 

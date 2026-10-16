@@ -1318,6 +1318,12 @@ function drawRainUI() {
     drawRainChooserUI();
     return;
   }
+  if (r.kind === "erosion" && r.stage === 4 && r.replayTime >= 0) {
+    label("Replay · watch the bed change from its starting shape",
+      0, GUIDED_INFO_Y, 2.3, 0.13, 28, "#e6f4f5", "#0b2430");
+    button("Back to Takeaway", 0, GUIDED_ACTION_Y, () => r.endReplay(), 1.3);
+    return;
+  }
   const copy = [
     null,
     [
@@ -1412,7 +1418,11 @@ function drawRainUI() {
       "#e6f4f5",
       "#0b2430",
     );
-    takeawayActions(GUIDED_ACTION_Y);
+    if (r.kind === "erosion" && r.replayFrames.length > 1) {
+      button("Replay", -0.78, GUIDED_ACTION_Y, () => r.startReplay(), 0.7);
+      button("Restart", 0, GUIDED_ACTION_Y, start, 0.7);
+      button("Exit to Menu", 0.78, GUIDED_ACTION_Y, openMenu, 0.7);
+    } else takeawayActions(GUIDED_ACTION_Y);
     foregroundTakeaway();
   } else if (r.stage !== 1)
     label(

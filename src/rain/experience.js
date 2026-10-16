@@ -173,61 +173,42 @@ export class RainExperience {
     );
     this.group.add(this.contours);
     this.contours.visible = this.kind !== "erosion";
-    // Visible rock sides close the terrain slab, rather than a floating paper surface.
-    const rim = [];
-    for (let c = 0; c < this.size; c++) rim.push(c);
-    for (let r = 1; r < this.size; r++) rim.push(r * this.size + this.size - 1);
-    for (let c = this.size - 2; c >= 0; c--)
-      rim.push((this.size - 1) * this.size + c);
-    for (let r = this.size - 2; r > 0; r--) rim.push(r * this.size);
-    const baseTop = this.kind === "erosion" ? -0.14 : -0.04;
-    const walls = [];
-    for (let i = 0; i < rim.length; i++) {
-      const a = cellPoint(rim[i], this.heights),
-        b = cellPoint(rim[(i + 1) % rim.length], this.heights);
-      walls.push(
-        a.x,
-        a.y,
-        a.z,
-        b.x,
-        b.y,
-        b.z,
-        a.x,
-        baseTop - 0.02,
-        a.z,
-        b.x,
-        b.y,
-        b.z,
-        b.x,
-        baseTop - 0.02,
-        b.z,
-        a.x,
-        baseTop - 0.02,
-        a.z,
+    // The erosion bed stays open at its edges so deep cuts remain visible.
+    // The drainage sandbox keeps its solid slab to show the two outlets.
+    if (this.kind !== "erosion") {
+      const rim = [];
+      for (let c = 0; c < this.size; c++) rim.push(c);
+      for (let r = 1; r < this.size; r++) rim.push(r * this.size + this.size - 1);
+      for (let c = this.size - 2; c >= 0; c--)
+        rim.push((this.size - 1) * this.size + c);
+      for (let r = this.size - 2; r > 0; r--) rim.push(r * this.size);
+      const baseTop = -0.04;
+      const walls = [];
+      for (let i = 0; i < rim.length; i++) {
+        const a = cellPoint(rim[i], this.heights),
+          b = cellPoint(rim[(i + 1) % rim.length], this.heights);
+        walls.push(
+          a.x, a.y, a.z,
+          b.x, b.y, b.z,
+          a.x, baseTop - 0.02, a.z,
+          b.x, b.y, b.z,
+          b.x, baseTop - 0.02, b.z,
+          a.x, baseTop - 0.02, a.z,
+        );
+      }
+      const wallGeo = new THREE.BufferGeometry();
+      wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(walls, 3));
+      wallGeo.computeVertexNormals();
+      this.group.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({
+        color: 0x705b46, roughness: 1, side: THREE.DoubleSide,
+      })));
+      const base = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 0.08, 2),
+        new THREE.MeshStandardMaterial({ color: 0x3f4939 }),
       );
+      base.position.y = baseTop - 0.04;
+      this.group.add(base);
     }
-    const wallGeo = new THREE.BufferGeometry();
-    wallGeo.setAttribute(
-      "position",
-      new THREE.Float32BufferAttribute(walls, 3),
-    );
-    wallGeo.computeVertexNormals();
-    this.group.add(
-      new THREE.Mesh(
-        wallGeo,
-        new THREE.MeshStandardMaterial({
-          color: 0x705b46,
-          roughness: 1,
-          side: THREE.DoubleSide,
-        }),
-      ),
-    );
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(2, 0.08, 2),
-      new THREE.MeshStandardMaterial({ color: 0x3f4939 }),
-    );
-    base.position.y = baseTop - 0.04;
-    this.group.add(base);
     this.divide = this.line(
       Array.from({ length: this.size }, (_, r) => {
         const p = cellPoint(r * this.size + Math.floor((this.size - 1) / 2), this.heights);
@@ -832,6 +813,7 @@ export class RainExperience {
   }
   finish() {
     this.endReplay();
+    if (this.kind === "erosion") this.captureReplayFrame();
     this.grab.cancel();
     this.pouring = false;
     this.endStroke();
@@ -864,8 +846,19 @@ export class RainExperience {
     this.terrain.geometry.computeBoundingSphere();
     this.paint(frame, cover);
   }
+  captureReplayFrame() {
+    if (this.kind !== "erosion") return;
+    const last = this.replayFrames.at(-1);
+    const lastCover = this.replayVegetationFrames.at(-1);
+    if (!this.heights.some((height, i) => Math.abs(height - last[i]) > 0.00001) &&
+        !this.vegetation.some((cover, i) => Math.abs(cover - lastCover[i]) > 0.00001)) return;
+    const index = Math.min(this.replayFrames.length, 159);
+    this.replayFrames[index] = this.heights.slice();
+    this.replayVegetationFrames[index] = this.vegetation.slice();
+  }
   startReplay() {
-    if (this.kind !== "erosion" || this.stage !== 1 || this.replayFrames.length < 2) return false;
+    if (this.kind !== "erosion" || ![1, 4].includes(this.stage) ||
+        this.replayFrames.length < 2) return false;
     this.endStroke();
     this.pouring = false;
     this.drops = [];
@@ -936,10 +929,12 @@ export class RainExperience {
   update(dt, raining = false) {
     this.time += dt;
     if (this.replayTime >= 0) {
-      this.elapsed += dt;
-      if (this.elapsed >= 240) {
-        this.finish();
-        return;
+      if (this.stage === 1) {
+        this.elapsed += dt;
+        if (this.elapsed >= 240) {
+          this.finish();
+          return;
+        }
       }
       this.replayTime += dt;
       const index = Math.min(this.replayFrames.length - 1,
