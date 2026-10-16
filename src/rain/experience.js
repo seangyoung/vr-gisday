@@ -64,6 +64,7 @@ export class RainExperience {
       new THREE.Vector3(-1.18, -0.23, -1.18),
       new THREE.Vector3(1.18, 1.18, 1.18),
     );
+    this.grab.turnPivot.copy(this.grabBounds.getCenter(new THREE.Vector3()));
     scene.add(this.group);
     this.group.add(new THREE.HemisphereLight(0xd4f5ff, 0x39513a, 2.3));
     const sun = new THREE.DirectionalLight(0xffe5ba, 2.2);

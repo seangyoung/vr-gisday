@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Group, Object3D, Matrix4, Vector3, Quaternion } from "three";
+import { Group, Object3D, Matrix4, Vector3, Quaternion, PerspectiveCamera } from "three";
 import { ModelGrab } from "../src/manipulation.js";
 const pose = (x, y = 0, z = 0, q = new Quaternion()) =>
   new Matrix4().compose(new Vector3(x, y, z), q, new Vector3(1, 1, 1));
@@ -123,4 +123,28 @@ test("coincident hands cannot generate invalid scales; separating rebases cleanl
     ]),
   );
   assert.ok(Number.isFinite(o.scale.x));
+});
+
+test("a held tabletop model snap-turns around its center once per stick deflection", () => {
+  const object = assembly();
+  object.position.set(0.3, 1.2, -1.5);
+  object.rotation.set(0.35, 0.2, 0);
+  const grab = new ModelGrab(object);
+  grab.turnPivot.set(0, 0.3, 0);
+  const camera = new PerspectiveCamera();
+  const hand = pose(0.1, 1.1, -0.9);
+  const center = object.localToWorld(grab.turnPivot.clone());
+  assert.equal(grab.turnWithStick(0, 1, 0, camera), false);
+  grab.begin(0, hand);
+  assert.equal(grab.turnWithStick(0, 1, 0, camera), true);
+  close(object.localToWorld(grab.turnPivot.clone()), center);
+  const turned = object.quaternion.clone();
+  assert.equal(grab.turnWithStick(0, 1, 0, camera), false);
+  grab.update(new Map([[0, hand]]));
+  assert.ok(object.quaternion.angleTo(turned) < 1e-7);
+  grab.turnWithStick(0, 0, 0, camera);
+  assert.equal(grab.turnWithStick(0, 0, -1, camera), true);
+  close(object.localToWorld(grab.turnPivot.clone()), center);
+  grab.release(0);
+  assert.equal(grab.turnWithStick(0, 1, 0, camera), false);
 });

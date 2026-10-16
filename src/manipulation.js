@@ -7,6 +7,8 @@ export class ModelGrab {
     this.minScale = minScale;
     this.maxScale = maxScale;
     this.hands = new Map();
+    this.stickReady = new Map();
+    this.turnPivot = new Vector3(0, 0.5, 0);
   }
   begin(id, matrix) {
     if (this.hands.has(id) || this.hands.size === 2) return;
@@ -15,11 +17,41 @@ export class ModelGrab {
   }
   release(id) {
     this.hands.delete(id);
+    this.stickReady.delete(id);
     this.rebase();
   }
   cancel() {
     this.hands.clear();
+    this.stickReady.clear();
     this.base = null;
+  }
+  turnWithStick(id, horizontal, vertical, camera) {
+    if (!this.hands.has(id)) {
+      this.stickReady.delete(id);
+      return false;
+    }
+    if (Math.hypot(horizontal, vertical) < 0.3) {
+      this.stickReady.set(id, true);
+      return false;
+    }
+    if (this.stickReady.get(id) === false ||
+        Math.max(Math.abs(horizontal), Math.abs(vertical)) < 0.75) return false;
+    this.stickReady.set(id, false);
+    const sideways = Math.abs(horizontal) >= Math.abs(vertical);
+    const axis = sideways ? new Vector3(0, 1, 0)
+      : new Vector3(1, 0, 0).applyQuaternion(
+        camera.getWorldQuaternion(new Quaternion())).setY(0).normalize();
+    if (axis.lengthSq() < 0.01) axis.set(1, 0, 0);
+    const turn = new Quaternion().setFromAxisAngle(axis,
+      Math.sign(sideways ? horizontal : vertical) * Math.PI / 4);
+    this.object.updateWorldMatrix(true, false);
+    const before = this.object.localToWorld(this.turnPivot.clone());
+    this.object.quaternion.premultiply(turn);
+    this.object.updateWorldMatrix(true, false);
+    const after = this.object.localToWorld(this.turnPivot.clone());
+    this.object.position.add(before.sub(after));
+    this.rebase();
+    return true;
   }
   rebase() {
     this.object.updateMatrix();

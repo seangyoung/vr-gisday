@@ -139,6 +139,7 @@ export class InterpolationExperience extends TimedExhibit {
     this.model.visible = false;
     scene.add(this.model);
     this.grab = new ModelGrab(this.model, 0.32, 0.95);
+    this.grab.turnPivot.copy(MODEL_BOUNDS.getCenter(new THREE.Vector3()));
     this.model.add(new THREE.AmbientLight(0xffffff, 1.25));
     const sunlight = new THREE.DirectionalLight(0xffffff, 2.3);
     sunlight.position.set(-0.7, 1.8, 1.5);

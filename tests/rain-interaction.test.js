@@ -113,6 +113,25 @@ test("erosion tray keeps its forward pitch without opaque side walls or base", (
   r.dispose();
 });
 
+test("both tabletop rain models can be snap-turned without changing the terrain", () => {
+  for (const kind of ["drainage", "erosion"]) {
+    const rain = new RainExperience(new THREE.Scene(), () => {}, kind);
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.6, 0);
+    rain.place(camera);
+    rain.explore();
+    const terrain = rain.heights.slice();
+    const center = rain.group.localToWorld(rain.grab.turnPivot.clone());
+    const hand = new THREE.Matrix4().makeTranslation(0, 1.4, -1);
+    rain.grab.begin(0, hand);
+    assert.equal(rain.grab.turnWithStick(0, 1, 0, camera), true);
+    assert.ok(rain.group.localToWorld(rain.grab.turnPivot.clone())
+      .distanceTo(center) < 1e-8);
+    assert.deepEqual(rain.heights, terrain);
+    rain.dispose();
+  }
+});
+
 test("erosion tray paints vegetation with the right trigger while rain stays available", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
   r.explore();

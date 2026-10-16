@@ -1396,10 +1396,10 @@ function drawRainUI() {
   const [title, body] = copy[r.stage];
   if (r.stage === 1)
     label(
-      `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"} · Grips: move/size\n${r.kind === "erosion"
+      `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"}\nGrip: move/size · Grip + stick: turn 45°\n${r.kind === "erosion"
         ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Green cover protects soil; bare patches erode faster."
         : r.overlay ? "Blue and gold mark the two drainage basins." : "Runoff follows slope; ridges divide basins."}`,
-      0, GUIDED_INFO_Y, 2.3, 0.2, 32, "#e6f4f5", "#0b2430",
+      0, GUIDED_INFO_Y, 2.3, 0.22, 29, "#e6f4f5", "#0b2430",
     );
   else lessonCard(title, body);
   if (r.stage === 1) {
@@ -1971,8 +1971,8 @@ function drawScene() {
     label("B · Back / exit", 0.72, -0.40, 1.35, 0.15, 42);
     label("Trigger · Point / select", -0.75, -0.59, 1.45, 0.14, 36);
     label("Grip · Grab / resize", 0.75, -0.59, 1.45, 0.14, 36);
-    label("Sticks · Walk and turn in landscape demos", 0, -0.74,
-      2.6, 0.13, 30, "#b6d1d9");
+    label("Sticks · Walk/turn in landscape demos\nGrip + stick · Turn tabletop models 45°", 0, -0.74,
+      2.6, 0.18, 32, "#d8eae8");
     button("Continue to experiences", 0, -0.96, () => {
       step = -1;
       draw();
@@ -2595,10 +2595,19 @@ renderer.setAnimationLoop((time, frame) => {
       rain?.grab.update(poses);
       scan?.grab.update(poses);
       showcase?.grab?.update(poses);
-      if (scan && !scan.room && scan.stage === 1 && !soundMenuOpen)
+      let tabletopGrab = null;
+      if (!soundMenuOpen) {
+        if (scan && !scan.room && scan.stage === 1) tabletopGrab = scan.grab;
+        else if (rain && rain.stage > 0 && rain.stage < 4 && rain.group.visible)
+          tabletopGrab = rain.grab;
+        else if (["interpolation", "suitability"].includes(showcase?.kind) &&
+            showcase.started && !showcase.finished && showcase.model.visible)
+          tabletopGrab = showcase.grab;
+      }
+      if (tabletopGrab)
         for (const { c, id } of controllers) {
           const pad = c.userData.xrInput?.gamepad;
-          scan.rotateWithStick(id,
+          tabletopGrab.turnWithStick(id,
             pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0,
             pad?.mapping === "xr-standard" ? pad.axes[3] ?? 0 : 0,
             renderer.xr.getCamera());
@@ -2608,7 +2617,6 @@ renderer.setAnimationLoop((time, frame) => {
       rain?.grab.cancel();
       scan?.grab.cancel();
       showcase?.grab?.cancel();
-      scan?.stickReady?.clear();
     }
     for (const b of soundMenuOpen ? soundButtons : buttons) {
       b.userData.baseColor ??= b.material.color.clone();

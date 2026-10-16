@@ -116,6 +116,7 @@ export class SuitabilityExperience extends TimedExhibit {
     this.model.visible = false;
     scene.add(this.model);
     this.grab = new ModelGrab(this.model, 0.35, 1.0);
+    this.grab.turnPivot.copy(BOUNDS.getCenter(new THREE.Vector3()));
 
     this.model.add(new THREE.AmbientLight(0xffffff, 1.65));
     const sun = new THREE.DirectionalLight(0xffffff, 2.4);

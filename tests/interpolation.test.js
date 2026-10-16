@@ -6,6 +6,13 @@ import {
   STATIONS, idwEstimate, nearestEstimate, smoothEstimate,
 } from "../src/interpolation/model.js";
 
+globalThis.document = {
+  createElement: () => ({
+    width: 256, height: 80,
+    getContext: () => ({ fillRect() {}, strokeRect() {}, fillText() {} }),
+  }),
+};
+
 test("IDW honors measured readings and normalized neighbor weights", () => {
   for (const station of STATIONS)
     assert.equal(idwEstimate(station.x, station.z).value, station.value);
@@ -61,4 +68,21 @@ test("probe targeting reaches the base beneath a raised surface", () => {
   assert.ok(Math.abs(demo.probe.z + 0.2) < 1e-6);
   demo.showTarget(0, null);
   assert.equal(demo.targets[0].visible, false);
+});
+
+test("the rainfall model turns with a held grip without moving its estimate", () => {
+  const demo = new InterpolationExperience(new THREE.Group(), () => {}, new THREE.Scene());
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.y = 1.6;
+  demo.place(camera);
+  demo.begin();
+  const estimate = demo.displayValue;
+  const center = demo.model.localToWorld(demo.grab.turnPivot.clone());
+  const hand = new THREE.Matrix4().makeTranslation(0, 1.3, -1);
+  demo.grab.begin(0, hand);
+  assert.equal(demo.grab.turnWithStick(0, 1, 0, camera), true);
+  assert.ok(demo.model.localToWorld(demo.grab.turnPivot.clone())
+    .distanceTo(center) < 1e-8);
+  assert.equal(demo.displayValue, estimate);
+  demo.dispose();
 });

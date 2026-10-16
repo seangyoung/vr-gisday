@@ -21,7 +21,6 @@ export class ScanExperience {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
-    this.stickReady = new Map();
     this.materials = scanMaterials();
     this.group.add(new THREE.HemisphereLight(0xe3f3ff, 0x3f4d39, 2.15));
     const sun = new THREE.DirectionalLight(0xffead0, 2.1);
@@ -115,37 +114,12 @@ export class ScanExperience {
   finish() {
     this.stage = 2;
     this.grab.cancel();
-    this.stickReady.clear();
     this.group.visible = false;
     this.onChange();
   }
   rotateWithStick(id, horizontal, vertical, camera) {
-    if (this.stage !== 1 || !this.grab.hands.has(id)) {
-      this.stickReady.delete(id);
-      return false;
-    }
-    if (Math.hypot(horizontal, vertical) < 0.3) {
-      this.stickReady.set(id, true);
-      return false;
-    }
-    if (this.stickReady.get(id) === false ||
-        Math.max(Math.abs(horizontal), Math.abs(vertical)) < 0.75) return false;
-    this.stickReady.set(id, false);
-    const sideways = Math.abs(horizontal) >= Math.abs(vertical);
-    const axis = sideways ? new THREE.Vector3(0, 1, 0)
-      : new THREE.Vector3(1, 0, 0).applyQuaternion(
-        camera.getWorldQuaternion(new THREE.Quaternion())).setY(0).normalize();
-    if (axis.lengthSq() < 0.01) axis.set(1, 0, 0);
-    const turn = new THREE.Quaternion().setFromAxisAngle(axis,
-      Math.sign(sideways ? horizontal : vertical) * Math.PI / 4);
-    this.group.updateWorldMatrix(true, false);
-    const before = this.group.localToWorld(new THREE.Vector3(0, 0.5, 0));
-    this.group.quaternion.premultiply(turn);
-    this.group.updateWorldMatrix(true, false);
-    const after = this.group.localToWorld(new THREE.Vector3(0, 0.5, 0));
-    this.group.position.add(before.sub(after));
-    this.grab.rebase();
-    return true;
+    return this.stage === 1 && this.grab.turnWithStick(
+      id, horizontal, vertical, camera);
   }
   update(dt) {
     if (this.highlightAge > 0) {
