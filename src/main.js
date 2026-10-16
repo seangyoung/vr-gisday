@@ -40,6 +40,7 @@ import { ChangeExperience } from "./change/experience.js";
 import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
+import { SuitabilityExperience } from "./suitability/experience.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { hasQuestShortcuts } from "./input-layout.js";
 import { ControllerGuide } from "./controller-guide.js";
@@ -675,6 +676,7 @@ function startShowcase(kind) {
     projection: ProjectionExperience,
     change: ChangeExperience,
     interpolation: InterpolationExperience,
+    suitability: SuitabilityExperience,
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
   showcase = new Constructor(root, (reason) => {
@@ -1103,6 +1105,9 @@ function drawShowcaseUI() {
       interpolation: ["Between the Rain Gauges",
         "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare surfaces, then estimate rain at a new spot.",
         "Fit the surfaces"],
+      suitability: ["Where Should It Go?",
+        "A town needs a new clinic. GIS suitability analysis combines several spatial criteria.\nInspect three sites using a 450 m distance buffer, road proximity, and flood exposure.\nChange the priorities to see how the preferred site changes.",
+        "Compare the sites"],
     };
     const [title, body, action] = introductions[exhibit.kind];
     lessonCard(title, body, 0.13);
@@ -1141,6 +1146,8 @@ function drawShowcaseUI() {
         "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nMercator keeps local shape; equal-area keeps relative area."],
       interpolation: ["Spatial interpolation fills the gaps",
         "Spatial interpolation estimates values between gauges.\nIDW favors nearby readings; a smooth trend may miss points.\nNearest-gauge zones make steps. Check held-out gauges."],
+      suitability: ["The chosen site depends on priorities",
+        "A buffer shows places within a set straight-line distance.\nSuitability analysis puts each criterion on a common scale and combines weighted scores.\nChanging the weights can change which site ranks first."],
     };
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
@@ -1153,10 +1160,39 @@ function drawShowcaseUI() {
     if (exhibit.kind === "interpolation")
       label("These rainfall readings are synthetic. Fewer gauges mean more uncertainty between them.",
         0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
+    if (exhibit.kind === "suitability")
+      label("This town is schematic. A real clinic decision also weighs travel time,\nland and operating costs, local knowledge, and community priorities.",
+        0, -0.43, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
     takeawayActions(-0.62);
     return;
   }
-  if (exhibit.kind === "interpolation") {
+  if (exhibit.kind === "suitability") {
+    const selected = exhibit.scoreSet.scores.find((entry) =>
+      entry.site.id === exhibit.selectedSite?.id);
+    if (exhibit.scoresVisible) {
+      label(`${exhibit.priority === "reach" ? "Reach first" : "Flood safety first"} · Scores: ${exhibit.scoreSet.scores.map((entry) =>
+        `${entry.site.id} ${entry.score}`).join("  ·  ")} · ${exhibit.scoreSet.winner.site.id} leads`,
+      0, -0.53, 2.45, 0.14, 27, "#e6f4f5", "#0b2430");
+      label(exhibit.priority === "reach"
+        ? "Weights: nearby residents 72% · road proximity 20% · flood safety 8%"
+        : "Weights: nearby residents 30% · road proximity 10% · flood safety 60%",
+      0, -0.69, 2.45, 0.12, 25, "#b6d1d9", "#0b2430");
+    } else {
+      label(selected
+        ? `Site ${selected.site.id} · ${selected.residents} residents in buffer · ${selected.roadMeters} m to road · ${selected.floodplain ? "floodplain" : "higher ground"}`
+        : "Select site A, B, or C on the town model to reveal its distance buffer.",
+      0, -0.53, 2.45, 0.14, 25, "#e6f4f5", "#0b2430");
+      label("White ring = 450 m straight-line buffer · Bright homes are inside it",
+        0, -0.69, 2.45, 0.12, 25, "#b6d1d9", "#0b2430");
+    }
+    button("Reach first", -0.60, -0.88, () => exhibit.setPriority("reach"),
+      1.05, exhibit.priority === "reach");
+    button("Flood safety first", 0.60, -0.88, () => exhibit.setPriority("safety"),
+      1.05, exhibit.priority === "safety");
+    button(exhibit.scoresVisible ? "Hide scores" : "Compare scores", -0.60, -1.09,
+      () => exhibit.toggleScores(), 1.05);
+    button("Takeaway", 0.60, -1.09, () => exhibit.finish(), 1.05);
+  } else if (exhibit.kind === "interpolation") {
     const explanations = {
       samples: "Spatial interpolation: estimate between the gauge readings.",
       idw: "Spatial interpolation · IDW weights nearby gauges more.",
@@ -1826,7 +1862,8 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (showcase) return [showcase.kind === "projection" ? "Drag globe" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
-    showcase.kind === "interpolation" ? "Move/size" : null, onMenu, exitLabel];
+    ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
+    onMenu, exitLabel];
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
@@ -2036,6 +2073,10 @@ function drawScene() {
         category: "Interpolation", preview: "Estimate rainfall between measured locations.",
         glyph: "⌁", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
+      { title: "Where Should It Go?", lines: ["Where Should", "It Go?"],
+        category: "Site suitability", preview: "Compare clinic sites as priorities change.",
+        glyph: "✚", color: "#e8c98b",
+        action: () => startShowcase("suitability") },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
@@ -2163,7 +2204,7 @@ for (let i = 0; i < 2; i++) {
         return;
       }
     }
-    if (showcase?.kind === "interpolation" && !soundMenuOpen) {
+    if (["interpolation", "suitability"].includes(showcase?.kind) && !soundMenuOpen) {
       const model = showcase.grabHit(raycaster);
       if (modelBeforeUi(model, hit) && showcase.selectFromRay(raycaster)) {
         sound.click();
@@ -2234,7 +2275,7 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
-    if (showcase?.kind === "interpolation" && showcase.started &&
+    if (["interpolation", "suitability"].includes(showcase?.kind) && showcase.started &&
         !showcase.finished && grip.visible) {
       grip.updateWorldMatrix(true, false);
       const ui = intersect(c);
@@ -2701,7 +2742,7 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
     camera.position.y = 1.6;
     startPixels();
-  } else if (["spectral", "cluster", "projection", "change", "interpolation"].includes(
+  } else if (["spectral", "cluster", "projection", "change", "interpolation", "suitability"].includes(
     new URLSearchParams(location.search).get("demo"))) {
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
