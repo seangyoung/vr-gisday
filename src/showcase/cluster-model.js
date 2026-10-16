@@ -11,44 +11,66 @@ export const SNOW_WINDOW = Object.freeze({
   minX: 529115, maxX: 529700, minY: 180770, maxY: 181350,
 });
 
-// Hypothetical ward centers. Each plan assigns whole historical housing blocks;
-// their shared street corridors, not a square grid, form the visible boundaries.
+// Each entry assigns one source block (by id) to a hypothetical ward. These
+// plans keep adjacent blocks together across the street corridors; they are
+// teaching examples, not historical administrative boundaries. A keeps a
+// compact concentration, B and C redraw six connected wards, and D uses four
+// broader connected wards. Keeping the assignments fixed avoids runtime
+// zoning calculations on the headset.
 export const CLUSTER_MODES = Object.freeze({
-  points: { name: "Mapped buildings" },
-  wardA: { name: "Plan A · six wards", seeds: [
-    [529240, 181040], [529320, 181220], [529390, 181040],
-    [529530, 181195], [529550, 181010], [529420, 180870],
+  points: { name: "Mapped buildings", note: [
+    "Each circle records deaths at a building.",
+    "Compare these same deaths in Plans A–D.",
   ] },
-  wardB: { name: "Plan B · six wards", seeds: [
-    [529230, 180990], [529355, 181190], [529450, 181065],
-    [529610, 181140], [529555, 180945], [529345, 180925],
+  wardA: { name: "Plan A · six compact wards", count: 6, note: [
+    "A compact ward gathers many deaths",
+    "beside the Broad Street pump.",
+  ], wards: [
+    5, 5, 4, 4, 4, 4, 4, 4, 4, 4,
+    4, 3, 3, 1, 3, 3, 2, 1, 2, 1,
+    1, 1, 0, 4, 5, 5, 2, 5, 2, 2,
+    3, 2, 5, 0, 5, 0, 0, 0, 0, 3,
   ] },
-  wardC: { name: "Plan C · five wards", seeds: [
-    [529220, 181040], [529350, 181210], [529445, 181065],
-    [529570, 181165], [529485, 180915],
-  ] },
-  wardD: { name: "Plan D · seven wards", seeds: [
-    [529225, 181050], [529315, 181225], [529410, 181070],
-    [529495, 181245], [529610, 181120], [529535, 180950],
-    [529325, 180925],
-  ] },
+  wardB: { name: "Plan B · six diagonal wards", count: 6, note: [
+      "Diagonal wards split high-count blocks",
+      "among several zones.",
+    ], wards: [
+      4, 4, 0, 0, 0, 0, 0, 0, 0, 1,
+      0, 1, 1, 1, 1, 1, 3, 3, 3, 1,
+      1, 3, 2, 2, 5, 5, 3, 5, 3, 4,
+      3, 3, 5, 4, 5, 5, 4, 2, 2, 2,
+    ] },
+  wardC: { name: "Plan C · six east–west wards", count: 6, note: [
+      "The darkest ward appears north",
+      "of the Broad Street pump.",
+    ], wards: [
+      4, 4, 1, 1, 1, 2, 1, 1, 2, 2,
+      1, 2, 2, 5, 2, 2, 4, 5, 4, 5,
+      5, 5, 0, 0, 3, 3, 5, 3, 5, 4,
+      4, 5, 3, 0, 3, 3, 3, 0, 0, 0,
+    ] },
+  wardD: { name: "Plan D · four broad wards", count: 4, note: [
+      "Four broad wards have similar totals",
+      "across the same 489 recorded deaths.",
+    ], wards: [
+      3, 3, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 1, 2, 1, 1, 2, 2, 2, 2,
+      2, 2, 1, 0, 3, 3, 2, 3, 2, 3,
+      2, 2, 3, 1, 3, 3, 1, 1, 1, 1,
+    ] },
 });
+const INTERIOR_BLOCK_IDS = new Set(SNOW_BLOCKS
+  .filter((block) => blockAt(block.x, block.y, 0)?.id === block.id)
+  .map((block) => block.id));
 
 export function wardFor(block, mode) {
-  const seeds = CLUSTER_MODES[mode]?.seeds;
-  if (!seeds) return null;
-  let best = 0, distance = Infinity;
-  seeds.forEach(([x, y], index) => {
-    const d = (block.x - x) ** 2 + (block.y - y) ** 2;
-    if (d < distance) { best = index; distance = d; }
-  });
-  return best;
+  return CLUSTER_MODES[mode]?.wards?.[block.id] ?? null;
 }
 
 export function aggregationFor(mode) {
-  const seeds = CLUSTER_MODES[mode]?.seeds;
-  if (!seeds) return [];
-  const zones = seeds.map((_, id) => ({
+  const count = CLUSTER_MODES[mode]?.count;
+  if (!count) return [];
+  const zones = Array.from({ length: count }, (_, id) => ({
     id, name: String.fromCharCode(65 + id), blocks: [], deaths: 0, x: 0, y: 0,
   }));
   for (const block of SNOW_BLOCKS) {
@@ -61,6 +83,16 @@ export function aggregationFor(mode) {
   for (const zone of zones) {
     zone.x /= zone.blocks.length;
     zone.y /= zone.blocks.length;
+    // The mean of a long or concave ward can land in another ward. Put its
+    // letter over an actual block belonging to this ward instead.
+    const candidates = zone.blocks.filter((block) =>
+      INTERIOR_BLOCK_IDS.has(block.id));
+    const labelBlock = (candidates.length ? candidates : zone.blocks)
+      .reduce((best, block) => (block.x - zone.x) ** 2 +
+        (block.y - zone.y) ** 2 < (best.x - zone.x) ** 2 +
+        (best.y - zone.y) ** 2 ? block : best);
+    zone.labelX = labelBlock.x;
+    zone.labelY = labelBlock.y;
   }
   return zones;
 }

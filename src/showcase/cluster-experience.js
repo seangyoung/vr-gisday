@@ -65,14 +65,16 @@ function drawMap(canvas, mode) {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "bold 19px system-ui";
+    const darkest = zones.reduce((best, zone) =>
+      zone.deaths > best.deaths ? zone : best);
     for (const zone of zones) {
-      const x = px(zone.x), y = py(zone.y);
+      const x = px(zone.labelX), y = py(zone.labelY);
       ctx.beginPath();
       ctx.arc(x, y, 14, 0, Math.PI * 2);
       ctx.fillStyle = "#102b38";
       ctx.fill();
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = zone === darkest ? "#a6f5d9" : "#ffffff";
+      ctx.lineWidth = zone === darkest ? 3 : 1.5;
       ctx.stroke();
       ctx.fillStyle = "#ffffff";
       ctx.fillText(zone.name, x, y + 1);
@@ -92,8 +94,8 @@ function drawMap(canvas, mode) {
   }
   ctx.fillStyle = "#e9f5f0";
   ctx.textAlign = "left";
-  ctx.font = "bold 27px system-ui";
-  ctx.fillText(CLUSTER_MODES[mode].name, 602, 63);
+  ctx.font = "bold 26px system-ui";
+  ctx.fillText(CLUSTER_MODES[mode].name, 602, 63, 305);
   ctx.font = "22px system-ui";
   ctx.fillStyle = "#c4dce0";
   ctx.fillText("1854 Soho, London", 602, 102);
@@ -122,9 +124,14 @@ function drawMap(canvas, mode) {
       ctx.fillText(name, 644, y + 22);
     });
   }
-  ctx.fillStyle = "#9fbfc7";
-  ctx.font = "19px system-ui";
-  ctx.fillText("Sample wards · mapped death counts", 602, 555, 305);
+  ctx.font = "18px system-ui";
+  if (mode !== "points") {
+    ctx.fillStyle = "#e9f5f0";
+    ctx.fillText("Ringed letter = highest ward count", 602, 534, 305);
+  }
+  ctx.fillStyle = "#a6f5d9";
+  CLUSTER_MODES[mode].note.forEach((line, index) =>
+    ctx.fillText(line, 602, (mode === "points" ? 548 : 557) + index * 23, 305));
   ctx.strokeStyle = "#d5e5d6";
   ctx.lineWidth = 1.4;
   ctx.strokeRect(plot.x, plot.y, plot.size, plot.size);
@@ -148,8 +155,6 @@ function drawSelection(canvas, selection) {
   } else {
     for (const block of selection.zone.blocks) {
       blockPath(ctx, block);
-      ctx.fillStyle = "#ffffff30";
-      ctx.fill("evenodd");
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 2.5;
       ctx.stroke();
@@ -189,9 +194,11 @@ export class ClusterExperience extends TimedExhibit {
     if (!this.started || this.finished || !CLUSTER_MODES[mode]) return;
     this.mode = mode;
     this.selection = null;
+    const highest = mode === "points" ? null : aggregationFor(mode)
+      .reduce((best, zone) => zone.deaths > best.deaths ? zone : best);
     this.selectedText = mode === "points"
       ? "Select a building circle to see its recorded deaths."
-      : "Select a colored block to see its ward's recorded deaths.";
+      : `Highest ward: ${highest.deaths} deaths. Select a block to outline its ward.`;
     drawMap(this.mapCanvas, mode);
     this.map.material.map.needsUpdate = true;
     drawSelection(this.selectionCanvas, null);
@@ -226,7 +233,7 @@ export class ClusterExperience extends TimedExhibit {
       this.selection = zone ? { type: "zone", zone } : null;
       this.selectedText = zone
         ? `Ward ${zone.name}: ${zone.deaths} recorded deaths across ${zone.blocks.length} blocks.`
-        : "Select a colored block to inspect its ward count.";
+        : "Select a block to outline its ward and see its death count.";
     }
     // Selecting changes only the transparent highlight and readout; the
     // expensive base map texture stays in place without a fade or reload.

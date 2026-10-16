@@ -1092,7 +1092,7 @@ function drawShowcaseUI() {
         "Satellites measure visible colors and near infrared (NIR).\nHealthy leaves reflect much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
-        "John Snow mapped cholera deaths near a London water pump in 1854.\nGroup the same street blocks into different sample wards.\nWatch how ward boundaries change the shaded pattern of death counts.",
+        "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
         "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot's circles show where shape and area stretch.",
@@ -1136,7 +1136,7 @@ function drawShowcaseUI() {
   if (exhibit.finished) {
     const takeaways = {
       cluster: ["Same deaths, new boundaries",
-        "Administrative ward totals can hide a street-level concentration.\nChanging boundaries changes the shading around the same mapped deaths.\nThis zoning effect is part of MAUP: the modifiable areal unit problem."],
+        "The same 489 deaths can look concentrated or nearly uniform.\nPlans A–C change six ward boundaries; Plan D uses four broad wards.\nThis is MAUP: the modifiable areal unit problem."],
       projection: ["Every flat map makes a choice",
         "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nMercator keeps local shape; equal-area keeps relative area."],
       interpolation: ["Spatial interpolation fills the gaps",
@@ -1145,8 +1145,8 @@ function drawShowcaseUI() {
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.05);
     if (exhibit.kind === "cluster")
-      label("The colors show death counts per ward. Population data would support rate comparisons.",
-        0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
+      label("Colors show raw death counts. Broad wards cover more blocks;\npopulation data would support mortality-rate comparisons.",
+        0, -0.43, 2.4, 0.18, 26, "#b6d1d9", "#0b2430");
     if (exhibit.kind === "projection")
       label("Choose a projection that supports what your map needs to compare.",
         0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");

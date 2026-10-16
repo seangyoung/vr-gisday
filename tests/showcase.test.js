@@ -6,7 +6,7 @@ import { displayedBandBrightness, nirGrayPixel } from "../src/showcase/spectral-
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
-  aggregationFor, blockAt,
+  aggregationFor, blockAt, wardFor,
 } from "../src/showcase/cluster-model.js";
 import {
   GlobeSpin, TISSOT_LONGITUDES, nearestTissotCircle,
@@ -41,13 +41,17 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(SNOW_BLOCKS.reduce((sum, block) => sum + block.deaths, 0),
     SNOW_TOTAL);
   for (const [mode, count] of [["wardA", 6], ["wardB", 6],
-    ["wardC", 5], ["wardD", 7]]) {
+    ["wardC", 6], ["wardD", 4]]) {
     const zones = aggregationFor(mode);
     assert.equal(zones.length, count);
     assert.ok(zones.every((zone) => zone.blocks.length > 0));
     assert.equal(zones.reduce((sum, zone) => sum + zone.deaths, 0), SNOW_TOTAL);
     assert.deepEqual(zones.flatMap((zone) => zone.blocks.map((block) => block.id))
       .sort((a, b) => a - b), SNOW_BLOCKS.map((block) => block.id));
+    assert.ok(zones.every((zone) => {
+      const underLabel = blockAt(zone.labelX, zone.labelY, 0);
+      return underLabel && wardFor(underLabel, mode) === zone.id;
+    }));
   }
   assert.notDeepEqual(aggregationFor("wardA").map((zone) => zone.deaths),
     aggregationFor("wardB").map((zone) => zone.deaths));
@@ -60,6 +64,25 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(blockAt(SNOW_BLOCKS[0].x, SNOW_BLOCKS[0].y, 0)?.id,
     SNOW_BLOCKS[0].id);
   assert.equal(blockAt(0, 0), null);
+});
+
+test("ward plans visibly change the mapped concentration while keeping deaths fixed", () => {
+  const compact = aggregationFor("wardA");
+  const diagonal = aggregationFor("wardB");
+  const eastWest = aggregationFor("wardC");
+  const broad = aggregationFor("wardD");
+  const pump = SNOW_PUMPS.find((point) => point.name.includes("Broad"));
+  const darkestCompact = compact.reduce((best, zone) =>
+    zone.deaths > best.deaths ? zone : best);
+  assert.equal(darkestCompact.deaths, 176);
+  assert.ok(Math.hypot(darkestCompact.x - pump.x, darkestCompact.y - pump.y) < 80);
+  assert.ok(Math.max(...diagonal.map((zone) => zone.deaths)) < 100);
+  assert.ok(new Set([1, 12, 30, 39].map((id) =>
+    wardFor(SNOW_BLOCKS[id], "wardB"))).size >= 3);
+  const darkestEastWest = eastWest.reduce((best, zone) =>
+    zone.deaths > best.deaths ? zone : best);
+  assert.ok(darkestEastWest.y > pump.y + 50);
+  assert.ok(broad.every((zone) => zone.deaths >= 100 && zone.deaths < 150));
 });
 
 test("projection examples preserve distinct distortion tradeoffs", () => {
