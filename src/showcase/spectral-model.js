@@ -1,4 +1,4 @@
-export const BAND_NAMES = ["Blue", "Green", "Red", "Near infrared"];
+export const BAND_NAMES = ["Blue", "Green", "Red", "Near infrared (NIR)"];
 export const SPECTRAL_MODES = ["natural", "false", "nir"];
 
 // NASA's published composites are rendered JPEGs, not raw sensor bands.

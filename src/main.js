@@ -1235,7 +1235,7 @@ function drawShowcaseUI() {
       0.72, exhibit.mode === "natural");
     button("False color", 0, -0.75, () => exhibit.setMode("false"),
       0.72, exhibit.mode === "false");
-    button("NIR only", 0.78, -0.75, () => exhibit.setMode("nir"),
+    button("Near infrared", 0.78, -0.75, () => exhibit.setMode("nir"),
       0.72, exhibit.mode === "nir");
     button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
