@@ -95,22 +95,39 @@ test("terrain transforms preserve water and geometry; reset restores full pose a
   r.dispose();
 });
 
-test("erosion tray keeps its forward pitch without opaque side walls or base", () => {
+test("erosion tray has a visible base and corners with translucent soil sides", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   r.place(camera);
   assert.ok(r.group.rotation.x > 0.45);
   assert.ok(r.group.position.y < camera.position.y - 0.14);
-  const base = r.group.children.find(
-    (child) => child.geometry?.type === "BoxGeometry" && child.geometry.parameters.width === 2,
-  );
-  assert.equal(base, undefined);
-  assert.equal(r.group.children.some((child) => child.material?.color?.getHex() === 0x705b46), false);
+  assert.ok(r.soilBase);
+  assert.ok(r.soilBase.position.y < r.soilFloorY);
+  assert.equal(r.soilCorners.length, 4);
+  assert.equal(r.soilWalls.material.transparent, true);
+  assert.ok(r.soilWalls.material.opacity < 0.8);
   r.group.rotation.x = 0;
   r.place(camera);
   assert.ok(r.group.rotation.x > 0.45);
   r.dispose();
+});
+
+test("both soil profiles follow the terrain edge during display changes and reset", () => {
+  for (const kind of ["erosion", "drainage"]) {
+    const r = new RainExperience(new THREE.Scene(), () => {}, kind);
+    const rim = r.soilRim[Math.floor(r.soilRim.length / 2)];
+    const changed = r.heights.slice();
+    changed[rim] += 0.15;
+    r.showReplayFrame(changed);
+    const walls = r.soilWalls.geometry.attributes.position;
+    const index = r.soilRim.indexOf(rim) * 6;
+    assert.ok(Math.abs(walls.getY(index) - changed[rim]) < 1e-6);
+    assert.ok(Math.abs(walls.getY(index + 2) - r.soilFloorY) < 1e-6);
+    r.restore();
+    assert.ok(Math.abs(walls.getY(index) - r.heights[rim]) < 1e-6);
+    r.dispose();
+  }
 });
 
 test("both tabletop rain models can be snap-turned without changing the terrain", () => {

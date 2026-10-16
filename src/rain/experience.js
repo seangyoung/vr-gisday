@@ -61,7 +61,7 @@ export class RainExperience {
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
     this.grabBounds = new THREE.Box3(
-      new THREE.Vector3(-1.18, -0.23, -1.18),
+      new THREE.Vector3(-1.18, -0.34, -1.18),
       new THREE.Vector3(1.18, 1.18, 1.18),
     );
     this.grab.turnPivot.copy(this.grabBounds.getCenter(new THREE.Vector3()));
@@ -174,42 +174,7 @@ export class RainExperience {
     );
     this.group.add(this.contours);
     this.contours.visible = this.kind !== "erosion";
-    // The erosion bed stays open at its edges so deep cuts remain visible.
-    // The drainage sandbox keeps its solid slab to show the two outlets.
-    if (this.kind !== "erosion") {
-      const rim = [];
-      for (let c = 0; c < this.size; c++) rim.push(c);
-      for (let r = 1; r < this.size; r++) rim.push(r * this.size + this.size - 1);
-      for (let c = this.size - 2; c >= 0; c--)
-        rim.push((this.size - 1) * this.size + c);
-      for (let r = this.size - 2; r > 0; r--) rim.push(r * this.size);
-      const baseTop = -0.04;
-      const walls = [];
-      for (let i = 0; i < rim.length; i++) {
-        const a = cellPoint(rim[i], this.heights),
-          b = cellPoint(rim[(i + 1) % rim.length], this.heights);
-        walls.push(
-          a.x, a.y, a.z,
-          b.x, b.y, b.z,
-          a.x, baseTop - 0.02, a.z,
-          b.x, b.y, b.z,
-          b.x, baseTop - 0.02, b.z,
-          a.x, baseTop - 0.02, a.z,
-        );
-      }
-      const wallGeo = new THREE.BufferGeometry();
-      wallGeo.setAttribute("position", new THREE.Float32BufferAttribute(walls, 3));
-      wallGeo.computeVertexNormals();
-      this.group.add(new THREE.Mesh(wallGeo, new THREE.MeshStandardMaterial({
-        color: 0x705b46, roughness: 1, side: THREE.DoubleSide,
-      })));
-      const base = new THREE.Mesh(
-        new THREE.BoxGeometry(2, 0.08, 2),
-        new THREE.MeshStandardMaterial({ color: 0x3f4939 }),
-      );
-      base.position.y = baseTop - 0.04;
-      this.group.add(base);
-    }
+    this.createSoilProfile();
     this.divide = this.line(
       Array.from({ length: this.size }, (_, r) => {
         const p = cellPoint(r * this.size + Math.floor((this.size - 1) / 2), this.heights);
@@ -353,6 +318,92 @@ export class RainExperience {
     }
     this.setSource(this.source);
   }
+  createSoilProfile() {
+    const rim = [];
+    for (let c = 0; c < this.size; c++) rim.push(c);
+    for (let r = 1; r < this.size; r++) rim.push(r * this.size + this.size - 1);
+    for (let c = this.size - 2; c >= 0; c--)
+      rim.push((this.size - 1) * this.size + c);
+    for (let r = this.size - 2; r > 0; r--) rim.push(r * this.size);
+    this.soilRim = rim;
+    this.soilFloorY = this.kind === "erosion" ? -0.26 : -0.16;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(rim.length * 18), 3));
+    const colors = new Float32Array(rim.length * 18);
+    const top = new THREE.Color(this.kind === "erosion" ? 0xb88b5c : 0x9d9873);
+    const bottom = new THREE.Color(this.kind === "erosion" ? 0x725039 : 0x625743);
+    for (let i = 0; i < rim.length; i++) {
+      for (const [j, color] of [[0, top], [1, top], [2, bottom],
+        [3, top], [4, bottom], [5, bottom]])
+        color.toArray(colors, i * 18 + j * 3);
+    }
+    geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    this.soilWalls = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({
+      vertexColors: true, side: THREE.DoubleSide,
+      transparent: true, opacity: this.kind === "erosion" ? 0.72 : 0.64,
+      depthWrite: false,
+    }));
+    this.soilWalls.frustumCulled = false;
+    this.group.add(this.soilWalls);
+
+    this.soilBase = new THREE.Mesh(
+      new THREE.BoxGeometry(2.04, 0.04, 2.04),
+      new THREE.MeshStandardMaterial({ color: 0x625543, roughness: 1 }),
+    );
+    this.soilBase.position.y = this.soilFloorY - 0.02;
+    this.group.add(this.soilBase);
+
+    const outline = new THREE.BufferGeometry();
+    outline.setAttribute("position", new THREE.BufferAttribute(new Float32Array(rim.length * 6), 3));
+    this.soilOutline = new THREE.LineSegments(outline, new THREE.LineBasicMaterial({
+      color: 0xd2b58b, transparent: true, opacity: 0.8, depthWrite: false,
+    }));
+    this.soilOutline.frustumCulled = false;
+    this.group.add(this.soilOutline);
+
+    const postMaterial = new THREE.MeshStandardMaterial({
+      color: 0xbda27e, roughness: 0.85,
+    });
+    const postGeometry = new THREE.CylinderGeometry(0.012, 0.012, 1, 8);
+    this.soilCorners = [0, this.size - 1, this.size * this.size - 1,
+      this.size * (this.size - 1)].map(() => {
+      const post = new THREE.Mesh(postGeometry, postMaterial);
+      this.group.add(post);
+      return post;
+    });
+    this.refreshSoilProfile();
+  }
+  refreshSoilProfile() {
+    const terrain = this.terrain.geometry.attributes.position;
+    const walls = this.soilWalls.geometry.attributes.position;
+    const outline = this.soilOutline.geometry.attributes.position;
+    const floor = this.soilFloorY;
+    for (let i = 0; i < this.soilRim.length; i++) {
+      const a = this.soilRim[i], b = this.soilRim[(i + 1) % this.soilRim.length];
+      const ax = terrain.getX(a), ay = terrain.getY(a), az = terrain.getZ(a);
+      const bx = terrain.getX(b), by = terrain.getY(b), bz = terrain.getZ(b);
+      const offset = i * 6;
+      walls.setXYZ(offset, ax, ay, az);
+      walls.setXYZ(offset + 1, bx, by, bz);
+      walls.setXYZ(offset + 2, ax, floor, az);
+      walls.setXYZ(offset + 3, bx, by, bz);
+      walls.setXYZ(offset + 4, bx, floor, bz);
+      walls.setXYZ(offset + 5, ax, floor, az);
+      outline.setXYZ(i * 2, ax, ay + 0.004, az);
+      outline.setXYZ(i * 2 + 1, bx, by + 0.004, bz);
+    }
+    walls.needsUpdate = true;
+    this.soilWalls.geometry.computeVertexNormals();
+    outline.needsUpdate = true;
+    for (const [i, id] of [0, this.size - 1, this.size * this.size - 1,
+      this.size * (this.size - 1)].entries()) {
+      const top = terrain.getY(id) + 0.012;
+      const post = this.soilCorners[i];
+      post.position.set(terrain.getX(id), (top + floor) / 2, terrain.getZ(id));
+      post.scale.y = top - floor;
+    }
+  }
   refreshOriginalBed(heights = this.heights, hide = true) {
     const positions = this.originalBed.geometry.attributes.position;
     for (let i = 0; i < positions.count; i++)
@@ -421,6 +472,7 @@ export class RainExperience {
         geo.computeVertexNormals();
         geo.computeBoundingSphere();
         geo.computeBoundingBox();
+        this.refreshSoilProfile();
         this.paint();
       }
     }
@@ -604,6 +656,7 @@ export class RainExperience {
     geometry.computeVertexNormals();
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
+    this.refreshSoilProfile();
     this.contours.visible = false;
     this.divide.visible = false;
     for (const tree of this.trees)
@@ -658,6 +711,7 @@ export class RainExperience {
     const oldStage = this.stage;
     this.stage = 1;
     this.applyBrush(0, 0, 0);
+    this.showReplayFrame(this.heights);
     this.stage = oldStage;
     this.edited = false;
     this.contours.visible = this.kind !== "erosion";
@@ -845,6 +899,7 @@ export class RainExperience {
     positions.needsUpdate = true;
     this.terrain.geometry.computeVertexNormals();
     this.terrain.geometry.computeBoundingSphere();
+    this.refreshSoilProfile();
     this.paint(frame, cover);
   }
   captureReplayFrame() {

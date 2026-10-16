@@ -73,7 +73,7 @@ export function outletFor(id, heights) {
 }
 export const CHALLENGE = cellAt(0.15, -0.25);
 
-// Outer rim stays anchored so the slab walls and outlet mouths remain joined.
+// Outer rim stays anchored so the outlet mouths and tray corners remain joined.
 export function createHeights() {
   return Float64Array.from({ length: SIZE * SIZE }, (_, id) => cellPoint(id).y);
 }
