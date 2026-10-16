@@ -140,7 +140,7 @@ export class ChangeExperience extends TimedExhibit {
     ctx.stroke();
     dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
     dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right");
-    if (this.revealed) {
+    if (this.revealed && this.sceneInfo.focus) {
       const { u, v, rx, ry } = this.sceneInfo.focus;
       ctx.strokeStyle = "#fff9bb";
       ctx.lineWidth = 6;
@@ -155,7 +155,7 @@ export class ChangeExperience extends TimedExhibit {
   }
 
   imageHit(raycaster) {
-    if (!this.started || this.finished || !this.ready || this.revealed) return null;
+    if (!this.started || this.finished || !this.ready) return null;
     this.image.updateWorldMatrix(true, false);
     return raycaster.intersectObject(this.image, false)[0];
   }

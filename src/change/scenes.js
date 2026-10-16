@@ -15,7 +15,6 @@ export const CHANGE_SCENES = [
     answer: 0,
     observation: "Blue water now fills broad river valleys.",
     explanation: "June 2008 rain flooded saturated valleys.\nSatellite views map the water's extent.",
-    focus: { u: 0.49, v: 0.53, rx: 0.21, ry: 0.18 },
     source: "https://eros.usgs.gov/earthshots/illinoisindiana-usa",
   },
   {
@@ -32,7 +31,6 @@ export const CHANGE_SCENES = [
     answer: 1,
     observation: "Dark red patches replaced parts of the green forest.",
     explanation: "The 1988 fires left dark-red burn scars.\nLater images track forest recovery.",
-    focus: { u: 0.76, v: 0.29, rx: 0.15, ry: 0.22 },
     source: "https://eros.usgs.gov/earthshots/fire-and-recovery",
   },
   {
