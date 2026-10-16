@@ -2074,10 +2074,6 @@ function drawScene() {
         category: "Interpolation", preview: "Estimate rainfall between measured locations.",
         glyph: "⌁", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
-      { title: "Where Should It Go?", lines: ["Where Should", "It Go?"],
-        category: "Site suitability", preview: "Compare clinic sites as priorities change.",
-        glyph: "✚", color: "#e8c98b",
-        action: () => startShowcase("suitability") },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
