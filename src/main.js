@@ -1257,9 +1257,7 @@ function drawShowcaseUI() {
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(exhibit.selectedCircle
-      ? exhibit.flat
-        ? "The selected circle starts round on Earth. Its map shape and size show distortion."
-        : "Flatten the map to compare the selected circle's shape and area."
+      ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
       ? "Tissot's circles start equally sized on Earth. Select one to see its distortion."
       : `${exhibit.projection === "equalArea" ? "Equal-area" :

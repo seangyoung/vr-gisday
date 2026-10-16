@@ -325,8 +325,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   positionTooltip() {
     const circle = this.selectedCircle;
-    const visible = !!(this.tissot && circle && this.flat &&
-      this.transitionAge >= 1);
+    const visible = !!(this.tissot && circle && this.transitionAge >= 1);
     this.tooltip.visible = visible;
     this.tooltipLeader.visible = visible;
     if (!visible) return;
@@ -334,19 +333,59 @@ export class ProjectionExperience extends TimedExhibit {
     const geographicU = (circle.longitude + 180) / 360;
     const u = ((geographicU - offset) % 1 + 1) % 1;
     const longitude = u * 360 - 180;
-    const scale = projectionFitScale(this.projection, this.standardParallel);
-    const projected = projectMetric(longitude, circle.latitude,
-      this.projection, this.standardParallel);
-    const anchorX = this.map.position.x + projected.x * scale;
-    const anchorY = this.map.position.y + projected.y * scale;
-    const side = anchorX > 1.1 ? -1 : 1;
-    const cardX = anchorX + side * 0.53;
-    const cardY = anchorY + (anchorY > 0.32 ? -0.26 : 0.26);
-    this.tooltip.position.set(cardX, cardY, 0.15);
+    let anchorX, anchorY, anchorZ = 0;
+    if (this.flat) {
+      const scale = projectionFitScale(this.projection, this.standardParallel);
+      const projected = projectMetric(longitude, circle.latitude,
+        this.projection, this.standardParallel);
+      anchorX = this.map.position.x + projected.x * scale;
+      anchorY = this.map.position.y + projected.y * scale;
+    } else {
+      const latitude = circle.latitude * Math.PI / 180;
+      const relativeLongitude = longitude * Math.PI / 180;
+      const mapPoint = new THREE.Vector3(
+        0.49 * Math.cos(latitude) * Math.sin(relativeLongitude),
+        0.49 * Math.sin(latitude),
+        0.49 * Math.cos(latitude) * Math.cos(relativeLongitude));
+      if (mapPoint.z > 0.06) {
+        anchorX = this.map.position.x + mapPoint.x;
+        anchorY = this.map.position.y + mapPoint.y;
+        anchorZ = mapPoint.z;
+      } else {
+        const globeLongitude = circle.longitude * Math.PI / 180;
+        const globePoint = new THREE.Vector3(
+          0.49 * Math.cos(latitude) * Math.sin(globeLongitude),
+          0.49 * Math.sin(latitude),
+          0.49 * Math.cos(latitude) * Math.cos(globeLongitude))
+          .applyEuler(this.globe.rotation);
+        if (globePoint.z > 0.06) {
+          anchorX = this.globe.position.x + globePoint.x;
+          anchorY = this.globe.position.y + globePoint.y;
+          anchorZ = globePoint.z;
+        } else {
+          // The selected circle is on the far side of both wrapped surfaces.
+          // Keep the explanation by the map without pointing to a hidden spot.
+          anchorX = this.map.position.x;
+          anchorY = this.map.position.y;
+          anchorZ = 0.49;
+          this.tooltipLeader.visible = false;
+        }
+      }
+    }
+    const side = anchorX > (this.flat ? 1.1 : 0.95) ? -1 : 1;
+    const cardScale = this.flat ? 1 : 0.78;
+    const halfWidth = 0.47 * cardScale;
+    const halfHeight = 0.23 * cardScale;
+    const cardX = anchorX + side * (halfWidth + 0.06);
+    const cardY = anchorY + (anchorY > 0.32 ? -1 : 1) * (halfHeight + 0.03);
+    const leaderZ = Math.max(0.14, anchorZ + 0.04);
+    this.tooltip.scale.setScalar(cardScale);
+    this.tooltip.position.set(cardX, cardY, leaderZ + 0.01);
     const points = this.tooltipLeader.geometry.attributes.position;
-    points.setXYZ(0, anchorX, anchorY, 0.14);
-    points.setXYZ(1, cardX - side * 0.47,
-      THREE.MathUtils.clamp(anchorY, cardY - 0.23, cardY + 0.23), 0.14);
+    points.setXYZ(0, anchorX, anchorY, leaderZ);
+    points.setXYZ(1, cardX - side * halfWidth,
+      THREE.MathUtils.clamp(anchorY, cardY - halfHeight, cardY + halfHeight),
+      leaderZ);
     points.needsUpdate = true;
   }
   targetVertices(flat, projection = this.projection) {
@@ -403,7 +442,10 @@ export class ProjectionExperience extends TimedExhibit {
     if (!this.started || this.finished) return;
     this.spin.step(dt);
     orientGlobe(this.globe, this.spin);
-    if (this.transitionAge >= 1) return;
+    if (this.transitionAge >= 1) {
+      if (this.selectedCircle && !this.flat) this.positionTooltip();
+      return;
+    }
     this.transitionAge = Math.min(1, this.transitionAge + dt / 0.9);
     const ease = 1 - (1 - this.transitionAge) ** 3;
     const position = this.map.geometry.attributes.position;
