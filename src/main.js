@@ -41,6 +41,7 @@ import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
+import { exhibitPanelHit } from "./showcase/pointer-targets.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { hasQuestShortcuts } from "./input-layout.js";
 import { ControllerGuide } from "./controller-guide.js";
@@ -2629,10 +2630,8 @@ renderer.setAnimationLoop((time, frame) => {
       const interpolationTarget = hit || soundMenuOpen ||
         showcase?.kind !== "interpolation" ? null : showcase.targetHit(raycaster);
       const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
-      const exhibitPanel = hit || soundMenuOpen || !showcase?.started ||
-        showcase.kind === "interpolation" ? null :
-        raycaster.intersectObjects(showcase.kind === "projection"
-          ? [showcase.globe, showcase.map] : [showcase.image ?? showcase.map], false)[0];
+      const exhibitPanel = hit || soundMenuOpen ? null :
+        exhibitPanelHit(raycaster, showcase);
       const pointerAvailable =
         !grab?.hands.has(id) &&
         !rain?.grab.hands.has(id) &&

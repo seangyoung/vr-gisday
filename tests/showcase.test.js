@@ -14,6 +14,19 @@ import {
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "../src/showcase/projection-model.js";
 import { orientGlobe } from "../src/showcase/projection-experience.js";
+import { exhibitPanelHit } from "../src/showcase/pointer-targets.js";
+
+test("XR hover safely handles free-floating exhibits without flat panels", () => {
+  const raycaster = new THREE.Raycaster(
+    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(exhibitPanelHit(raycaster, { kind: "suitability", started: true }), null);
+  assert.equal(exhibitPanelHit(raycaster, { kind: "interpolation", started: true }), null);
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+    new THREE.MeshBasicMaterial());
+  assert.ok(exhibitPanelHit(raycaster, { kind: "cluster", started: true, map: panel }));
+  panel.geometry.dispose();
+  panel.material.dispose();
+});
 
 test("rendered Landsat composites map display colors to sampled band brightness", () => {
   assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
