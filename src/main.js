@@ -1196,34 +1196,30 @@ function drawShowcaseUI() {
   } else if (exhibit.kind === "interpolation") {
     const explanations = {
       samples: "Spatial interpolation: estimate between the gauge readings.",
-      idw: "Spatial interpolation · IDW weights nearby gauges more.",
-      smooth: "Spatial interpolation · a smooth trend shows the region.",
       zones: "Spatial interpolation · nearest-gauge zones make steps.",
+      smooth: "Smooth trend · amber: gauge above surface · cyan: below.",
+      idw: "Inverse distance weighting (IDW) favors nearby gauges.",
     };
     label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
       "#e6f4f5", "#0b2430");
     if (exhibit.showWeights) {
       const terms = exhibit.estimate.neighbors.map(({ station, weight }) =>
         `${station.value}×${Math.round(weight * 100)}%`).join(" + ");
-      label(`IDW weights = 1/d² for the 3 nearest gauges\n${terms} ≈ ${exhibit.estimate.value.toFixed(1)} mm`,
+      label(`IDW weights = 1/d² for ${exhibit.estimate.neighbors.length} nearest gauge${exhibit.estimate.neighbors.length === 1 ? "" : "s"}\n${terms} ≈ ${exhibit.estimate.value.toFixed(1)} mm`,
         0, -0.66, 2.48, 0.18, 26, "#ffdd91", "#0b2430");
     } else label(`Point at the model to move ? · ${exhibit.mode === "smooth" ? "smooth" :
       exhibit.mode === "zones" ? "nearest" : "IDW"} estimate ${exhibit.displayValue.toFixed(1)} mm`,
       0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
     button("Readings", -0.91, -0.84, () => exhibit.setMode("samples"),
       0.55, exhibit.mode === "samples");
-    button("IDW", -0.32, -0.84, () => exhibit.setMode("idw"),
-      0.52, exhibit.mode === "idw");
+    button("Zones", -0.32, -0.84, () => exhibit.setMode("zones"),
+      0.52, exhibit.mode === "zones");
     button("Smooth", 0.30, -0.84, () => exhibit.setMode("smooth"),
       0.58, exhibit.mode === "smooth");
-    button("Zones", 0.92, -0.84, () => exhibit.setMode("zones"),
-      0.54, exhibit.mode === "zones");
+    button("IDW", 0.92, -0.84, () => exhibit.setMode("idw"),
+      0.54, exhibit.mode === "idw");
     button(exhibit.showWeights ? "Hide IDW math" : "Explain IDW", -0.60, -1.07,
-      () => {
-        if (!exhibit.showWeights) exhibit.setMode("idw");
-        exhibit.showWeights = !exhibit.showWeights;
-        draw();
-      }, 1.05,
+      () => exhibit.toggleWeights(), 1.05,
       !!exhibit.showWeights);
     button("Takeaway", 0.60, -1.07, () => exhibit.finish(), 1.05);
   } else if (exhibit.kind === "change") {

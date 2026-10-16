@@ -133,6 +133,7 @@ export class InterpolationExperience extends TimedExhibit {
     super(root, onChange);
     this.kind = "interpolation";
     this.mode = "samples";
+    this.showWeights = false;
     this.probe = null;
     this.model = new THREE.Group();
     this.model.visible = false;
@@ -193,6 +194,9 @@ export class InterpolationExperience extends TimedExhibit {
     this.stationGroup = new THREE.Group();
     this.model.add(this.stationGroup);
     this.stationHeads = [];
+    this.stationValueTags = [];
+    this.smoothResiduals = new THREE.Group();
+    this.model.add(this.smoothResiduals);
     for (const station of STATIONS) {
       const h = heightForValue(station.value);
       const stem = new THREE.Mesh(
@@ -208,7 +212,31 @@ export class InterpolationExperience extends TimedExhibit {
       head.position.set(station.x, h, station.z);
       this.stationGroup.add(head);
       this.stationHeads.push(head);
+      const valueTag = makeText(`${station.value} mm`);
+      valueTag.scale.set(0.24, 0.075, 1);
+      valueTag.position.set(station.x, h + 0.105, station.z);
+      valueTag.material.depthWrite = false;
+      valueTag.renderOrder = 5;
+      valueTag.visible = false;
+      this.stationGroup.add(valueTag);
+      this.stationValueTags.push(valueTag);
+
+      const trendHeight = heightForValue(smoothEstimate(station.x, station.z));
+      const gap = Math.abs(h - trendHeight);
+      if (gap > 0.025) {
+        const residual = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.02, 0.02, gap, 8),
+          new THREE.MeshBasicMaterial({
+            color: h > trendHeight ? 0xffbd78 : 0x69def2,
+            depthTest: false, depthWrite: false,
+          }),
+        );
+        residual.position.set(station.x, (h + trendHeight) / 2, station.z);
+        residual.renderOrder = 3;
+        this.smoothResiduals.add(residual);
+      }
     }
+    this.smoothResiduals.visible = false;
     this.surfaces = {
       idw: buildSmoothSurface((x, z) => idwEstimate(x, z).value),
       smooth: buildSmoothSurface((x, z) => smoothEstimate(x, z)),
@@ -240,8 +268,21 @@ export class InterpolationExperience extends TimedExhibit {
     if (!this.started || this.finished || !["samples", "idw", "smooth", "zones"].includes(mode)) return;
     this.mode = mode;
     this.showWeights = false;
+    this.smoothResiduals.visible = mode === "smooth";
     for (const [name, surface] of Object.entries(this.surfaces))
       if (name === mode) surface.visible = true;
+    this.placeProbe(this.probe.x, this.probe.z, false);
+    this.onChange("reveal");
+  }
+
+  toggleWeights() {
+    if (!this.started || this.finished) return;
+    if (!this.showWeights) {
+      this.mode = "idw";
+      this.surfaces.idw.visible = true;
+    }
+    this.showWeights = !this.showWeights;
+    this.smoothResiduals.visible = false;
     this.placeProbe(this.probe.x, this.probe.z, false);
     this.onChange("reveal");
   }
@@ -256,10 +297,13 @@ export class InterpolationExperience extends TimedExhibit {
       : this.mode === "zones"
       ? nearestEstimate(this.probe.x, this.probe.z)
       : result.value;
-    const showNeighbors = this.mode === "samples" || this.mode === "idw";
+    const showNeighbors = this.mode === "idw";
     const selected = new Set(showNeighbors ? result.neighbors.map(({ index }) => index) : []);
     this.stationHeads.forEach((head, index) => head.material.color.set(
       selected.has(index) ? 0xffd070 : 0xffffff));
+    this.stationValueTags.forEach((tag, index) => {
+      tag.visible = !!this.showWeights && selected.has(index);
+    });
     for (const child of [...this.probeGroup.children]) {
       child.traverse((node) => {
         node.geometry?.dispose();
