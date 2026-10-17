@@ -53,6 +53,7 @@ test("controller stroke edits mesh, survives mode switch, cancels safely, and re
   r.elapsed = 239.99;
   r.update(0.02, true);
   assert.equal(r.stage, 4);
+  assert.equal(r.group.visible, false, "the drainage takeaway hides its landscape");
   assert.equal(r.stroke, null);
   r.dispose();
 });
@@ -249,14 +250,21 @@ test("takeaway replay shows the saved erosion and returns to the takeaway", () =
   r.showReplayFrame(r.heights);
   r.finish();
   assert.equal(r.stage, 4);
+  assert.equal(r.group.visible, false, "the erosion takeaway hides its tray");
   assert.equal(r.replayFrames.length, 2);
   assert.equal(r.startReplay(), true);
+  assert.equal(r.group.visible, true, "Replay restores the saved tray view");
   r.update(0.01);
   assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - original) < 1e-6);
   r.update(4);
   assert.equal(r.stage, 4);
   assert.equal(r.replayTime, -1);
+  assert.equal(r.group.visible, false, "the tray hides again when Replay ends");
   assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - (original - 0.08)) < 1e-6);
+  assert.equal(r.startReplay(), true);
+  assert.equal(r.group.visible, true);
+  r.endReplay();
+  assert.equal(r.group.visible, false, "Back to Takeaway also hides the tray");
   r.dispose();
 });
 

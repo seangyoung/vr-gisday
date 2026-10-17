@@ -684,6 +684,7 @@ export class RainExperience {
     this.setSource(this.source);
   }
   restore(notify = true) {
+    this.group.visible = true;
     if (this.originalBed) this.originalBed.visible = false;
     if (this.waterSurface) this.waterSurface.mesh.visible = false;
     this.pouring = false;
@@ -838,6 +839,7 @@ export class RainExperience {
   }
   explore() {
     this.stage = 1;
+    this.group.visible = true;
     this.onEvent("reveal");
     this.onChange();
   }
@@ -876,6 +878,7 @@ export class RainExperience {
     this.brush.visible = false;
     this.cloud.visible = this.kind !== "erosion";
     this.stage = 4;
+    this.group.visible = false;
     this.playback = 0;
     this.onChange();
   }
@@ -921,6 +924,7 @@ export class RainExperience {
     this.particles.count = 0;
     this.replayTime = 0;
     this.replayFrameIndex = -1;
+    this.group.visible = true;
     this.waterSurface.mesh.visible = false;
     this.originalBed.visible = false;
     this.onEvent("reveal");
@@ -931,6 +935,7 @@ export class RainExperience {
     if (this.replayTime < 0) return;
     this.replayTime = -1;
     this.replayFrameIndex = -1;
+    if (this.stage === 4) this.group.visible = false;
     this.showReplayFrame(this.heights);
     if (this.waterSurface) this.waterSurface.update(this.heights, this.water);
     this.onChange();
