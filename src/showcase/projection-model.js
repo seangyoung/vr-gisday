@@ -124,6 +124,36 @@ export function relativeAreaScale(projection, latitudeDegrees) {
   return 1 / cosine;
 }
 
+export function continentDistortionSummary(continent, projection,
+  standardParallel = 0) {
+  const latitude = continent.center[1];
+  const place = Math.abs(latitude) >= 80 ? "polar region" :
+    `near ${Math.round(Math.abs(latitude))}°${latitude < 0 ? "S" : "N"}`;
+  const title = `${continent.name.toUpperCase()} · ${place}`;
+  if (Math.abs(latitude) >= 80) return {
+    title,
+    detail: projection === "mercator"
+      ? "Mercator stops at 85°; the pole is off-map."
+      : projection === "equalArea"
+      ? "Area kept; polar shape stretches at the edge."
+      : "Polar area and east–west shape stretch sharply.",
+  };
+  const area = relativeAreaScale(projection, latitude).toFixed(1);
+  const axes = indicatrixAxes(projection, latitude, standardParallel);
+  if (projection === "mercator") return {
+    title, detail: `Area ~${area}× · local shape kept`,
+  };
+  if (projection === "equalArea") {
+    const ratio = (Math.max(axes.horizontal, axes.vertical) /
+      Math.min(axes.horizontal, axes.vertical)).toFixed(1);
+    const direction = axes.horizontal > axes.vertical ? "wider" : "taller";
+    return { title,
+      detail: `Area kept · shape ~${ratio}× ${direction}` };
+  }
+  return { title,
+    detail: `Area ~${area}× · east–west ~${axes.horizontal.toFixed(1)}×` };
+}
+
 export class GlobeSpin {
   constructor() {
     this.yaw = 0;

@@ -4,7 +4,8 @@ import { continentAt } from "./continent-model.js";
 import { TimedExhibit } from "./exhibit.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, TISSOT_LATITUDES,
-  equalAreaReferencePoint, nearestTissotCircle, projectMetric,
+  continentDistortionSummary, equalAreaReferencePoint,
+  nearestTissotCircle, projectMetric,
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "./projection-model.js";
 
@@ -146,8 +147,9 @@ export class ProjectionExperience extends TimedExhibit {
     this.flat = false;
     this.tissot = false;
     this.selectedCircle = null;
-    this.continentCompare = false;
     this.selectedContinent = null;
+    this.continentGripBy = null;
+    this.continentGrip = null;
     this.draggingBy = null;
     this.interaction = null;
     this.spin = new GlobeSpin();
@@ -181,6 +183,16 @@ export class ProjectionExperience extends TimedExhibit {
       new THREE.MeshBasicMaterial({ color: 0xffd17b, depthTest: false }));
     this.continentMarker.visible = false;
     this.globe.add(this.continentMarker);
+    this.continentTooltipCanvas = document.createElement("canvas");
+    this.continentTooltipCanvas.width = 1100;
+    this.continentTooltipCanvas.height = 210;
+    this.continentTooltip = new THREE.Mesh(new THREE.PlaneGeometry(1.18, 0.2),
+      new THREE.MeshBasicMaterial({ map: textureFor(this.continentTooltipCanvas),
+        side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
+    this.continentTooltip.position.set(1.28, 0.87, 0.19);
+    this.continentTooltip.renderOrder = 6;
+    this.continentTooltip.visible = false;
+    this.group.add(this.continentTooltip);
     this.tooltipCanvas = document.createElement("canvas");
     this.tooltipCanvas.width = 1024;
     this.tooltipCanvas.height = 500;
@@ -211,6 +223,8 @@ export class ProjectionExperience extends TimedExhibit {
     this.draggingBy = null;
     this.interaction = null;
     this.spin.end();
+    this.continentGripBy = null;
+    this.continentGrip = null;
     this.group.visible = false;
     super.finish();
   }
@@ -224,35 +238,23 @@ export class ProjectionExperience extends TimedExhibit {
   }
   setTissot(enabled) {
     if (!this.started || this.finished) return;
-    if (enabled) this.clearContinentCompare();
+    if (enabled) this.clearContinentSelection();
     this.tissot = enabled;
     if (!enabled) this.selectedCircle = null;
     this.paintTexture();
     this.updateTooltip();
     this.onChange();
   }
-  clearContinentCompare() {
-    if (this.interaction?.kind === "continent") {
-      this.draggingBy = null;
-      this.interaction = null;
-    }
-    this.continentCompare = false;
+  clearContinentSelection() {
     this.selectedContinent = null;
+    this.continentGripBy = null;
+    this.continentGrip = null;
     this.continentOverlay.visible = false;
     this.continentMarker.visible = false;
+    this.continentTooltip.visible = false;
+    this.spin.end();
     this.spin.yawVelocity = 0;
     this.spin.pitchVelocity = 0;
-  }
-  setContinentCompare(enabled) {
-    if (!this.started || this.finished) return;
-    if (!enabled) this.clearContinentCompare();
-    else {
-      this.continentCompare = true;
-      this.tissot = false;
-      this.selectedCircle = null;
-      this.paintTexture();
-      this.updateTooltip();
-    }
     this.onChange();
   }
   paintContinentOverlay() {
@@ -289,11 +291,105 @@ export class ProjectionExperience extends TimedExhibit {
     this.continentOverlay.geometry.dispose();
     this.continentOverlay.geometry = new THREE.PlaneGeometry(width, width);
     this.continentOverlay.material.map.needsUpdate = true;
+    this.paintContinentTooltip();
     this.updateContinentOverlayVisibility();
   }
+  paintContinentTooltip() {
+    if (!this.selectedContinent) return;
+    const { title, detail } = continentDistortionSummary(
+      this.selectedContinent, this.projection, this.standardParallel);
+    const ctx = this.continentTooltipCanvas.getContext("2d");
+    ctx.fillStyle = "#0b2430";
+    ctx.fillRect(0, 0, 1100, 210);
+    ctx.strokeStyle = "#ffd17b";
+    ctx.lineWidth = 7;
+    ctx.strokeRect(4, 4, 1092, 202);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffd17b";
+    ctx.font = "600 63px system-ui, sans-serif";
+    ctx.fillText(title, 550, 65, 1030);
+    ctx.fillStyle = "#e6f4f5";
+    ctx.font = "500 60px system-ui, sans-serif";
+    ctx.fillText(detail, 550, 145, 1030);
+    this.continentTooltip.material.map.needsUpdate = true;
+  }
   updateContinentOverlayVisibility() {
-    this.continentOverlay.visible = !!(this.continentCompare &&
-      this.selectedContinent && this.flat && this.transitionAge >= 1);
+    const visible = !!(this.selectedContinent && this.flat &&
+      this.transitionAge >= 1);
+    this.continentOverlay.visible = visible;
+    this.continentTooltip.visible = visible && this.continentGripBy === null;
+  }
+  continentGripHit(raycaster) {
+    if (!this.started || this.finished || this.continentGripBy !== null)
+      return null;
+    this.group.updateWorldMatrix(true, true);
+    if (this.continentOverlay.visible) {
+      const hit = raycaster.intersectObject(this.continentOverlay, false)[0];
+      if (hit?.uv) {
+        const x = Math.min(1023, Math.max(0, Math.floor(hit.uv.x * 1024)));
+        const y = Math.min(1023, Math.max(0, Math.floor((1 - hit.uv.y) * 1024)));
+        if (this.continentCanvas.getContext("2d").getImageData(x, y, 1, 1).data[3] > 25)
+          return { ...hit, kind: "overlay" };
+      }
+    }
+    const hit = raycaster.intersectObject(this.globe, false)[0];
+    if (!hit?.uv) return null;
+    const continent = continentAt(hit.uv.x * 360 - 180,
+      hit.uv.y * 180 - 90);
+    return continent ? { ...hit, kind: "globe", continent } : null;
+  }
+  beginContinentGrip(raycaster, source) {
+    if (this.draggingBy !== null || this.continentGripBy !== null) return false;
+    const hit = this.continentGripHit(raycaster);
+    if (!hit) return false;
+    const rayPoint = this.rayPoint(raycaster, 0.56);
+    if (!rayPoint) return false;
+    if (hit.kind === "globe") {
+      this.selectedContinent = hit.continent;
+      this.spin.end();
+      this.spin.yawVelocity = this.spin.pitchVelocity = 0;
+      const longitude = (hit.uv.x * 360 - 180) * Math.PI / 180;
+      const latitude = (hit.uv.y * 180 - 90) * Math.PI / 180;
+      this.continentMarker.position.set(
+        0.51 * Math.cos(latitude) * Math.sin(longitude),
+        0.51 * Math.sin(latitude),
+        0.51 * Math.cos(latitude) * Math.cos(longitude));
+      this.continentMarker.visible = true;
+      if (this.selectedCircle) {
+        this.selectedCircle = null;
+        this.paintTexture();
+        this.updateTooltip();
+      }
+      this.paintContinentOverlay();
+      this.continentOverlay.position.copy(rayPoint);
+    } else this.continentOverlay.position.z = 0.56;
+    this.continentGripBy = source;
+    this.continentGrip = { kind: hit.kind, startRayPoint: rayPoint,
+      startPosition: this.continentOverlay.position.clone(), moved: false };
+    this.updateContinentOverlayVisibility();
+    this.onChange();
+    return true;
+  }
+  dragContinentGrip(raycaster, source) {
+    if (this.continentGripBy !== source || !this.continentGrip) return;
+    const point = this.rayPoint(raycaster, 0.56);
+    if (!point) return;
+    const gesture = this.continentGrip;
+    if (point.distanceTo(gesture.startRayPoint) > 0.025) gesture.moved = true;
+    this.continentOverlay.position.copy(gesture.startPosition).add(
+      point.sub(gesture.startRayPoint));
+  }
+  endContinentGrip(source) {
+    if (this.continentGripBy !== source || !this.continentGrip) return;
+    const gesture = this.continentGrip;
+    this.continentGripBy = null;
+    this.continentGrip = null;
+    if (gesture.kind === "globe" && !gesture.moved)
+      this.continentOverlay.position.copy(this.projectedContinentCenter());
+    else this.continentOverlay.position.z = 0.09;
+    this.updateContinentOverlayVisibility();
+    this.onChange();
   }
   projectedContinentCenter() {
     const [longitude, latitude] = this.selectedContinent.center;
@@ -329,38 +425,19 @@ export class ProjectionExperience extends TimedExhibit {
     return origin.x - origin.z * direction.x / direction.z;
   }
   beginInteraction(raycaster, source) {
-    if (!this.started || this.finished || this.draggingBy !== null) return false;
+    if (!this.started || this.finished || this.draggingBy !== null ||
+        this.continentGripBy !== null) return false;
     this.group.updateWorldMatrix(true, true);
+    if (this.continentGripHit(raycaster)?.kind === "overlay") return false;
     const hit = raycaster.intersectObjects([this.globe, this.map], false)[0];
     if (!hit) {
+      if (this.selectedContinent) this.clearContinentSelection();
       this.selectCircle(null);
       return false;
     }
     const kind = hit.object === this.globe ? "globe" : "map";
-    const longitude = hit.uv.x * 360 - 180;
-    const latitude = hit.uv.y * 180 - 90;
-    const continent = kind === "globe" && this.continentCompare
-      ? continentAt(longitude, latitude) : null;
-    if (continent) {
-      this.selectedContinent = continent;
-      this.spin.end();
-      this.spin.yawVelocity = this.spin.pitchVelocity = 0;
-      const lon = longitude * Math.PI / 180;
-      const lat = latitude * Math.PI / 180;
-      this.continentMarker.position.set(0.51 * Math.cos(lat) * Math.sin(lon),
-        0.51 * Math.sin(lat), 0.51 * Math.cos(lat) * Math.cos(lon));
-      this.continentMarker.visible = true;
-      this.paintContinentOverlay();
-      this.continentOverlay.position.copy(this.rayPoint(raycaster, 0.56) ??
-        this.projectedContinentCenter());
-      this.draggingBy = source;
-      this.interaction = { kind: "continent", moved: false,
-        startPoint: this.continentOverlay.position.clone() };
-      this.onChange();
-      return true;
-    }
-    if (kind === "globe" && this.selectedContinent && this.continentCompare)
-      return false;
+    if (kind === "globe" && this.selectedContinent)
+      this.clearContinentSelection();
     this.draggingBy = source;
     this.interaction = { kind, uv: hit.uv.clone(), moved: false,
       startX: this.mapRayX(raycaster), lastX: this.mapRayX(raycaster),
@@ -371,12 +448,7 @@ export class ProjectionExperience extends TimedExhibit {
   dragInteraction(raycaster, source, dt) {
     if (this.draggingBy !== source || !this.interaction) return;
     const gesture = this.interaction;
-    if (gesture.kind === "continent") {
-      const point = this.rayPoint(raycaster, 0.56);
-      if (!point) return;
-      if (point.distanceTo(gesture.startPoint) > 0.025) gesture.moved = true;
-      this.continentOverlay.position.copy(point);
-    } else if (gesture.kind === "globe") {
+    if (gesture.kind === "globe") {
       const angles = this.rayAngles(raycaster);
       if (Math.hypot(angles[0] - gesture.startAngles[0],
         angles[1] - gesture.startAngles[1]) > 0.015) gesture.moved = true;
@@ -398,14 +470,9 @@ export class ProjectionExperience extends TimedExhibit {
     const gesture = this.interaction;
     this.draggingBy = null;
     this.interaction = null;
-    if (gesture.kind === "continent") {
-      if (!gesture.moved)
-        this.continentOverlay.position.copy(this.projectedContinentCenter());
-      else this.continentOverlay.position.z = 0.09;
-      this.onChange();
-      return;
-    }
     if (gesture.kind === "globe") this.spin.end();
+    if (!gesture.moved && gesture.kind === "map" && this.selectedContinent)
+      this.clearContinentSelection();
     if (!gesture.moved && this.tissot) {
       const offset = gesture.kind === "map" ? this.map.material.map.offset.x : 0;
       const longitude = (((gesture.uv.x + offset) % 1 + 1) % 1) * 360 - 180;
@@ -415,6 +482,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   selectCircle(circle) {
     if (!this.started || this.finished || !this.tissot) return;
+    if (circle && this.selectedContinent) this.clearContinentSelection();
     this.selectedCircle = circle;
     this.paintTexture();
     this.updateTooltip();
@@ -578,7 +646,7 @@ export class ProjectionExperience extends TimedExhibit {
   update(dt) {
     super.update(dt);
     if (!this.started || this.finished) return;
-    if (!this.selectedContinent || !this.continentCompare) this.spin.step(dt);
+    if (!this.selectedContinent) this.spin.step(dt);
     orientGlobe(this.globe, this.spin);
     if (this.transitionAge >= 1) return;
     this.transitionAge = Math.min(1, this.transitionAge + dt / 0.9);

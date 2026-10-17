@@ -1117,7 +1117,7 @@ function drawShowcaseUI() {
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot circles and draggable continents reveal distortion.",
+        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nSelect Tissot circles or grip a continent to reveal distortion.",
         "Flatten the globe"],
       change: ["What Changed?",
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
@@ -1309,13 +1309,11 @@ function drawShowcaseUI() {
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(!exhibit.flat
-      ? exhibit.continentCompare && exhibit.selectedContinent
+      ? exhibit.selectedContinent
         ? "Flatten the map to compare your selected continent."
         : "Wrapped globe · choose Flatten to compare projections."
-      : exhibit.continentCompare && exhibit.selectedContinent
-      ? `${exhibit.selectedContinent.name} · drag its translucent outline over the map.`
-      : exhibit.continentCompare
-      ? "Grab a continent on the globe; drag its outline over the map."
+      : exhibit.selectedContinent
+      ? `${exhibit.selectedContinent.name} · grip outline to move; click away to clear.`
       : exhibit.selectedCircle
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
@@ -1331,18 +1329,14 @@ function drawShowcaseUI() {
     button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7,
       exhibit.projection === "equalArea");
     const equalArea = exhibit.projection === "equalArea";
-    button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.9 : -0.76, -0.79,
-      () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.5 : 0.58);
-    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? -0.32 : -0.04, -0.79,
-      () => exhibit.setTissot(!exhibit.tissot), equalArea ? 0.6 : 0.68, exhibit.tissot);
-    button(exhibit.continentCompare ? "Continent ✓" : "Compare land",
-      equalArea ? 0.35 : 0.78, -0.79,
-      () => exhibit.setContinentCompare(!exhibit.continentCompare),
-      equalArea ? 0.66 : 0.75, exhibit.continentCompare);
+    button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.78 : -0.52, -0.79,
+      () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.7 : 0.85);
+    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? 0 : 0.52, -0.79,
+      () => exhibit.setTissot(!exhibit.tissot), equalArea ? 0.78 : 0.95, exhibit.tissot);
     if (equalArea)
-      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.94, -0.79,
-        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.47);
-    label(exhibit.continentCompare
+      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.78, -0.79,
+        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
+    label(exhibit.selectedContinent
       ? "Equal-area reference preserves area; its local center limits shape distortion."
       : `Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
       0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
@@ -1948,10 +1942,10 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
     return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu, exitLabel];
-  if (showcase) return [showcase.kind === "projection" ?
-    showcase.continentCompare ? "Grab land" : "Drag globe" :
+  if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
-    ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
+    showcase.kind === "projection" ? "Grab land" :
+      ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
     onMenu, exitLabel];
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
@@ -2258,7 +2252,7 @@ for (let i = 0; i < 2; i++) {
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing) return;
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
-        showcase?.grab?.hands.size)
+        showcase?.grab?.hands.size || showcase?.continentGripBy != null)
       return;
     const hit = intersect(c);
     if (hit?.object.userData.fallbackAction) {
@@ -2382,6 +2376,14 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
+    if (showcase?.kind === "projection" && showcase.started &&
+        !showcase.finished && !soundMenuOpen && grip.visible) {
+      const ui = intersect(c);
+      const target = showcase.continentGripHit(raycaster);
+      if (modelBeforeUi(target, ui) &&
+          showcase.beginContinentGrip(raycaster, i)) sound.click();
+      return;
+    }
     if (!floatingModel || !grip.visible) return;
     grip.updateWorldMatrix(true, false);
     const near =
@@ -2401,6 +2403,7 @@ for (let i = 0; i < 2; i++) {
     scan?.grab.release(i);
     rain?.grab.release(i);
     showcase?.grab?.release(i);
+    showcase?.endContinentGrip?.(i);
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
@@ -2413,6 +2416,7 @@ for (let i = 0; i < 2; i++) {
     scan?.grab.release(i);
     rain?.grab.release(i);
     showcase?.grab?.release(i);
+    showcase?.endContinentGrip?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -2612,6 +2616,16 @@ renderer.setAnimationLoop((time, frame) => {
         showcase.dragInteraction(raycaster, active.id, dt);
       }
     }
+    if (showcase?.kind === "projection" &&
+        showcase.continentGripBy !== null) {
+      const active = controllers.find(({ id }) => id === showcase.continentGripBy);
+      if (!visibleSession || !active?.c.visible || soundMenuOpen)
+        showcase.endContinentGrip(showcase.continentGripBy);
+      else {
+        intersect(active.c);
+        showcase.dragContinentGrip(raycaster, active.id);
+      }
+    }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
@@ -2771,7 +2785,9 @@ renderer.setAnimationLoop((time, frame) => {
       const hit = intersect(c);
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) ||
         scanHit(c) || (showcase?.kind === "interpolation" ? null :
-          showcase?.grabHit?.(raycaster));
+          showcase?.kind === "projection"
+            ? showcase.continentGripHit(raycaster)
+            : showcase?.grabHit?.(raycaster));
       const interpolationTarget = hit || soundMenuOpen ||
         showcase?.kind !== "interpolation" ? null : showcase.targetHit(raycaster);
       const ground = hit || soundMenuOpen || viewshed?.isClimbing
@@ -2783,6 +2799,7 @@ renderer.setAnimationLoop((time, frame) => {
         !rain?.grab.hands.has(id) &&
         !scan?.grab.hands.has(id) &&
         !showcase?.grab?.hands.has(id) &&
+        showcase?.continentGripBy !== id &&
         showcase?.draggingBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
       if (teleport.active && teleport.demo === landscapeDemo &&
@@ -2806,6 +2823,7 @@ renderer.setAnimationLoop((time, frame) => {
           scan?.grab.hands.has(id) ||
           rain?.grab.hands.has(id) ||
           showcase?.grab?.hands.has(id) ||
+          showcase?.continentGripBy === id ||
           rain?.stroke?.id === id
           ? 0xffca83
           : model
@@ -2944,8 +2962,10 @@ if (
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (showcase) {
-      if (["projection", "change"].includes(showcase.kind) &&
-          showcase.beginInteraction(raycaster, "preview")) {
+      const picked = showcase.kind === "projection" &&
+        showcase.beginContinentGrip(raycaster, "preview");
+      if (picked || (["projection", "change"].includes(showcase.kind) &&
+          showcase.beginInteraction(raycaster, "preview"))) {
         previewSpinPointer = e.pointerId;
         previewSpinTime = e.timeStamp;
         renderer.domElement.setPointerCapture(e.pointerId);
@@ -2967,12 +2987,14 @@ if (devPreview) {
     previewRaining = false;
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
+      showcase?.endContinentGrip?.("preview");
       previewSpinPointer = null;
     }
   });
   window.addEventListener("pointercancel", (e) => {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
+      showcase?.endContinentGrip?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -2991,6 +3013,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
+      showcase?.dragContinentGrip?.(raycaster, "preview");
       previewSpinTime = e.timeStamp;
       return;
     }

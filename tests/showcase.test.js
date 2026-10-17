@@ -9,7 +9,8 @@ import {
   aggregationFor, blockAt, wardFor,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, TISSOT_LONGITUDES, equalAreaReferencePoint, nearestTissotCircle,
+  GlobeSpin, TISSOT_LONGITUDES, continentDistortionSummary,
+  equalAreaReferencePoint, nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "../src/showcase/projection-model.js";
@@ -193,6 +194,20 @@ test("continent-centered reference keeps the same ground area across latitudes",
       ...continent.center);
     assert.ok(Math.abs(origin.x) < 1e-8 && Math.abs(origin.y) < 1e-8);
   }
+});
+
+test("continent tooltip describes local projection tradeoffs and polar limits", () => {
+  const eurasia = CONTINENTS.find((c) => c.name === "Eurasia");
+  const mercator = continentDistortionSummary(eurasia, "mercator");
+  assert.match(mercator.title, /Eurasia/i);
+  assert.match(mercator.detail, /Area ~.*local shape kept/);
+  const plate = continentDistortionSummary(eurasia, "equirectangular");
+  assert.match(plate.detail, /east–west/);
+  const equalArea = continentDistortionSummary(eurasia, "equalArea");
+  assert.match(equalArea.detail, /Area kept.*shape/);
+  const antarctica = CONTINENTS.find((c) => c.name === "Antarctica");
+  assert.match(continentDistortionSummary(antarctica, "mercator").detail,
+    /stops at 85°/);
 });
 
 test("globe swipe coasts, settles, and resumes its default spin", () => {
