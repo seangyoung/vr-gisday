@@ -25,6 +25,7 @@ export const LAYER_HINTS = {
   boundaries: "Jurisdictions: district lines organize people and services.",
 };
 export const LANDSCAPE_EXTENT = 160;
+export const TELEPORT_MAX_DISTANCE = 120;
 const extent = LANDSCAPE_EXTENT;
 export const riverX = (z) =>
   7 + 3.5 * Math.sin(z * 0.018) + 1.1 * Math.sin(z * 0.065);
@@ -574,6 +575,14 @@ export class LayerExperience {
         );
         this.pickGround.visible = false;
         world.add(this.pickGround);
+      } else {
+        this.pickFlatGround = new THREE.Mesh(
+          new THREE.PlaneGeometry(2 * extent, 2 * extent),
+          new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }),
+        );
+        this.pickFlatGround.rotation.x = -Math.PI / 2;
+        this.pickFlatGround.visible = false;
+        world.add(this.pickFlatGround);
       }
       for (const key of LAYER_KEYS.filter((k) => k !== "topography")) {
         const layer = new THREE.Group();
@@ -616,6 +625,60 @@ export class LayerExperience {
   }
   walkHeightAt(x, z, raised) {
     return landscapeHeight(x, z, raised);
+  }
+  teleportCandidate(raycaster, uiHit = null) {
+    if (!this.started || this.finished) return null;
+    const raised = this.selected.has("topography");
+    const variant = raised ? this.variants.raised : this.variants.flat;
+    const pick = raised ? this.pickGround : this.pickFlatGround;
+    pick.updateWorldMatrix(true, false);
+    const groundHit = raycaster.intersectObject(pick, false)[0];
+    const roadMesh = this.selected.has("roads") && variant.roads.visible &&
+      variant.roads.scale.y > 0.95 ? variant.roads.children[1] : null;
+    roadMesh?.updateWorldMatrix(true, false);
+    const roadHit = roadMesh && raycaster.intersectObject(roadMesh, false)[0];
+    const roadFromAbove = roadHit && raycaster.ray.origin.y > roadHit.point.y + 0.1;
+    const onRoad = !!roadFromAbove && (!groundHit || roadHit.distance < groundHit.distance);
+    const hit = onRoad ? roadHit : groundHit;
+    if (!hit || hit.distance > TELEPORT_MAX_DISTANCE || hit.distance < 1) return null;
+    if (uiHit && uiHit.distance < hit.distance) return null;
+    if (this.clipboard.visible) {
+      const board = this.clipboard.children[0];
+      board.updateWorldMatrix(true, false);
+      const boardHit = raycaster.intersectObject(board, false)[0];
+      if (boardHit && boardHit.distance < hit.distance) return null;
+    }
+    const local = this.group.worldToLocal(hit.point.clone());
+    const limit = LANDSCAPE_EXTENT - 4;
+    if (Math.abs(local.x) > limit || Math.abs(local.z) > limit) return null;
+    const scaleY = variant.world.scale.y;
+    const groundAt = (x, z) => this.walkHeightAt(x, z, raised) * scaleY;
+    const surface = onRoad ? highwayWalkingHeight(local.x, local.z, raised) * scaleY
+      : groundAt(local.x, local.z);
+    const slope = onRoad ? 0 : Math.max(
+      Math.abs(groundAt(local.x + 1, local.z) - surface),
+      Math.abs(groundAt(local.x - 1, local.z) - surface),
+      Math.abs(groundAt(local.x, local.z + 1) - surface),
+      Math.abs(groundAt(local.x, local.z - 1) - surface),
+    );
+    const point = this.group.localToWorld(new THREE.Vector3(local.x, surface + 0.42, local.z));
+    return {
+      x: local.x, z: local.z, point, distance: hit.distance,
+      onRoad, valid: Number.isFinite(surface) && slope <= 1.2,
+    };
+  }
+  teleportTo(candidate, camera) {
+    if (!this.started || this.finished || !candidate?.valid) return false;
+    if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.z)) return false;
+    const limit = LANDSCAPE_EXTENT - 4;
+    if (Math.abs(candidate.x) > limit || Math.abs(candidate.z) > limit) return false;
+    const eye = camera.getWorldPosition(new THREE.Vector3());
+    const landing = this.group.localToWorld(new THREE.Vector3(candidate.x, 0, candidate.z));
+    this.group.position.x += eye.x - landing.x;
+    this.group.position.z += eye.z - landing.z;
+    this.onRoad = candidate.onRoad;
+    this.walk(0, 0, 0, camera);
+    return true;
   }
   walk(stickX, stickY, dt, camera) {
     const eye = camera.getWorldPosition(new THREE.Vector3());

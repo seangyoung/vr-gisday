@@ -31,6 +31,7 @@ import {
   riverX,
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
+import { LandscapeTeleport, teleportStickAction } from "./layers/teleport.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { PixelExperience } from "./pixels/experience.js";
 import { PIXEL_EXTENT } from "./pixels/model.js";
@@ -63,6 +64,7 @@ renderer.xr.enabled = true;
 renderer.xr.setReferenceSpaceType("local");
 document.body.append(renderer.domElement);
 const scene = new THREE.Scene();
+const teleport = new LandscapeTeleport(scene);
 const camera = new THREE.PerspectiveCamera(
   devPreview ? 90 : 65,
   innerWidth / innerHeight,
@@ -506,6 +508,7 @@ function openMenu() {
 }
 function resetView() {
   closeSoundMenu();
+  teleport.cancel();
   if (devPreview) place();
   else pendingPlacement = true;
 }
@@ -569,6 +572,7 @@ function start() {
   draw();
 }
 function stopRainInput() {
+  teleport.cancel();
   sound.setWater(false);
   waterSoundUntil = 0;
   scan?.grab.cancel();
@@ -927,8 +931,8 @@ function drawLayersUI() {
 
     return;
   }
-  label("Left stick: move · right stick: turn 30°", 0, 0.68,
-    2.3, 0.13, 28, "#b6d1d9", "#0b2430");
+  label("Left stick: walk · Right stick: turn sideways\nRight stick forward: aim ray · release to teleport", 0, 0.68,
+    2.3, 0.18, 27, "#b6d1d9", "#0b2430");
   {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
@@ -994,8 +998,8 @@ function drawViewshedUI() {
 
     return;
   }
-  label("Left stick: move · right stick: turn 30°",
-    0, 0.68, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
+  label("Left stick: walk · Right stick: turn sideways\nRight stick forward: aim ray · release to teleport",
+    0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430");
   {
     const cameraNow = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
     ["valley", "redrock", "mesa"].forEach((id, i) => {
@@ -1062,8 +1066,8 @@ function drawPixelsUI() {
     return;
   }
   label(
-    "GSD = pixel ground width · left stick: move · right: turn",
-    0, 0.68, 2.3, 0.12, 30, "#b6d1d9", "#0b2430",
+    "Left stick: walk · Right stick: turn sideways\nRight stick forward: aim ray · release to teleport",
+    0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430",
   );
   for (const [size, x] of [[2, -0.84], [8, -0.28], [24, 0.28], [48, 0.84]])
     button(`${size} m`, x, 0.5, () => p.setSize(size), 0.48)
@@ -1863,6 +1867,34 @@ function draw() {
       };
       panel.append(b);
     }
+    const previewLandscape = pixels ?? viewshed ?? layers;
+    if (previewLandscape?.started && !previewLandscape.finished) {
+      const b = document.createElement("button");
+      b.textContent = teleport.active
+        ? `Hide teleport marker (${teleport.candidate?.valid ? "valid" : "no landing"})`
+        : "Preview teleport marker";
+      b.onclick = () => {
+        if (teleport.active) teleport.cancel();
+        else {
+          const eye = camera.getWorldPosition(new THREE.Vector3());
+          const forward = camera.getWorldDirection(new THREE.Vector3());
+          forward.y = 0;
+          forward.normalize();
+          const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+          const local = previewLandscape.group.worldToLocal(
+            eye.clone().addScaledVector(forward, 12).addScaledVector(right, 6));
+          const raised = previewLandscape.selected.has("topography");
+          const variant = raised ? previewLandscape.variants.raised : previewLandscape.variants.flat;
+          const height = previewLandscape.walkHeightAt(local.x, local.z, raised) * variant.world.scale.y;
+          const origin = previewLandscape.group.localToWorld(
+            new THREE.Vector3(local.x, height + 18, local.z));
+          teleport.begin(previewLandscape);
+          teleport.aim(new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0)));
+        }
+        draw();
+      };
+      panel.append(b);
+    }
     for (const mesh of buttons) {
       if (mesh.userData.debugHidden) continue;
       const b = document.createElement("button");
@@ -1991,7 +2023,7 @@ function drawScene() {
     if (showFallbackControls) {
       label("YOUR VR CONTROLS", 0, 0.74, 2.5, 0.18, 52, "#a6f5d9");
       label("Point and press a trigger to select", 0, 0.37, 2.6, 0.18, 42);
-      label("Use Reset, Sound, or Skip below.\nGrip to move models; sticks move and turn in landscapes.",
+      label("Use Reset, Sound, or Skip below.\nLeft stick walks; right stick turns or aims a teleport.",
         0, 0.03, 2.55, 0.26, 33, "#e6f4f5", "#0b2430");
       button("Continue to experiences", 0, -0.50, () => {
         step = -1;
@@ -2011,7 +2043,7 @@ function drawScene() {
     label("B · Back / exit", 0.72, -0.40, 1.35, 0.15, 42);
     label("Trigger · Point / select", -0.75, -0.59, 1.45, 0.14, 36);
     label("Grip · Grab / resize", 0.75, -0.59, 1.45, 0.14, 36);
-    label("Sticks · Walk/turn in landscape demos\nGrip + stick · Turn tabletop models 45°", 0, -0.74,
+    label("Landscapes · Left walk, right turn / forward teleport\nGrip + stick · Turn tabletop models 45°", 0, -0.74,
       2.6, 0.18, 32, "#d8eae8");
     button("Continue to experiences", 0, -0.96, () => {
       step = -1;
@@ -2203,6 +2235,7 @@ for (let i = 0; i < 2; i++) {
     if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
+    if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing) return;
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
         showcase?.grab?.hands.size)
@@ -2280,6 +2313,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.scanning = false;
   });
   c.addEventListener("squeezestart", () => {
+    if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (soundMenuOpen) return;
     if (viewshed?.started && grip.visible) {
       grip.updateWorldMatrix(true, false);
@@ -2350,6 +2384,7 @@ for (let i = 0; i < 2; i++) {
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
+    if (c.userData.xrInput?.handedness === "right") teleport.cancel();
     viewshed?.releaseRung(i);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
@@ -2565,12 +2600,48 @@ renderer.setAnimationLoop((time, frame) => {
         ? controllers.find(({ c }) => c.userData.xrInput?.handedness === "right")
         : null;
       const gamepad = right?.c.userData.xrInput?.gamepad;
-      const axis = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
-      if (viewshed?.isClimbing) rightTurnReady = false;
-      else if (Math.abs(axis) < 0.3) rightTurnReady = true;
-      else if (rightTurnReady && Math.abs(axis) > 0.7) {
-        landscapeDemo.turn(Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
+      const rightX = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
+      const rightY = gamepad?.mapping === "xr-standard" ? gamepad.axes[3] ?? 0 : 0;
+      const canTeleport = visible && !soundMenuOpen && landscapeDemo.started &&
+        !landscapeDemo.finished && !viewshed?.isClimbing &&
+        right?.c.visible && right?.grip.visible && gamepad?.mapping === "xr-standard";
+      if (teleport.active && (!canTeleport || teleport.demo !== landscapeDemo)) {
+        teleport.cancel();
         rightTurnReady = false;
+      }
+      let teleportHandled = false;
+      if (canTeleport) {
+        const action = teleportStickAction(teleport.active, rightX, rightY);
+        if (action === "begin") {
+          teleport.begin(landscapeDemo);
+          const uiHit = intersect(right.c);
+          teleport.aim(raycaster, uiHit);
+          rightTurnReady = false;
+          teleportHandled = true;
+        } else if (action === "aim") {
+          const uiHit = intersect(right.c);
+          teleport.aim(raycaster, uiHit);
+          rightTurnReady = false;
+          teleportHandled = true;
+        } else if (action === "commit") {
+          const uiHit = intersect(right.c);
+          teleport.aim(raycaster, uiHit);
+          if (teleport.release(renderer.xr.getCamera())) sound.cue("reveal");
+          rightTurnReady = false;
+          teleportHandled = true;
+        } else if (action === "cancel") {
+          teleport.cancel();
+          rightTurnReady = false;
+          teleportHandled = true;
+        }
+      }
+      if (viewshed?.isClimbing) rightTurnReady = false;
+      else if (!teleportHandled && !teleport.active) {
+        if (Math.abs(rightX) < 0.3) rightTurnReady = true;
+        else if (rightTurnReady && Math.abs(rightX) > 0.7) {
+          landscapeDemo.turn(Math.sign(rightX) * Math.PI / 6, renderer.xr.getCamera());
+          rightTurnReady = false;
+        }
       }
       const left = visible && !soundMenuOpen
         ? controllers.find(
@@ -2581,7 +2652,7 @@ renderer.setAnimationLoop((time, frame) => {
       const leftPad = left?.c.userData.xrInput?.gamepad;
       const leftX = leftPad?.mapping === "xr-standard" ? leftPad.axes[2] ?? 0 : 0;
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
-      if (visible && !soundMenuOpen)
+      if (visible && !soundMenuOpen && !teleportHandled && !teleport.active)
         landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
       if (!soundMenuOpen)
         landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera(), false,
@@ -2693,6 +2764,14 @@ renderer.setAnimationLoop((time, frame) => {
         !showcase?.grab?.hands.has(id) &&
         showcase?.draggingBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
+      if (teleport.active && teleport.demo === landscapeDemo &&
+          c.userData.xrInput?.handedness === "right") {
+        beam.visible = true;
+        targetBeam.visible = false;
+        beam.scale.z = teleport.candidate?.distance ?? 12;
+        beam.material.color.set(teleport.candidate?.valid ? 0x68f5cf : 0xff927b);
+        continue;
+      }
       beam.visible = pointerAvailable && !activeTarget && !viewshed?.isClimbing;
       targetBeam.visible = activeTarget;
       if (activeTarget) targetBeam.scale.z = interpolationTarget.distance;
