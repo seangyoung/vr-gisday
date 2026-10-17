@@ -171,10 +171,25 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   const topHand = topRung.getWorldPosition(new THREE.Vector3());
   assert.equal(demo.gripRung(0, topHand), true, "gripping a step resumes climbing");
   assert.equal(demo.isAtTop, false);
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(topHand)]]), 0.016);
+  assert.equal(demo.isAtTop, false, "a stationary re-grip does not immediately re-lock");
+  assert.equal(demo.isClimbing, true);
+  assert.equal(demo.clipboard.visible, false);
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
+    topHand.clone().add(new THREE.Vector3(0, -0.02, 0)),
+  )]]), 0.016);
+  assert.equal(demo.isAtTop, false, "small hand jitter at the top does not re-lock");
   demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
     topHand.clone().add(new THREE.Vector3(0, 0.2, 0)),
   )]]), 0.016);
   assert.ok(demo.climbHeight < 10.3, "lifting the hand lowers the visitor");
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
+    topHand.clone().add(new THREE.Vector3(0, -0.25, 0)),
+  )]]), 0.016);
+  assert.equal(demo.isAtTop, true, "climbing upward again can restore the top perch");
+  topRung.getWorldPosition(topHand);
+  assert.equal(demo.gripRung(0, topHand), true);
+  assert.equal(demo.isAtTop, false);
   demo.releaseRung(0);
   for (let i = 0; i < 90 && demo.isClimbing; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);

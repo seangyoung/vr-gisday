@@ -125,6 +125,7 @@ export class ViewshedExperience extends LayerExperience {
     this.climbGroundY = 0;
     this.fallSpeed = 0;
     this.topLocked = false;
+    this.topLockReady = true;
     this.revealAge = 1;
     this.marker = observationMarker();
     this.marker.visible = false;
@@ -313,6 +314,7 @@ export class ViewshedExperience extends LayerExperience {
     if (!this.started || this.finished || this.observer.height !== TOWER_HEIGHT ||
         !this.nearestRung(handWorld)) return false;
     const firstHand = !this.climbHands.size;
+    if (this.topLocked) this.topLockReady = false;
     this.topLocked = false;
     this.climbHands.set(id, handWorld.y);
     this.fallSpeed = 0;
@@ -345,7 +347,8 @@ export class ViewshedExperience extends LayerExperience {
       const pull = deltas.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
       this.climbHeight = THREE.MathUtils.clamp(this.climbHeight + pull, 0, CLIMB_HEIGHT);
       this.fallSpeed = 0;
-      if (this.climbHeight >= CLIMB_HEIGHT - 0.01) {
+      if (this.climbHeight <= CLIMB_HEIGHT - 0.15) this.topLockReady = true;
+      if (this.topLockReady && this.climbHeight >= CLIMB_HEIGHT - 0.01) {
         this.climbHeight = CLIMB_HEIGHT;
         this.topLocked = true;
         this.climbHands.clear();
@@ -367,6 +370,7 @@ export class ViewshedExperience extends LayerExperience {
     this.climbHeight = 0;
     this.fallSpeed = 0;
     this.topLocked = false;
+    this.topLockReady = true;
     this.group.position.y = this.climbGroundY;
   }
   update(dt) {
