@@ -166,6 +166,10 @@ test("clipboard scene choices swap terrain, map target, walking height, and visi
     assert.equal(demo.canyonWorlds.get(id).world.visible, true);
     assert.ok(Math.abs(demo.marker.position.y - spec.heightAt(spec.start.x, spec.start.z)) < 1e-9);
     assert.ok(Math.abs(demo.targetRing.position.y - spec.heightAt(spec.target.x, spec.target.z) - 0.2) < 1e-9);
+    assert.equal(demo.targetRing.children[0].material.depthTest, true,
+      "the ground ring respects terrain and clipboard depth");
+    assert.ok(demo.targetRing.children.some((mesh) => mesh.renderOrder === 5 && !mesh.material.depthTest),
+      "an elevated beacon locates the hidden ground target");
     assert.ok(Math.abs(demo.sampler.sample(25, 10) - spec.heightAt(25, 10)) < 0.03);
     assert.ok(spec.water(100) < spec.water(-100), "the river runs downhill");
     assert.ok(demo.visiblePercent < valleyCoverage, "the canyon has more visible occlusion");

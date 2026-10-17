@@ -130,15 +130,66 @@ export class ViewshedExperience extends LayerExperience {
     this.marker = observationMarker();
     this.marker.visible = false;
     this.group.add(this.marker);
-    this.targetRing = new THREE.Mesh(
-      new THREE.TorusGeometry(2.3, 0.18, 8, 48),
-      new THREE.MeshBasicMaterial({ color: 0x55d8f3, depthTest: false }),
+    this.targetRing = new THREE.Group();
+    const targetColor = 0x168cff;
+    const groundRing = new THREE.Mesh(
+      new THREE.TorusGeometry(3.2, 0.22, 8, 48),
+      new THREE.MeshBasicMaterial({ color: targetColor }),
     );
-    this.targetRing.rotation.x = Math.PI / 2;
+    groundRing.rotation.x = Math.PI / 2;
+    this.targetRing.add(groundRing);
+    // An elevated locator remains identifiable when the ground target is
+    // hidden by a ridge. It is a waypoint cue, not part of the sightline test.
+    const locatorMaterial = new THREE.MeshBasicMaterial({
+      color: targetColor, depthTest: false, depthWrite: false, fog: false,
+    });
+    const locatorOutline = new THREE.MeshBasicMaterial({
+      color: 0x103b52, depthTest: false, depthWrite: false, fog: false,
+    });
+    const stemOutline = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.25, 0.25, 18, 8), locatorOutline,
+    );
+    stemOutline.position.y = 9;
+    stemOutline.renderOrder = 4;
+    this.targetRing.add(stemOutline);
+    const locatorStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 18, 8), locatorMaterial,
+    );
+    locatorStem.position.y = 9;
+    locatorStem.renderOrder = 5;
+    this.targetRing.add(locatorStem);
+    for (const rotationY of [0, Math.PI / 2]) {
+      const outline = new THREE.Mesh(
+        new THREE.TorusGeometry(4.8, 0.58, 8, 48), locatorOutline,
+      );
+      outline.position.y = 18;
+      outline.rotation.y = rotationY;
+      outline.renderOrder = 4;
+      this.targetRing.add(outline);
+      const halo = new THREE.Mesh(
+        new THREE.TorusGeometry(4.8, 0.32, 8, 48), locatorMaterial,
+      );
+      halo.position.y = 18;
+      halo.rotation.y = rotationY;
+      halo.renderOrder = 5;
+      this.targetRing.add(halo);
+    }
+    const coreOutline = new THREE.Mesh(
+      new THREE.SphereGeometry(1.5, 12, 8), locatorOutline,
+    );
+    coreOutline.position.y = 18;
+    coreOutline.renderOrder = 4;
+    this.targetRing.add(coreOutline);
+    const locatorCore = new THREE.Mesh(
+      new THREE.SphereGeometry(1.1, 12, 8), locatorMaterial,
+    );
+    locatorCore.position.y = 18;
+    locatorCore.renderOrder = 5;
+    this.targetRing.add(locatorCore);
     this.group.add(this.targetRing);
     this.sightline = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
-      new THREE.LineBasicMaterial({ color: visibleColor, transparent: true, opacity: 0.85, depthTest: false }),
+      new THREE.LineBasicMaterial({ color: visibleColor, transparent: true, opacity: 0.85, depthWrite: false }),
     );
     this.sightline.frustumCulled = false;
     this.group.add(this.sightline);
@@ -412,8 +463,15 @@ export class ViewshedExperience extends LayerExperience {
     const targetX = ((this.sceneChoice.target.x + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
     const targetZ = ((this.sceneChoice.target.z + LANDSCAPE_EXTENT) / (2 * LANDSCAPE_EXTENT)) * size;
     ctx.beginPath();
-    ctx.arc(targetX, targetZ, 7 * ratio, 0, Math.PI * 2);
-    ctx.fillStyle = "#55d8f3";
+    ctx.arc(targetX, targetZ, 9 * ratio, 0, Math.PI * 2);
+    ctx.fillStyle = "#168cff";
+    ctx.fill();
+    ctx.lineWidth = 3 * ratio;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(targetX, targetZ, 2.5 * ratio, 0, Math.PI * 2);
+    ctx.fillStyle = "#17363d";
     ctx.fill();
     ctx.font = `bold ${17 * ratio}px system-ui, sans-serif`;
     ctx.fillStyle = "#17363d";

@@ -959,6 +959,12 @@ function drawLayersUI() {
     return;
   }
 }
+function foregroundViewshedClipboard(v) {
+  for (const mesh of v.clipboard.children.slice(0, 2)) mesh.renderOrder = 6;
+  v.ui.traverse((object) => {
+    if (object.isMesh) object.renderOrder = 7;
+  });
+}
 function drawViewshedUI() {
   const v = viewshed;
   if (!v.started) {
@@ -984,6 +990,7 @@ function drawViewshedUI() {
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
+    foregroundViewshedClipboard(v);
 
     return;
   }
@@ -1011,19 +1018,20 @@ function drawViewshedUI() {
     uiParent.add(map);
     buttons.push(map);
     v.registerVisitorMarker(map, LANDSCAPE_EXTENT, true);
-    label("Tap map: move tower.\nCan it see the blue target?", 0.64, 0.25, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
+    label("Blue beacon marks the ground target.\nCan the tower see its base?", 0.64, 0.25, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
     button("Eye level · 2 m", 0.64, 0.04, () => v.setHeight(2), 1.04)
       .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
     button("Tower · 12 m", 0.64, -0.19, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
-    label("Gold tower · white ring: you · Grip rung, pull down; release both to drop", 0, -0.74, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Tap map to move tower · White ring: you · Grip rung, pull down; release both to drop", 0, -0.74, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
     0, -0.84, 2.3, 0.1, 25, "#d8f3e6", "#0b2430",
   );
   button("Takeaway", 0, -1.01, () => v.finish(), 1.4);
+  foregroundViewshedClipboard(v);
 }
 function drawPixelsUI() {
   const p = pixels;
