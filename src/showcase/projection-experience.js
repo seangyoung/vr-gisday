@@ -158,7 +158,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.globe = new THREE.Mesh(meshGeometry(), new THREE.MeshBasicMaterial({
       map: textureFor(this.displayCanvas), side: THREE.DoubleSide,
     }));
-    this.globe.position.set(-0.66, 0.25, 0);
+    this.globe.position.set(-0.84, 0.25, 0);
     this.group.add(this.globe);
     this.map = new THREE.Mesh(meshGeometry(), new THREE.MeshBasicMaterial({
       map: textureFor(this.displayCanvas), side: THREE.DoubleSide,
