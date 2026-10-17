@@ -9,11 +9,12 @@ import {
   aggregationFor, blockAt, wardFor,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, TISSOT_LONGITUDES, nearestTissotCircle,
+  GlobeSpin, TISSOT_LONGITUDES, equalAreaReferencePoint, nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "../src/showcase/projection-model.js";
 import { orientGlobe } from "../src/showcase/projection-experience.js";
+import { CONTINENTS, continentAt } from "../src/showcase/continent-model.js";
 import { exhibitPanelHit } from "../src/showcase/pointer-targets.js";
 
 test("XR hover safely handles free-floating exhibits without flat panels", () => {
@@ -158,6 +159,40 @@ test("Tissot circle selection follows geographic locations across the map seam",
   assert.deepEqual(nearestTissotCircle(-179, -31),
     { longitude: -180, latitude: -30 });
   assert.equal(nearestTissotCircle(34, 15), null);
+});
+
+test("land picks identify generalized continents and leave open ocean unselected", () => {
+  for (const [lon, lat, name] of [
+    [20, 0, "Africa"], [-100, 40, "North America"],
+    [-65, -15, "South America"], [10, 50, "Eurasia"],
+    [80, 50, "Eurasia"], [135, -25, "Australia"],
+    [0, -85, "Antarctica"],
+  ]) assert.equal(continentAt(lon, lat)?.name, name);
+  assert.equal(continentAt(-140, 0), null);
+  assert.equal(CONTINENTS.length, 6);
+});
+
+test("continent-centered reference keeps the same ground area across latitudes", () => {
+  const radians = Math.PI / 180;
+  for (const latitude of [0, 30, 60]) {
+    const delta = 0.5;
+    const corners = [[10 - delta, latitude - delta],
+      [10 + delta, latitude - delta], [10 + delta, latitude + delta],
+      [10 - delta, latitude + delta]].map(([lon, lat]) =>
+      equalAreaReferencePoint(lon, lat, 20, 20));
+    const mappedArea = Math.abs(corners.reduce((sum, point, i) =>
+      sum + point.x * corners[(i + 1) % 4].y -
+      corners[(i + 1) % 4].x * point.y, 0) / 2);
+    const groundArea = 2 * delta * radians *
+      (Math.sin((latitude + delta) * radians) -
+        Math.sin((latitude - delta) * radians));
+    assert.ok(Math.abs(mappedArea / groundArea - 1) < 0.001);
+  }
+  for (const continent of CONTINENTS) {
+    const origin = equalAreaReferencePoint(...continent.center,
+      ...continent.center);
+    assert.ok(Math.abs(origin.x) < 1e-8 && Math.abs(origin.y) < 1e-8);
+  }
 });
 
 test("globe swipe coasts, settles, and resumes its default spin", () => {

@@ -1117,7 +1117,7 @@ function drawShowcaseUI() {
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot's circles show where shape and area stretch.",
+        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTissot circles and draggable continents reveal distortion.",
         "Flatten the globe"],
       change: ["What Changed?",
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
@@ -1175,8 +1175,8 @@ function drawShowcaseUI() {
       label("Colors show raw death counts. Broad wards cover more blocks;\npopulation data would support mortality-rate comparisons.",
         0, -0.43, 2.4, 0.18, 26, "#b6d1d9", "#0b2430");
     if (exhibit.kind === "projection")
-      label("Choose a projection that supports what your map needs to compare.",
-        0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
+      label("The continent reference keeps area; shape is most faithful near its center.\nChoose a projection that supports what your map needs to compare.",
+        0, -0.43, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
     if (exhibit.kind === "interpolation")
       label("These rainfall readings are synthetic. Fewer gauges mean more uncertainty between them.",
         0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
@@ -1309,7 +1309,13 @@ function drawShowcaseUI() {
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
     label(!exhibit.flat
-      ? "Wrapped globe · choose Flatten to compare projections."
+      ? exhibit.continentCompare && exhibit.selectedContinent
+        ? "Flatten the map to compare your selected continent."
+        : "Wrapped globe · choose Flatten to compare projections."
+      : exhibit.continentCompare && exhibit.selectedContinent
+      ? `${exhibit.selectedContinent.name} · drag its translucent outline over the map.`
+      : exhibit.continentCompare
+      ? "Grab a continent on the globe; drag its outline over the map."
       : exhibit.selectedCircle
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
@@ -1325,14 +1331,20 @@ function drawShowcaseUI() {
     button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7,
       exhibit.projection === "equalArea");
     const equalArea = exhibit.projection === "equalArea";
-    button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.78 : -0.52, -0.79,
-      () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.7 : 0.85);
-    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? 0 : 0.52, -0.79,
-      () => exhibit.setTissot(!exhibit.tissot), equalArea ? 0.78 : 0.95, exhibit.tissot);
+    button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.9 : -0.76, -0.79,
+      () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.5 : 0.58);
+    button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? -0.32 : -0.04, -0.79,
+      () => exhibit.setTissot(!exhibit.tissot), equalArea ? 0.6 : 0.68, exhibit.tissot);
+    button(exhibit.continentCompare ? "Continent ✓" : "Compare land",
+      equalArea ? 0.35 : 0.78, -0.79,
+      () => exhibit.setContinentCompare(!exhibit.continentCompare),
+      equalArea ? 0.66 : 0.75, exhibit.continentCompare);
     if (equalArea)
-      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.78, -0.79,
-        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
-    label(`Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
+      button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.94, -0.79,
+        () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.47);
+    label(exhibit.continentCompare
+      ? "Equal-area reference preserves area; its local center limits shape distortion."
+      : `Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
       0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);
   }
@@ -1936,7 +1948,8 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
     return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu, exitLabel];
-  if (showcase) return [showcase.kind === "projection" ? "Drag globe" :
+  if (showcase) return [showcase.kind === "projection" ?
+    showcase.continentCompare ? "Grab land" : "Drag globe" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
     onMenu, exitLabel];

@@ -33,6 +33,23 @@ const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
 const mercatorLimit = mercatorY(85 * deg);
 
+// Lambert azimuthal equal-area on the unit sphere, centered near the selected
+// landmass. Keeping the map's uniform scene scale makes its area comparable.
+export function equalAreaReferencePoint(longitudeDegrees, latitudeDegrees,
+  centerLongitudeDegrees, centerLatitudeDegrees) {
+  const phi = latitudeDegrees * deg;
+  const phi0 = centerLatitudeDegrees * deg;
+  const delta = (longitudeDegrees - centerLongitudeDegrees) * deg;
+  const cosine = Math.sin(phi0) * Math.sin(phi) +
+    Math.cos(phi0) * Math.cos(phi) * Math.cos(delta);
+  const k = Math.sqrt(2 / Math.max(1e-9, 1 + cosine));
+  return {
+    x: k * Math.cos(phi) * Math.sin(delta),
+    y: k * (Math.cos(phi0) * Math.sin(phi) -
+      Math.sin(phi0) * Math.cos(phi) * Math.cos(delta)),
+  };
+}
+
 // The display mesh must use one scale on both axes. Stretching every
 // projection into the same rectangle would add false shape distortion.
 export function projectMetric(longitudeDegrees, latitudeDegrees,
