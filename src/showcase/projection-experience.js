@@ -287,7 +287,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   updateTooltip() {
     const circle = this.selectedCircle;
-    if (!this.tissot || !circle) {
+    if (!this.flat || !this.tissot || !circle) {
       this.tooltip.visible = false;
       this.tooltipLeader.visible = false;
       return;
@@ -325,7 +325,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   positionTooltip() {
     const circle = this.selectedCircle;
-    const visible = !!(this.tissot && circle && this.transitionAge >= 1);
+    const visible = !!(this.flat && this.tissot && circle && this.transitionAge >= 1);
     this.tooltip.visible = visible;
     this.tooltipLeader.visible = visible;
     if (!visible) return;
@@ -442,10 +442,7 @@ export class ProjectionExperience extends TimedExhibit {
     if (!this.started || this.finished) return;
     this.spin.step(dt);
     orientGlobe(this.globe, this.spin);
-    if (this.transitionAge >= 1) {
-      if (this.selectedCircle && !this.flat) this.positionTooltip();
-      return;
-    }
+    if (this.transitionAge >= 1) return;
     this.transitionAge = Math.min(1, this.transitionAge + dt / 0.9);
     const ease = 1 - (1 - this.transitionAge) ** 3;
     const position = this.map.geometry.attributes.position;

@@ -1308,7 +1308,9 @@ function drawShowcaseUI() {
     button("Takeaway", 0, -1.08, () => exhibit.finish(), 1.1);
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
-    label(exhibit.selectedCircle
+    label(!exhibit.flat
+      ? "Wrapped globe · choose Flatten to compare projections."
+      : exhibit.selectedCircle
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
       ? "Tissot's circles start equally sized on Earth. Select one to see its distortion."
