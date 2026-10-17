@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
+import { PixelExperience } from "../src/pixels/experience.js";
 import {
   LayerExperience,
   LAYER_KEYS,
@@ -251,6 +252,38 @@ test("walking reaches the bridge from the road but stays below it from the river
   assert.equal(passedUnder, true);
   assert.equal(l.onRoad, false);
   l.dispose();
+});
+
+test("layers and pixel visitors briefly fall after walking off the bridge side", () => {
+  for (const Experience of [LayerExperience, PixelExperience]) {
+    const demo = new Experience(new THREE.Scene(), () => {});
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.6, 0);
+    demo.place(camera);
+    demo.begin();
+    demo.selected = new Set(["topography", "roads"]);
+    demo.applyVisibility();
+    demo.group.rotation.y = 0;
+    const x = riverX(highwayZ(0));
+    const z = highwayZ(x) + 8.75;
+    demo.group.position.set(-x, 0, -z);
+    demo.onRoad = true;
+    demo.walk(0, 0, 0, camera);
+    const shoulderHeight = demo.floorY - demo.group.position.y;
+    assert.ok(shoulderHeight - landscapeHeight(x, z) > 0.45);
+    demo.walk(0, 1, 0.1, camera);
+    const edgeGround = landscapeHeight(demo.visitor.x, demo.visitor.y);
+    const fallingHeight = demo.floorY - demo.group.position.y;
+    assert.equal(demo.onRoad, false);
+    assert.equal(demo.fallingFromRoad, true);
+    assert.ok(fallingHeight < shoulderHeight && fallingHeight > edgeGround + 0.2,
+      "the first frame descends without snapping to terrain");
+    for (let i = 0; i < 20; i++) demo.walk(0, 0, 0.05, camera);
+    assert.equal(demo.fallingFromRoad, false);
+    assert.ok(Math.abs(demo.group.position.y +
+      landscapeHeight(demo.visitor.x, demo.visitor.y)) < 1e-6);
+    demo.dispose();
+  }
 });
 
 test("the river runs downhill inside a carved channel and the highway bridges it", () => {

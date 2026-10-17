@@ -526,6 +526,8 @@ export class LayerExperience {
     this.view = "map";
     this.visitor = new THREE.Vector2();
     this.onRoad = false;
+    this.fallingFromRoad = false;
+    this.fallVelocity = 0;
     this.visitorMarkers = [];
     this.floorY = 0;
     this.walkForward = new THREE.Vector3();
@@ -612,6 +614,8 @@ export class LayerExperience {
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z) - 0.25;
     this.visitor.set(0, 0);
     this.onRoad = false;
+    this.fallingFromRoad = false;
+    this.fallVelocity = 0;
     this.updateVisitorMarkers();
   }
   turn(angle, camera) {
@@ -677,6 +681,8 @@ export class LayerExperience {
     this.group.position.x += eye.x - landing.x;
     this.group.position.z += eye.z - landing.z;
     this.onRoad = candidate.onRoad;
+    this.fallingFromRoad = false;
+    this.fallVelocity = 0;
     this.walk(0, 0, 0, camera);
     return true;
   }
@@ -716,10 +722,26 @@ export class LayerExperience {
       ? highwayWalkingHeight(local.x, local.z, raised)
       : null;
     const road = roadLocal === null ? null : roadLocal * scaleY;
+    const previousHeight = this.floorY - this.group.position.y;
+    const steppedOffRoad = Math.hypot(local.x - startX, local.z - startZ) > 0.01;
+    if (this.onRoad && road === null && this.selected.has("roads") &&
+        steppedOffRoad && previousHeight - ground > 0.45 && dt > 0) {
+      this.fallingFromRoad = true;
+      this.fallVelocity = 0;
+    }
     if (road === null) this.onRoad = false;
     else if (!this.onRoad && road - ground <= BRIDGE_ACCESS_STEP) this.onRoad = true;
     const relief = this.onRoad ? road : ground;
-    this.group.position.y = this.floorY - relief;
+    let height = relief;
+    if (this.fallingFromRoad && !this.onRoad && dt > 0 && previousHeight > relief) {
+      this.fallVelocity = Math.min(14, this.fallVelocity + 22 * dt);
+      height = Math.max(relief, previousHeight - this.fallVelocity * dt);
+    }
+    if (height <= relief || this.onRoad) {
+      this.fallingFromRoad = false;
+      this.fallVelocity = 0;
+    }
+    this.group.position.y = this.floorY - height;
     this.updateVisitorMarkers();
     const waterLevel = (raised ? riverWaterHeight(local.z) : 0.032) * scaleY;
     const inWater = !this.onRoad && this.selected.has("hydrology") &&
@@ -846,6 +868,8 @@ export class LayerExperience {
     this.elapsed = 0;
     this.finished = false;
     this.onRoad = false;
+    this.fallingFromRoad = false;
+    this.fallVelocity = 0;
     this.group.position.y = this.floorY;
     this.applyVisibility();
     this.onChange();
