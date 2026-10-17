@@ -614,6 +614,9 @@ export class LayerExperience {
     this.group.position.z = pivot.z + offset.z;
     this.group.rotation.y += angle;
   }
+  walkHeightAt(x, z, raised) {
+    return landscapeHeight(x, z, raised);
+  }
   walk(stickX, stickY, dt, camera) {
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const local = this.group.worldToLocal(eye.clone());
@@ -645,7 +648,7 @@ export class LayerExperience {
     const raised = this.selected.has("topography");
     const variant = raised ? this.variants.raised : this.variants.flat;
     const scaleY = variant.world.scale.y;
-    const ground = landscapeHeight(local.x, local.z, raised) * scaleY;
+    const ground = this.walkHeightAt(local.x, local.z, raised) * scaleY;
     const roadLocal = this.selected.has("roads") && variant.roads.scale.y > 0.95
       ? highwayWalkingHeight(local.x, local.z, raised)
       : null;

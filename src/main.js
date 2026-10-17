@@ -964,7 +964,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nHere a bare-earth digital elevation model (DEM) supplies ground heights.\nRidges can block sight. Move the tower or climb its ladder to test a higher viewpoint.",
+      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nTry a river valley and two winding canyons. Move the tower or climb to see past the terrain.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -980,7 +980,7 @@ function drawViewshedUI() {
   );
   if (v.finished) {
     label(
-      "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights.\nRaising the observer can reveal ground beyond a ridge.\nFor a site with trees or buildings, a surface model can add their heights to the analysis.",
+      "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights.\nCanyon walls can hide the opposite bank; raising the observer may reveal it.\nA surface model could also add trees and buildings to the analysis.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -990,28 +990,34 @@ function drawViewshedUI() {
   label("Left stick: move · right stick: turn 30°",
     0, 0.68, 2.3, 0.13, 28, "#b6d1d9", "#0b2430");
   {
+    const cameraNow = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+    ["valley", "redrock", "mesa"].forEach((id, i) => {
+      const names = ["River Valley", "Redrock Bend", "Mesa Gate"];
+      button(names[i], -0.77 + i * 0.77, 0.49,
+        () => v.setScene(id, cameraNow), 0.71, v.sceneChoice.id === id);
+    });
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
     v.renderMap(canvas.getContext("2d"));
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const map = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.17, 1.17),
+      new THREE.PlaneGeometry(1.03, 1.03),
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
     );
-    map.position.set(-0.52, 0.01, 0.06);
+    map.position.set(-0.53, -0.19, 0.06);
     map.userData.action = (hit) => { sound.click(); v.placeFromMap(hit); };
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
     v.registerVisitorMarker(map, LANDSCAPE_EXTENT, true);
-    label("Move the gold observer.\nCan it see the blue target?", 0.64, 0.48, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
-    button("Eye level · 2 m", 0.64, 0.18, () => v.setHeight(2), 1.04)
+    label("Tap map: move tower.\nCan it see the blue target?", 0.64, 0.25, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
+    button("Eye level · 2 m", 0.64, 0.04, () => v.setHeight(2), 1.04)
       .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
-    button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
+    button("Tower · 12 m", 0.64, -0.19, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
-    button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Gold tower · white ring: you · Grip rung, pull down; release both to drop", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
+    label("Gold tower · white ring: you · Grip rung, pull down; release both to drop", 0, -0.74, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,

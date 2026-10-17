@@ -9,6 +9,7 @@ import {
 } from "../src/viewshed/analysis.js";
 import { ViewshedExperience } from "../src/viewshed/experience.js";
 import { LANDSCAPE_EXTENT, landscapeHeight } from "../src/layers/experience.js";
+import { VIEWSHED_SCENES } from "../src/viewshed/scenes.js";
 
 test("a ridge blocks a low observer but a tower sees over it", () => {
   const ridge = (x) => (Math.abs(x - 4) < 0.7 ? 5 : 0);
@@ -145,5 +146,42 @@ test("reaching the tower top updates the viewshed and dropping restores eye leve
   for (let i = 0; i < 90 && demo.isClimbing; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);
   assert.equal(demo.observer.height, 2);
+  demo.dispose();
+});
+
+test("clipboard scene choices swap terrain, map target, walking height, and visibility analysis", () => {
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  const valleyPick = demo.pickGround;
+  const valleyCoverage = demo.visiblePercent;
+  for (const id of ["redrock", "mesa"]) {
+    demo.setScene(id, camera);
+    const spec = VIEWSHED_SCENES.find((scene) => scene.id === id);
+    assert.equal(demo.sceneChoice, spec);
+    assert.equal(demo.variants.raised.world.visible, false);
+    assert.notEqual(demo.pickGround, valleyPick);
+    assert.equal(demo.canyonWorlds.get(id).world.visible, true);
+    assert.ok(Math.abs(demo.marker.position.y - spec.heightAt(spec.start.x, spec.start.z)) < 1e-9);
+    assert.ok(Math.abs(demo.targetRing.position.y - spec.heightAt(spec.target.x, spec.target.z) - 0.2) < 1e-9);
+    assert.ok(Math.abs(demo.sampler.sample(25, 10) - spec.heightAt(25, 10)) < 0.03);
+    assert.ok(spec.water(100) < spec.water(-100), "the river runs downhill");
+    assert.ok(demo.visiblePercent < valleyCoverage, "the canyon has more visible occlusion");
+    assert.equal(demo.trace.visible, false, "the canyon blocks the blue target at eye level");
+    const low = demo.analysis.visible;
+    demo.setHeight(12);
+    assert.ok(demo.analysis.visible > low, "climbing reveals more terrain");
+    assert.equal(demo.trace.visible, true, "the tower clears the canyon obstruction");
+    demo.reset();
+    assert.equal(demo.sceneChoice, spec, "reset preserves the chosen scene");
+    assert.deepEqual(demo.observer, { ...spec.start, height: 2 });
+  }
+  demo.setScene("valley", camera);
+  assert.equal(demo.pickGround, valleyPick);
+  assert.equal(demo.variants.raised.world.visible, true);
+  assert.ok([...demo.canyonWorlds.values()].every((item) => !item.world.visible));
+  assert.ok(Math.abs(demo.sampler.sample(25, 10) - landscapeHeight(25, 10)) < 0.03);
   demo.dispose();
 });
