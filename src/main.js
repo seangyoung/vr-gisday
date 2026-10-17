@@ -33,6 +33,7 @@ import {
 import { renderLayerMap } from "./layers/map.js";
 import { LandscapeTeleport, teleportStickAction } from "./layers/teleport.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
+import { VIEWSHED_SCENES } from "./viewshed/scenes.js";
 import { PixelExperience } from "./pixels/experience.js";
 import { PIXEL_EXTENT } from "./pixels/model.js";
 import { SpectralExperience } from "./showcase/spectral-experience.js";
@@ -974,7 +975,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nTry a river valley and two winding canyons. Move the tower or climb to see past the terrain.",
+      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nCompare a river valley with a winding redrock canyon. Move the tower or climb to see past the terrain.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1002,10 +1003,9 @@ function drawViewshedUI() {
     0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430");
   {
     const cameraNow = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
-    ["valley", "redrock", "mesa"].forEach((id, i) => {
-      const names = ["River Valley", "Redrock Bend", "Mesa Gate"];
-      button(names[i], -0.77 + i * 0.77, 0.49,
-        () => v.setScene(id, cameraNow), 0.71, v.sceneChoice.id === id);
+    VIEWSHED_SCENES.forEach((scene, i) => {
+      button(scene.label, (i - (VIEWSHED_SCENES.length - 1) / 2) * 0.84, 0.49,
+        () => v.setScene(scene.id, cameraNow), 0.76, v.sceneChoice.id === scene.id);
     });
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;

@@ -44,12 +44,6 @@ export const VIEWSHED_SCENES = [
     width: 4.2, color: 0xa95d3a, sky: 0xe3bb96,
     mesas: [[-72, -70, 30, 11], [92, 48, 37, 9], [-110, 98, 46, 8]],
   }),
-  canyon({
-    id: "mesa", label: "Mesa Gate", target: { x: -108, z: -90 },
-    center: (z) => -70 + 35 * Math.sin(z * 0.016 + 1.45) + 11 * Math.sin(z * 0.043),
-    width: 5, color: 0xb98655, sky: 0xe6cba9,
-    mesas: [[-70, -35, 35, 19], [58, -96, 38, 16], [94, 76, 42, 13]],
-  }),
 ];
 
 function gridGeometry(spec, size, extent) {

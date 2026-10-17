@@ -150,6 +150,7 @@ test("reaching the tower top updates the viewshed and dropping restores eye leve
 });
 
 test("clipboard scene choices swap terrain, map target, walking height, and visibility analysis", () => {
+  assert.deepEqual(VIEWSHED_SCENES.map((scene) => scene.id), ["valley", "redrock"]);
   const demo = new ViewshedExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
@@ -157,7 +158,7 @@ test("clipboard scene choices swap terrain, map target, walking height, and visi
   demo.begin();
   const valleyPick = demo.pickGround;
   const valleyCoverage = demo.visiblePercent;
-  for (const id of ["redrock", "mesa"]) {
+  for (const id of ["redrock"]) {
     demo.setScene(id, camera);
     const spec = VIEWSHED_SCENES.find((scene) => scene.id === id);
     assert.equal(demo.sceneChoice, spec);
