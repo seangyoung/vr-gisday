@@ -1011,7 +1011,7 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Grip a ladder rung and pull down to climb · release both grips to drop", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Gold tower · white ring: you · Grip rung, pull down; release both to drop", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
