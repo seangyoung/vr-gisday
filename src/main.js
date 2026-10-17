@@ -1371,9 +1371,11 @@ function drawRainUI() {
     return;
   }
   if (r.kind === "erosion" && r.stage === 4 && r.replayTime >= 0) {
-    label("Replay · watch the bed change from its starting shape",
+    label(r.replayTime >= 4
+      ? "Final frame · grip to move or resize · grip + stick to turn"
+      : "Replay · watch the bed change from its starting shape",
       0, GUIDED_INFO_Y, 2.3, 0.13, 28, "#e6f4f5", "#0b2430");
-    button("Back to Takeaway", 0, GUIDED_ACTION_Y, () => r.endReplay(), 1.3);
+    button("Return to Takeaway", 0, GUIDED_ACTION_Y, () => r.endReplay(), 1.3);
     return;
   }
   const copy = [
@@ -2725,7 +2727,8 @@ renderer.setAnimationLoop((time, frame) => {
       let tabletopGrab = null;
       if (!soundMenuOpen) {
         if (scan && !scan.room && scan.stage === 1) tabletopGrab = scan.grab;
-        else if (rain && rain.stage > 0 && rain.stage < 4 && rain.group.visible)
+        else if (rain && rain.group.visible &&
+            (rain.stage > 0 && rain.stage < 4 || rain.stage === 4 && rain.replayTime >= 0))
           tabletopGrab = rain.grab;
         else if (["interpolation", "suitability"].includes(showcase?.kind) &&
             showcase.started && !showcase.finished && showcase.model.visible)

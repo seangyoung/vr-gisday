@@ -935,7 +935,10 @@ export class RainExperience {
     if (this.replayTime < 0) return;
     this.replayTime = -1;
     this.replayFrameIndex = -1;
-    if (this.stage === 4) this.group.visible = false;
+    if (this.stage === 4) {
+      this.grab.cancel();
+      this.group.visible = false;
+    }
     this.showReplayFrame(this.heights);
     if (this.waterSurface) this.waterSurface.update(this.heights, this.water);
     this.onChange();
@@ -997,14 +1000,18 @@ export class RainExperience {
           return;
         }
       }
-      this.replayTime += dt;
+      const wasPlaying = this.replayTime < 4;
+      this.replayTime = Math.min(4, this.replayTime + dt);
       const index = Math.min(this.replayFrames.length - 1,
         Math.floor((this.replayTime / 4) * this.replayFrames.length));
       if (index !== this.replayFrameIndex) {
         this.replayFrameIndex = index;
         this.showReplayFrame(this.replayFrames[index], this.replayVegetationFrames[index]);
       }
-      if (this.replayTime >= 4) this.endReplay();
+      if (this.replayTime >= 4) {
+        if (this.stage === 1) this.endReplay();
+        else if (wasPlaying) this.onChange();
+      }
       return;
     }
     if (this.kind === "erosion" && this.stage === 1) {

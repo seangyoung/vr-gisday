@@ -241,8 +241,11 @@ test("erosion tray updates rendered heights and reset restores the experiment wi
   r.dispose();
 });
 
-test("takeaway replay shows the saved erosion and returns to the takeaway", () => {
+test("takeaway replay holds its final frame until the visitor returns", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  r.place(camera);
   r.explore();
   const id = r.cellAt(0, 0);
   const original = r.heights[id];
@@ -258,13 +261,28 @@ test("takeaway replay shows the saved erosion and returns to the takeaway", () =
   assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - original) < 1e-6);
   r.update(4);
   assert.equal(r.stage, 4);
-  assert.equal(r.replayTime, -1);
-  assert.equal(r.group.visible, false, "the tray hides again when Replay ends");
+  assert.equal(r.replayTime, 4);
+  assert.equal(r.group.visible, true, "the tray stays visible on the last replay frame");
   assert.ok(Math.abs(r.terrain.geometry.attributes.position.getY(id) - (original - 0.08)) < 1e-6);
-  assert.equal(r.startReplay(), true);
+  r.update(10);
+  assert.equal(r.replayTime, 4, "the replay remains paused on its final frame");
   assert.equal(r.group.visible, true);
+  const left = new THREE.Matrix4().makeTranslation(-0.2, 1.4, -1);
+  const right = new THREE.Matrix4().makeTranslation(0.2, 1.4, -1);
+  r.grab.begin(0, left);
+  r.grab.begin(1, right);
+  const originalScale = r.group.scale.x;
+  r.grab.update(new Map([
+    [0, new THREE.Matrix4().makeTranslation(-0.35, 1.4, -1)],
+    [1, new THREE.Matrix4().makeTranslation(0.35, 1.4, -1)],
+  ]));
+  assert.ok(r.group.scale.x > originalScale, "the held model can still be resized");
+  r.grab.release(1);
+  assert.equal(r.grab.turnWithStick(0, 1, 0, camera), true);
   r.endReplay();
-  assert.equal(r.group.visible, false, "Back to Takeaway also hides the tray");
+  assert.equal(r.replayTime, -1);
+  assert.equal(r.group.visible, false, "Return to Takeaway hides the tray");
+  assert.equal(r.grab.hands.size, 0, "returning also releases any active grip");
   r.dispose();
 });
 
