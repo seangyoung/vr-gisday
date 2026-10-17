@@ -8,6 +8,11 @@ import { renderLayerMap } from "../layers/map.js";
 import { TerrainSampler, calculateViewshed, traceSightline } from "./analysis.js";
 
 const TARGET = { x: 50, z: -100 };
+const START_OBSERVER = { x: 0, z: -3.4 };
+const TOWER_HEIGHT = 12;
+const CLIMB_HEIGHT = TOWER_HEIGHT - 1.6;
+const RUNG_SPACING = 0.43;
+const RUNG_Z = -0.48;
 
 const visibleColor = new THREE.Color(0x55e5a9);
 const hiddenColor = new THREE.Color(0x9176bd);
@@ -56,6 +61,8 @@ function observationMarker() {
   const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 0.2, 16), dark);
   base.position.y = 0.1;
   const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.065, 1, 12), mastMaterial);
+  mast.scale.y = TOWER_HEIGHT;
+  mast.position.y = TOWER_HEIGHT / 2;
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 12), gold);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.74, 0.045, 8, 48),
@@ -63,9 +70,29 @@ function observationMarker() {
   );
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.08;
-  marker.add(base, mast, eye, ring);
+  const ladder = new THREE.Group();
+  const railMaterial = new THREE.MeshStandardMaterial({ color: 0x9fb9b8, metalness: 0.35, roughness: 0.55 });
+  const rungMaterial = new THREE.MeshStandardMaterial({ color: 0xe3bd77, metalness: 0.22, roughness: 0.52 });
+  const railGeometry = new THREE.CylinderGeometry(0.025, 0.025, TOWER_HEIGHT - 0.65, 8);
+  for (const x of [-0.32, 0.32]) {
+    const rail = new THREE.Mesh(railGeometry, railMaterial);
+    rail.position.set(x, TOWER_HEIGHT / 2 - 0.08, RUNG_Z);
+    ladder.add(rail);
+  }
+  const rungs = [];
+  const rungGeometry = new THREE.CylinderGeometry(0.035, 0.035, 0.67, 10);
+  for (let y = 0.55; y < TOWER_HEIGHT - 0.25; y += RUNG_SPACING) {
+    const rung = new THREE.Mesh(rungGeometry, rungMaterial);
+    rung.rotation.z = Math.PI / 2;
+    rung.position.set(0, y, RUNG_Z);
+    rung.userData.rungHeight = y;
+    ladder.add(rung);
+    rungs.push(rung);
+  }
+  marker.add(base, mast, eye, ring, ladder);
   marker.userData.mast = mast;
   marker.userData.eye = eye;
+  marker.userData.rungs = rungs;
   return marker;
 }
 
@@ -79,10 +106,16 @@ export class ViewshedExperience extends LayerExperience {
     this.applyVisibility();
     this.view = "map";
     this.sampler = new TerrainSampler(LANDSCAPE_EXTENT, 320);
-    this.observer = { x: 0, z: 0, height: 2 };
+    this.observer = { ...START_OBSERVER, height: 2 };
     this.visualHeight = 2;
+    this.climbHands = new Map();
+    this.climbHeight = 0;
+    this.climbGroundY = 0;
+    this.fallSpeed = 0;
+    this.climbedToTop = false;
     this.revealAge = 1;
     this.marker = observationMarker();
+    this.marker.visible = false;
     this.variants.raised.world.add(this.marker);
     this.targetRing = new THREE.Mesh(
       new THREE.TorusGeometry(2.3, 0.18, 8, 48),
@@ -129,9 +162,103 @@ export class ViewshedExperience extends LayerExperience {
     this.sightline.material.color.set(this.trace.visible ? visibleColor : hiddenColor);
   }
   setVisualHeight(height) {
-    this.marker.userData.mast.scale.y = height;
-    this.marker.userData.mast.position.y = height / 2;
     this.marker.userData.eye.position.y = height;
+  }
+  get isClimbing() {
+    return this.climbHands.size > 0 || this.climbHeight > 0;
+  }
+  begin() {
+    this.marker.visible = true;
+    super.begin();
+  }
+  place(camera) {
+    this.cancelClimb();
+    super.place(camera);
+    this.climbGroundY = this.group.position.y;
+  }
+  walk(stickX, stickY, dt, camera) {
+    if (this.isClimbing) return { distance: 0, wet: false };
+    const movement = super.walk(stickX, stickY, dt, camera);
+    this.climbGroundY = this.group.position.y;
+    return movement;
+  }
+  updateClipboard(leftGrip, camera, preview = false, fallback = false) {
+    if (this.isClimbing) {
+      this.clipboard.visible = false;
+      return;
+    }
+    super.updateClipboard(leftGrip, camera, preview, fallback);
+  }
+  nearestRung(handWorld) {
+    if (!handWorld?.isVector3) return null;
+    this.marker.updateWorldMatrix(true, false);
+    const local = this.marker.worldToLocal(handWorld.clone());
+    if (Math.abs(local.z - RUNG_Z) > 0.32 || Math.abs(local.x) > 0.48) return null;
+    let nearest = null;
+    for (const rung of this.marker.userData.rungs) {
+      const gap = Math.abs(local.y - rung.userData.rungHeight);
+      if (gap < 0.24 && (!nearest || gap < nearest.gap)) nearest = { rung, gap };
+    }
+    return nearest?.rung ?? null;
+  }
+  gripRung(id, handWorld) {
+    if (!this.started || this.finished || !this.nearestRung(handWorld)) return false;
+    const firstHand = !this.climbHands.size;
+    this.climbHands.set(id, handWorld.y);
+    this.fallSpeed = 0;
+    this.clipboard.visible = false;
+    if (firstHand) this.onChange();
+    return true;
+  }
+  releaseRung(id) {
+    this.climbHands.delete(id);
+    if (!this.climbHands.size && this.climbHeight > 0) this.fallSpeed = 0;
+  }
+  updateClimb(poses, dt) {
+    if (!this.started || this.finished) {
+      this.cancelClimb();
+      return;
+    }
+    const deltas = [];
+    for (const [id, lastY] of this.climbHands) {
+      const matrix = poses.get(id);
+      if (!matrix) {
+        this.climbHands.delete(id);
+        continue;
+      }
+      const y = new THREE.Vector3().setFromMatrixPosition(matrix).y;
+      deltas.push(THREE.MathUtils.clamp(lastY - y, -0.22, 0.22));
+      this.climbHands.set(id, y);
+    }
+    if (deltas.length) {
+      // The hand with the strongest pull drives the climb; the other may hold steady.
+      const pull = deltas.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
+      this.climbHeight = THREE.MathUtils.clamp(this.climbHeight + pull, 0, CLIMB_HEIGHT);
+      this.fallSpeed = 0;
+      if (this.climbHeight >= CLIMB_HEIGHT - 0.01 && !this.climbedToTop) {
+        this.climbedToTop = true;
+        this.setHeight(TOWER_HEIGHT);
+      }
+    } else if (this.climbHeight > 0) {
+      this.fallSpeed = Math.min(14, this.fallSpeed + 13 * dt);
+      this.climbHeight = Math.max(0, this.climbHeight - this.fallSpeed * dt);
+      if (this.climbHeight === 0) {
+        this.fallSpeed = 0;
+        if (this.climbedToTop) this.setHeight(2);
+        else this.onChange();
+        this.climbedToTop = false;
+      }
+    }
+    this.group.position.y = this.climbGroundY - this.climbHeight;
+  }
+  cancelClimb() {
+    const resetViewpoint = this.climbedToTop;
+    this.climbHands.clear();
+    this.climbHeight = 0;
+    this.fallSpeed = 0;
+    this.climbedToTop = false;
+    this.group.position.y = this.climbGroundY;
+    if (resetViewpoint && this.started && !this.finished) this.setHeight(2);
   }
   update(dt) {
     if (!this.started) return;
@@ -190,12 +317,17 @@ export class ViewshedExperience extends LayerExperience {
     return raycaster.intersectObject(this.pickGround, false)[0] ?? null;
   }
   reset() {
+    this.cancelClimb();
     this.elapsed = 0;
     this.finished = false;
-    this.observer = { x: 0, z: 0, height: 2 };
+    this.observer = { ...START_OBSERVER, height: 2 };
     this.visualHeight = 2;
     this.refresh();
     this.onChange();
+  }
+  finish() {
+    this.cancelClimb();
+    super.finish();
   }
   get visiblePercent() {
     return Math.round((100 * this.analysis.visible) / this.analysis.sampled);

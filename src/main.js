@@ -433,6 +433,7 @@ function toggleSoundMenu() {
   }
   stopRainInput();
   grab?.cancel();
+  viewshed?.cancelClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   const eye = cam.getWorldPosition(new THREE.Vector3());
   const forward = cam.getWorldDirection(new THREE.Vector3());
@@ -963,7 +964,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nHere a bare-earth digital elevation model (DEM) supplies ground heights.\nRidges can block sight. Can a taller viewpoint see the blue target?",
+      "A viewshed maps the ground visible from one observation point.\nHere a bare-earth digital elevation model (DEM) supplies ground heights.\nRidges can block sight. Move the tower or climb its ladder to test a higher viewpoint.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1010,7 +1011,7 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.64, -0.05, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.31, () => v.reset(), 1.04);
-    label("Gold: observer · white ring: you · tap map to move observer", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Grip a ladder rung and pull down to climb · release both grips to drop", 0, -0.68, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
@@ -1825,6 +1826,29 @@ function draw() {
         panel.append(b);
       }
     }
+    if (viewshed?.started && !viewshed.finished) {
+      const b = document.createElement("button");
+      b.textContent = viewshed.isClimbing ? "Preview ground" : "Preview tower top";
+      b.onclick = () => {
+        if (viewshed.isClimbing) viewshed.place(camera);
+        else {
+          const eye = camera.getWorldPosition(new THREE.Vector3());
+          const desired = camera.getWorldDirection(new THREE.Vector3());
+          desired.y = 0;
+          desired.normalize().multiplyScalar(0.55).add(eye);
+          const tower = viewshed.marker.getWorldPosition(new THREE.Vector3());
+          viewshed.group.position.x += desired.x - tower.x;
+          viewshed.group.position.z += desired.z - tower.z;
+          viewshed.climbGroundY = viewshed.group.position.y;
+          viewshed.climbHeight = 10.4;
+          viewshed.climbedToTop = true;
+          viewshed.group.position.y -= viewshed.climbHeight;
+          viewshed.setHeight(12);
+        }
+        draw();
+      };
+      panel.append(b);
+    }
     for (const mesh of buttons) {
       if (mesh.userData.debugHidden) continue;
       const b = document.createElement("button");
@@ -1857,6 +1881,8 @@ function controllerGuideContext(hand) {
   }
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
+  if (viewshed?.started && !viewshed.finished)
+    return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu, exitLabel];
   if (showcase) return [showcase.kind === "projection" ? "Drag globe" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
@@ -2163,6 +2189,7 @@ for (let i = 0; i < 2; i++) {
     if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
+    if (viewshed?.isClimbing) return;
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
         showcase?.grab?.hands.size)
       return;
@@ -2240,6 +2267,13 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezestart", () => {
     if (soundMenuOpen) return;
+    if (viewshed?.started && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      if (viewshed.gripRung(i, grip.getWorldPosition(new THREE.Vector3()))) {
+        sound.click();
+        return;
+      }
+    }
     if (scan && (scan.room || scan.stage === 1) && grip.visible) {
       if (scan.room && !scan.frozen) return;
       grip.updateWorldMatrix(true, false);
@@ -2294,6 +2328,7 @@ for (let i = 0; i < 2; i++) {
     }
   });
   c.addEventListener("squeezeend", () => {
+    viewshed?.releaseRung(i);
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -2301,6 +2336,7 @@ for (let i = 0; i < 2; i++) {
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
+    viewshed?.releaseRung(i);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
     guide.setHandedness("none");
@@ -2390,6 +2426,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
       if (session.visibilityState !== "visible") {
         grab?.cancel();
         stopRainInput();
+        viewshed?.cancelClimb();
       }
     });
     if (roomScan) startRoomScan();
@@ -2515,7 +2552,8 @@ renderer.setAnimationLoop((time, frame) => {
         : null;
       const gamepad = right?.c.userData.xrInput?.gamepad;
       const axis = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
-      if (Math.abs(axis) < 0.3) rightTurnReady = true;
+      if (viewshed?.isClimbing) rightTurnReady = false;
+      else if (Math.abs(axis) < 0.3) rightTurnReady = true;
       else if (rightTurnReady && Math.abs(axis) > 0.7) {
         landscapeDemo.turn(Math.sign(axis) * Math.PI / 6, renderer.xr.getCamera());
         rightTurnReady = false;
@@ -2591,6 +2629,7 @@ renderer.setAnimationLoop((time, frame) => {
         poses.set(id, grip.matrixWorld);
       }
     if (renderer.xr.getSession().visibilityState === "visible") {
+      viewshed?.updateClimb(poses, dt);
       grab?.update(poses);
       rain?.grab.update(poses);
       scan?.grab.update(poses);
@@ -2629,7 +2668,8 @@ renderer.setAnimationLoop((time, frame) => {
           showcase?.grabHit?.(raycaster));
       const interpolationTarget = hit || soundMenuOpen ||
         showcase?.kind !== "interpolation" ? null : showcase.targetHit(raycaster);
-      const ground = hit || soundMenuOpen ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
+      const ground = hit || soundMenuOpen || viewshed?.isClimbing
+        ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       const exhibitPanel = hit || soundMenuOpen ? null :
         exhibitPanelHit(raycaster, showcase);
       const pointerAvailable =
@@ -2639,7 +2679,7 @@ renderer.setAnimationLoop((time, frame) => {
         !showcase?.grab?.hands.has(id) &&
         showcase?.draggingBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
-      beam.visible = pointerAvailable && !activeTarget;
+      beam.visible = pointerAvailable && !activeTarget && !viewshed?.isClimbing;
       targetBeam.visible = activeTarget;
       if (activeTarget) targetBeam.scale.z = interpolationTarget.distance;
       if (showcase?.kind === "interpolation")
