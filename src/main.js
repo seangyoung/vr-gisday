@@ -436,7 +436,7 @@ function toggleSoundMenu() {
   }
   stopRainInput();
   grab?.cancel();
-  viewshed?.cancelClimb();
+  if (viewshed?.isClimbing) viewshed.cancelClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   const eye = cam.getWorldPosition(new THREE.Vector3());
   const forward = cam.getWorldDirection(new THREE.Vector3());
@@ -975,7 +975,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nCompare a river valley with a winding redrock canyon. Move the tower or climb to see past the terrain.",
+      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nCompare a river valley with a winding redrock canyon. Select Tower to extend the pole, then climb its side steps for the lookout view.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1028,7 +1028,7 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.64, -0.19, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
-    label("Tap map to move tower · White ring: you · Grip rung, pull down; release both to drop", 0, -0.74, 2.3, 0.12, 27, "#b6d1d9", "#0b2430");
+    label("Tower mode: grip steps to climb · Top: rest · Re-grip to descend/drop", 0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
@@ -1846,9 +1846,9 @@ function draw() {
     }
     if (viewshed?.started && !viewshed.finished) {
       const b = document.createElement("button");
-      b.textContent = viewshed.isClimbing ? "Preview ground" : "Preview tower top";
+      b.textContent = viewshed.isClimbing || viewshed.isAtTop ? "Preview ground" : "Preview tower top";
       b.onclick = () => {
-        if (viewshed.isClimbing) viewshed.place(camera);
+        if (viewshed.isClimbing || viewshed.isAtTop) viewshed.place(camera);
         else {
           const eye = camera.getWorldPosition(new THREE.Vector3());
           const desired = camera.getWorldDirection(new THREE.Vector3());
@@ -1857,11 +1857,14 @@ function draw() {
           const tower = viewshed.marker.getWorldPosition(new THREE.Vector3());
           viewshed.group.position.x += desired.x - tower.x;
           viewshed.group.position.z += desired.z - tower.z;
+          viewshed.walk(0, 0, 0, camera);
+          viewshed.setHeight(12);
+          viewshed.visualHeight = 12;
+          viewshed.setVisualHeight(12);
           viewshed.climbGroundY = viewshed.group.position.y;
           viewshed.climbHeight = 10.4;
-          viewshed.climbedToTop = true;
+          viewshed.topLocked = true;
           viewshed.group.position.y -= viewshed.climbHeight;
-          viewshed.setHeight(12);
         }
         draw();
       };
@@ -2603,7 +2606,7 @@ renderer.setAnimationLoop((time, frame) => {
       const rightX = gamepad?.mapping === "xr-standard" ? gamepad.axes[2] ?? 0 : 0;
       const rightY = gamepad?.mapping === "xr-standard" ? gamepad.axes[3] ?? 0 : 0;
       const canTeleport = visible && !soundMenuOpen && landscapeDemo.started &&
-        !landscapeDemo.finished && !viewshed?.isClimbing &&
+        !landscapeDemo.finished && !viewshed?.isClimbing && !viewshed?.isAtTop &&
         right?.c.visible && right?.grip.visible && gamepad?.mapping === "xr-standard";
       if (teleport.active && (!canTeleport || teleport.demo !== landscapeDemo)) {
         teleport.cancel();

@@ -94,9 +94,22 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   camera.position.set(0, 1.6, 0);
   demo.place(camera);
   const rung = demo.marker.userData.rungs.find((r) => r.position.y > 1.2);
-  const hand = demo.marker.localToWorld(rung.position.clone());
+  const hand = rung.getWorldPosition(new THREE.Vector3());
   assert.equal(demo.gripRung(0, hand), false, "the introduction does not accept climbs");
   demo.begin();
+  assert.equal(demo.marker.userData.steps.visible, false, "eye level keeps a short pole without steps");
+  assert.equal(demo.gripRung(0, hand), false, "steps require selecting tower height");
+  demo.setHeight(12);
+  demo.update(1);
+  assert.equal(demo.marker.userData.steps.visible, true);
+  assert.ok(demo.marker.userData.mast.scale.y > 11.9);
+  demo.visitor.set(demo.observer.x, demo.observer.z);
+  demo.setVisualHeight(12);
+  assert.equal(demo.marker.userData.eye.visible, false, "the nearby gold marker leaves the climb view clear");
+  assert.ok(rung.position.x !== 0 &&
+    Math.sign(rung.position.x) !== Math.sign(demo.marker.userData.rungs[1].position.x),
+  "side-mounted steps alternate around the pole");
+  rung.getWorldPosition(hand);
   assert.equal(demo.gripRung(0, hand.clone().add(new THREE.Vector3(2, 0, 0))), false);
   assert.equal(demo.gripRung(0, hand), true);
   assert.equal(demo.isClimbing, true);
@@ -111,7 +124,7 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   assert.ok(demo.climbHeight > 0.19);
   assert.ok(demo.group.position.y < startPosition.y - 0.19);
   const nextRung = demo.marker.userData.rungs.find((r) => r.position.y > 1.7);
-  const otherHand = demo.marker.localToWorld(nextRung.position.clone());
+  const otherHand = nextRung.getWorldPosition(new THREE.Vector3());
   assert.equal(demo.gripRung(1, otherHand), true);
   demo.releaseRung(0);
   demo.updateClimb(new Map([[1, new THREE.Matrix4().setPosition(
@@ -126,14 +139,16 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   demo.dispose();
 });
 
-test("reaching the tower top updates the viewshed and dropping restores eye level", () => {
+test("the tower top locks, restores the clipboard, and allows regripping to descend or drop", () => {
   const demo = new ViewshedExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   demo.place(camera);
   demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
   const rung = demo.marker.userData.rungs.find((r) => r.position.y > 1.2);
-  const hand = demo.marker.localToWorld(rung.position.clone());
+  const hand = rung.getWorldPosition(new THREE.Vector3());
   assert.equal(demo.gripRung(1, hand), true);
   const lowCoverage = demo.analysis.visible;
   for (let i = 1; i <= 60; i++) {
@@ -141,11 +156,35 @@ test("reaching the tower top updates the viewshed and dropping restores eye leve
     demo.updateClimb(new Map([[1, new THREE.Matrix4().setPosition(next)]]), 0.016);
   }
   assert.equal(demo.observer.height, 12);
+  assert.equal(demo.isAtTop, true);
+  assert.equal(demo.isClimbing, false);
+  demo.update(0.016);
+  assert.equal(demo.marker.userData.eye.visible, false, "the gold marker clears the lookout view");
+  assert.equal(demo.walk(0, -1, 0.5, camera).distance, 0, "the top perch prevents walking off");
   assert.ok(demo.analysis.visible >= lowCoverage);
   demo.releaseRung(1);
+  for (let i = 0; i < 90; i++) demo.updateClimb(new Map(), 0.05);
+  assert.equal(demo.climbHeight, 10.4, "letting go at the top keeps the visitor perched");
+  demo.updateClipboard(null, camera, true);
+  assert.equal(demo.clipboard.visible, true, "the clipboard returns at the top");
+  const topRung = demo.marker.userData.rungs.at(-1);
+  const topHand = topRung.getWorldPosition(new THREE.Vector3());
+  assert.equal(demo.gripRung(0, topHand), true, "gripping a step resumes climbing");
+  assert.equal(demo.isAtTop, false);
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
+    topHand.clone().add(new THREE.Vector3(0, 0.2, 0)),
+  )]]), 0.016);
+  assert.ok(demo.climbHeight < 10.3, "lifting the hand lowers the visitor");
+  demo.releaseRung(0);
   for (let i = 0; i < 90 && demo.isClimbing; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);
-  assert.equal(demo.observer.height, 2);
+  assert.equal(demo.observer.height, 12, "the chosen tower remains tall after a drop");
+  demo.update(0.016);
+  assert.equal(demo.marker.userData.eye.visible, true);
+  demo.setHeight(2);
+  demo.update(1);
+  assert.equal(demo.marker.userData.steps.visible, false);
+  assert.ok(demo.marker.userData.mast.scale.y < 2.1);
   demo.dispose();
 });
 
