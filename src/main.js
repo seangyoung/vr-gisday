@@ -1117,7 +1117,7 @@ function drawShowcaseUI() {
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nSelect Tissot circles or grip a continent to reveal distortion.",
+        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTry Tissot circles, or grip Australia and move it north or south to see its map shape change.",
         "Flatten the globe"],
       change: ["What Changed?",
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
@@ -1175,7 +1175,7 @@ function drawShowcaseUI() {
       label("Colors show raw death counts. Broad wards cover more blocks;\npopulation data would support mortality-rate comparisons.",
         0, -0.43, 2.4, 0.18, 26, "#b6d1d9", "#0b2430");
     if (exhibit.kind === "projection")
-      label("The continent reference keeps area; shape is most faithful near its center.\nChoose a projection that supports what your map needs to compare.",
+      label("Moving a landmass on the globe keeps its ground area. Its map footprint may grow or change shape.\nChoose a projection that supports what your map needs to compare.",
         0, -0.43, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
     if (exhibit.kind === "interpolation")
       label("These rainfall readings are synthetic. Fewer gauges mean more uncertainty between them.",
@@ -1313,7 +1313,7 @@ function drawShowcaseUI() {
         ? "Flatten the map to compare your selected continent."
         : "Wrapped globe · choose Flatten to compare projections."
       : exhibit.selectedContinent
-      ? `${exhibit.selectedContinent.name} · grip outline to move; click away to clear.`
+      ? `${exhibit.selectedContinent.name} · grip gold outline and move north/south; click away to clear.`
       : exhibit.selectedCircle
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
@@ -1337,7 +1337,7 @@ function drawShowcaseUI() {
       button(exhibit.standardParallel === 0 ? "Use 30°" : "Use 0°", 0.78, -0.79,
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
     label(exhibit.selectedContinent
-      ? "Equal-area reference preserves area; its local center limits shape distortion."
+      ? "Cyan: home position · gold: same landmass moved on the globe."
       : `Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
       0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);

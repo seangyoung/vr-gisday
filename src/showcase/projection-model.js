@@ -33,23 +33,6 @@ const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
 const mercatorLimit = mercatorY(85 * deg);
 
-// Lambert azimuthal equal-area on the unit sphere, centered near the selected
-// landmass. Keeping the map's uniform scene scale makes its area comparable.
-export function equalAreaReferencePoint(longitudeDegrees, latitudeDegrees,
-  centerLongitudeDegrees, centerLatitudeDegrees) {
-  const phi = latitudeDegrees * deg;
-  const phi0 = centerLatitudeDegrees * deg;
-  const delta = (longitudeDegrees - centerLongitudeDegrees) * deg;
-  const cosine = Math.sin(phi0) * Math.sin(phi) +
-    Math.cos(phi0) * Math.cos(phi) * Math.cos(delta);
-  const k = Math.sqrt(2 / Math.max(1e-9, 1 + cosine));
-  return {
-    x: k * Math.cos(phi) * Math.sin(delta),
-    y: k * (Math.cos(phi0) * Math.sin(phi) -
-      Math.sin(phi0) * Math.cos(phi) * Math.cos(delta)),
-  };
-}
-
 // The display mesh must use one scale on both axes. Stretching every
 // projection into the same rectangle would add false shape distortion.
 export function projectMetric(longitudeDegrees, latitudeDegrees,
@@ -125,33 +108,19 @@ export function relativeAreaScale(projection, latitudeDegrees) {
 }
 
 export function continentDistortionSummary(continent, projection,
-  standardParallel = 0) {
-  const latitude = continent.center[1];
-  const place = Math.abs(latitude) >= 80 ? "polar region" :
-    `near ${Math.round(Math.abs(latitude))}°${latitude < 0 ? "S" : "N"}`;
+  latitude = continent.center[1], footprintRatio = 1, atLimit = false) {
+  const place = `${Math.round(Math.abs(latitude))}°${latitude < 0 ? "S" : "N"}`;
   const title = `${continent.name.toUpperCase()} · ${place}`;
-  if (Math.abs(latitude) >= 80) return {
-    title,
-    detail: projection === "mercator"
-      ? "Mercator stops at 85°; the pole is off-map."
-      : projection === "equalArea"
-      ? "Area kept; polar shape stretches at the edge."
-      : "Polar area and east–west shape stretch sharply.",
-  };
-  const area = relativeAreaScale(projection, latitude).toFixed(1);
-  const axes = indicatrixAxes(projection, latitude, standardParallel);
-  if (projection === "mercator") return {
-    title, detail: `Area ~${area}× · local shape kept`,
-  };
-  if (projection === "equalArea") {
-    const ratio = (Math.max(axes.horizontal, axes.vertical) /
-      Math.min(axes.horizontal, axes.vertical)).toFixed(1);
-    const direction = axes.horizontal > axes.vertical ? "wider" : "taller";
-    return { title,
-      detail: `Area kept · shape ~${ratio}× ${direction}` };
-  }
+  if (Math.abs(latitude - continent.center[1]) < 2)
+    return { title, detail: "Grip and move north or south" };
+  if (projection === "equalArea")
+    return { title, detail: atLimit
+      ? "Map area equal · polar limit reached"
+      : "Map area stays equal · shape shifts" };
   return { title,
-    detail: `Area ~${area}× · east–west ~${axes.horizontal.toFixed(1)}×` };
+    detail: atLimit
+      ? `Footprint ~${footprintRatio.toFixed(1)}× · polar limit reached`
+      : `Map footprint ~${footprintRatio.toFixed(1)}× its home view` };
 }
 
 export class GlobeSpin {

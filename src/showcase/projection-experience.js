@@ -1,10 +1,14 @@
 import * as THREE from "three";
 import land from "./data/ne_110m_land.json" with { type: "json" };
 import { continentAt } from "./continent-model.js";
+import {
+  clampContinentLatitude, projectedContinentRings,
+  projectedFootprintArea,
+} from "./continent-shift.js";
 import { TimedExhibit } from "./exhibit.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, TISSOT_LATITUDES,
-  continentDistortionSummary, equalAreaReferencePoint,
+  continentDistortionSummary,
   nearestTissotCircle, projectMetric,
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "./projection-model.js";
@@ -131,6 +135,33 @@ function textureFor(canvas) {
   return texture;
 }
 
+function paintLandmassShape(mesh, canvas, rings, color, fill) {
+  const extent = Math.max(0.12, ...rings.flat().flatMap(([x, y]) =>
+    [Math.abs(x), Math.abs(y)]));
+  const width = extent * 2 + 0.08;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (const ring of rings) {
+    if (ring.length < 3) continue;
+    ctx.beginPath();
+    ring.forEach(([x, y], i) => {
+      const px = canvas.width * (0.5 + x / width);
+      const py = canvas.height * (0.5 - y / width);
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+  mesh.geometry.dispose();
+  mesh.geometry = new THREE.PlaneGeometry(width, width);
+  mesh.material.map.needsUpdate = true;
+}
+
 export function orientGlobe(globe, spin) {
   // Apply pitch in viewer space after yaw. With local-axis pitch (YXZ),
   // vertical drag reverses when the globe's far side rotates toward us.
@@ -148,11 +179,18 @@ export class ProjectionExperience extends TimedExhibit {
     this.tissot = false;
     this.selectedCircle = null;
     this.selectedContinent = null;
+    this.continentTarget = null;
+    this.continentFootprintRatio = 1;
+    this.continentAtLimit = false;
+    this.continentHomeKey = null;
+    this.continentRenderedLatitude = null;
+    this.continentHomeArea = 1;
     this.continentGripBy = null;
     this.continentGrip = null;
     this.draggingBy = null;
     this.interaction = null;
     this.spin = new GlobeSpin();
+    this.spin.yaw = -2.35;
     this.visualAge = 0;
     this.transitionAge = 1;
     this.baseCanvas = earthCanvas();
@@ -179,6 +217,15 @@ export class ProjectionExperience extends TimedExhibit {
     this.continentOverlay.visible = false;
     this.continentOverlay.renderOrder = 3;
     this.group.add(this.continentOverlay);
+    this.continentHomeCanvas = document.createElement("canvas");
+    this.continentHomeCanvas.width = this.continentHomeCanvas.height = 1024;
+    this.continentHome = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: textureFor(this.continentHomeCanvas),
+        transparent: true, depthTest: false, depthWrite: false,
+        side: THREE.DoubleSide }));
+    this.continentHome.visible = false;
+    this.continentHome.renderOrder = 2;
+    this.group.add(this.continentHome);
     this.continentMarker = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 8),
       new THREE.MeshBasicMaterial({ color: 0xffd17b, depthTest: false }));
     this.continentMarker.visible = false;
@@ -189,7 +236,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.continentTooltip = new THREE.Mesh(new THREE.PlaneGeometry(1.18, 0.2),
       new THREE.MeshBasicMaterial({ map: textureFor(this.continentTooltipCanvas),
         side: THREE.DoubleSide, depthTest: false, depthWrite: false }));
-    this.continentTooltip.position.set(1.28, 0.87, 0.19);
+    this.continentTooltip.position.set(0.15, 1.23, 0.19);
     this.continentTooltip.renderOrder = 6;
     this.continentTooltip.visible = false;
     this.group.add(this.continentTooltip);
@@ -238,7 +285,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   setTissot(enabled) {
     if (!this.started || this.finished) return;
-    if (enabled) this.clearContinentSelection();
+    if (enabled && this.selectedContinent) this.clearContinentSelection();
     this.tissot = enabled;
     if (!enabled) this.selectedCircle = null;
     this.paintTexture();
@@ -247,9 +294,15 @@ export class ProjectionExperience extends TimedExhibit {
   }
   clearContinentSelection() {
     this.selectedContinent = null;
+    this.continentTarget = null;
+    this.continentFootprintRatio = 1;
+    this.continentAtLimit = false;
+    this.continentHomeKey = null;
+    this.continentRenderedLatitude = null;
     this.continentGripBy = null;
     this.continentGrip = null;
     this.continentOverlay.visible = false;
+    this.continentHome.visible = false;
     this.continentMarker.visible = false;
     this.continentTooltip.visible = false;
     this.spin.end();
@@ -259,45 +312,41 @@ export class ProjectionExperience extends TimedExhibit {
   }
   paintContinentOverlay() {
     const continent = this.selectedContinent;
-    if (!continent) return;
+    if (!continent || !this.continentTarget) return;
     const scale = projectionFitScale(this.projection, this.standardParallel);
-    const rings = continent.rings.map((ring) => ring.map(([lon, lat]) => {
-      const point = equalAreaReferencePoint(lon, lat,
-        ...continent.center);
-      return [point.x * scale, point.y * scale];
-    }));
-    const extent = Math.max(0.15, ...rings.flat().flatMap(([x, y]) =>
-      [Math.abs(x), Math.abs(y)]));
-    const width = extent * 2 + 0.08;
-    const canvas = this.continentCanvas;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const ring of rings) {
-      if (ring.length < 3) continue;
-      ctx.beginPath();
-      ring.forEach(([x, y], i) => {
-        const px = canvas.width * (0.5 + x / width);
-        const py = canvas.height * (0.5 - y / width);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
-      ctx.closePath();
-      ctx.fillStyle = "#ffd17b66";
-      ctx.fill();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = "#fff3d2";
-      ctx.stroke();
+    const homeKey = `${continent.name}:${this.projection}:${this.standardParallel}`;
+    if (this.continentHomeKey !== homeKey) {
+      const home = projectedContinentRings(continent, continent.center,
+        this.projection, this.standardParallel);
+      this.continentHomeArea = projectedFootprintArea(home);
+      paintLandmassShape(this.continentHome, this.continentHomeCanvas,
+        home.map((ring) => ring.map(([x, y]) => [x * scale, y * scale])),
+        "#80ecf5", "#80ecf51a");
+      this.continentHomeKey = homeKey;
+      this.continentRenderedLatitude = null;
     }
-    this.continentOverlay.geometry.dispose();
-    this.continentOverlay.geometry = new THREE.PlaneGeometry(width, width);
-    this.continentOverlay.material.map.needsUpdate = true;
+    if (this.continentRenderedLatitude !== this.continentTarget[1]) {
+      const moved = projectedContinentRings(continent, this.continentTarget,
+        this.projection, this.standardParallel);
+      this.continentFootprintRatio = this.continentHomeArea > 0
+        ? projectedFootprintArea(moved) / this.continentHomeArea : 1;
+      paintLandmassShape(this.continentOverlay, this.continentCanvas,
+        moved.map((ring) => ring.map(([x, y]) => [x * scale, y * scale])),
+        "#fff3d2", "#ffd17b66");
+      this.continentRenderedLatitude = this.continentTarget[1];
+    }
+    this.continentHome.position.copy(this.projectedContinentCenter(
+      continent.center)).setZ(0.08);
+    this.continentOverlay.position.copy(this.projectedContinentCenter(
+      this.continentTarget)).setZ(this.continentGripBy === null ? 0.1 : 0.56);
     this.paintContinentTooltip();
     this.updateContinentOverlayVisibility();
   }
   paintContinentTooltip() {
     if (!this.selectedContinent) return;
     const { title, detail } = continentDistortionSummary(
-      this.selectedContinent, this.projection, this.standardParallel);
+      this.selectedContinent, this.projection, this.continentTarget[1],
+      this.continentFootprintRatio, this.continentAtLimit);
     const ctx = this.continentTooltipCanvas.getContext("2d");
     ctx.fillStyle = "#0b2430";
     ctx.fillRect(0, 0, 1100, 210);
@@ -318,7 +367,8 @@ export class ProjectionExperience extends TimedExhibit {
     const visible = !!(this.selectedContinent && this.flat &&
       this.transitionAge >= 1);
     this.continentOverlay.visible = visible;
-    this.continentTooltip.visible = visible && this.continentGripBy === null;
+    this.continentHome.visible = visible;
+    this.continentTooltip.visible = visible;
   }
   continentGripHit(raycaster) {
     if (!this.started || this.finished || this.continentGripBy !== null)
@@ -337,16 +387,19 @@ export class ProjectionExperience extends TimedExhibit {
     if (!hit?.uv) return null;
     const continent = continentAt(hit.uv.x * 360 - 180,
       hit.uv.y * 180 - 90);
-    return continent ? { ...hit, kind: "globe", continent } : null;
+    return continent && continent.name !== "Antarctica"
+      ? { ...hit, kind: "globe", continent } : null;
   }
   beginContinentGrip(raycaster, source) {
     if (this.draggingBy !== null || this.continentGripBy !== null) return false;
     const hit = this.continentGripHit(raycaster);
     if (!hit) return false;
-    const rayPoint = this.rayPoint(raycaster, 0.56);
-    if (!rayPoint) return false;
     if (hit.kind === "globe") {
       this.selectedContinent = hit.continent;
+      this.continentTarget = [...hit.continent.center];
+      this.continentAtLimit = false;
+      this.continentHomeKey = null;
+      this.continentRenderedLatitude = null;
       this.spin.end();
       this.spin.yawVelocity = this.spin.pitchVelocity = 0;
       const longitude = (hit.uv.x * 360 - 180) * Math.PI / 180;
@@ -356,49 +409,77 @@ export class ProjectionExperience extends TimedExhibit {
         0.51 * Math.sin(latitude),
         0.51 * Math.cos(latitude) * Math.cos(longitude));
       this.continentMarker.visible = true;
-      if (this.selectedCircle) {
+      if (this.tissot || this.selectedCircle) {
+        this.tissot = false;
         this.selectedCircle = null;
         this.paintTexture();
         this.updateTooltip();
       }
       this.paintContinentOverlay();
-      this.continentOverlay.position.copy(rayPoint);
-    } else this.continentOverlay.position.z = 0.56;
+    }
+    const mapPoint = this.mapCoordinatesFromRay(raycaster);
     this.continentGripBy = source;
-    this.continentGrip = { kind: hit.kind, startRayPoint: rayPoint,
-      startPosition: this.continentOverlay.position.clone(), moved: false };
+    this.continentGrip = {
+      kind: hit.kind,
+      offsetLongitude: hit.kind === "overlay" && mapPoint
+        ? ((this.continentTarget[0] - mapPoint[0] + 540) % 360) - 180 : 0,
+      offsetLatitude: hit.kind === "overlay" && mapPoint
+        ? this.continentTarget[1] - mapPoint[1] : 0,
+    };
+    this.continentOverlay.position.z = 0.56;
     this.updateContinentOverlayVisibility();
     this.onChange();
     return true;
   }
   dragContinentGrip(raycaster, source) {
     if (this.continentGripBy !== source || !this.continentGrip) return;
-    const point = this.rayPoint(raycaster, 0.56);
-    if (!point) return;
-    const gesture = this.continentGrip;
-    if (point.distanceTo(gesture.startRayPoint) > 0.025) gesture.moved = true;
-    this.continentOverlay.position.copy(gesture.startPosition).add(
-      point.sub(gesture.startRayPoint));
+    const coordinate = this.mapCoordinatesFromRay(raycaster);
+    if (!coordinate) {
+      if (this.continentGrip.kind === "globe") {
+        const point = this.rayPoint(raycaster, 0.56);
+        if (point) this.continentOverlay.position.copy(point);
+      }
+      return;
+    }
+    const longitude = ((coordinate[0] + this.continentGrip.offsetLongitude
+      + 540) % 360) - 180;
+    const requestedLatitude = coordinate[1] + this.continentGrip.offsetLatitude;
+    const latitude = clampContinentLatitude(this.selectedContinent,
+      requestedLatitude, this.projection);
+    const atLimit = Math.abs(latitude - requestedLatitude) > 0.3;
+    if (Math.abs(latitude - this.continentTarget[1]) < 0.75 &&
+        Math.abs(longitude - this.continentTarget[0]) < 0.5 &&
+        atLimit === this.continentAtLimit) return;
+    this.continentTarget = [longitude, latitude];
+    this.continentAtLimit = atLimit;
+    this.paintContinentOverlay();
+    this.continentOverlay.position.z = 0.56;
+    this.onChange();
   }
   endContinentGrip(source) {
     if (this.continentGripBy !== source || !this.continentGrip) return;
-    const gesture = this.continentGrip;
     this.continentGripBy = null;
     this.continentGrip = null;
-    if (gesture.kind === "globe" && !gesture.moved)
-      this.continentOverlay.position.copy(this.projectedContinentCenter());
-    else this.continentOverlay.position.z = 0.09;
+    this.continentOverlay.position.copy(this.projectedContinentCenter(
+      this.continentTarget)).setZ(0.1);
     this.updateContinentOverlayVisibility();
     this.onChange();
   }
-  projectedContinentCenter() {
-    const [longitude, latitude] = this.selectedContinent.center;
+  projectedContinentCenter(center) {
+    const [longitude, latitude] = center;
     const relativeLongitude = ((longitude - this.centralMeridian + 540) % 360) - 180;
     const point = projectMetric(relativeLongitude, latitude,
       this.projection, this.standardParallel);
     const scale = projectionFitScale(this.projection, this.standardParallel);
     return new THREE.Vector3(this.map.position.x + point.x * scale,
       this.map.position.y + point.y * scale, 0.09);
+  }
+  mapCoordinatesFromRay(raycaster) {
+    if (!this.flat || this.transitionAge < 1) return null;
+    const hit = raycaster.intersectObject(this.map, false)[0];
+    if (!hit?.uv) return null;
+    return [((hit.uv.x * 360 - 180 + this.centralMeridian + 540) % 360) - 180,
+      hit.uv.y * 180 - 90];
   }
   rayPoint(raycaster, z = 0.09) {
     this.group.updateWorldMatrix(true, false);
@@ -626,7 +707,12 @@ export class ProjectionExperience extends TimedExhibit {
   setProjection(projection) {
     if (!this.started || this.finished || !PROJECTIONS[projection]) return;
     this.projection = projection;
-    if (this.selectedContinent) this.paintContinentOverlay();
+    if (this.selectedContinent) {
+      this.continentTarget[1] = clampContinentLatitude(this.selectedContinent,
+        this.continentTarget[1], projection);
+      this.continentAtLimit = false;
+      this.paintContinentOverlay();
+    }
     this.transitionTo(true);
   }
   setStandardParallel(parallel) {
@@ -641,6 +727,12 @@ export class ProjectionExperience extends TimedExhibit {
     this.centralMeridian = ((this.centralMeridian + delta + 540) % 360) - 180;
     this.map.material.map.offset.x = this.centralMeridian / 360;
     this.positionTooltip();
+    if (this.selectedContinent) {
+      this.continentHome.position.copy(this.projectedContinentCenter(
+        this.selectedContinent.center)).setZ(0.08);
+      this.continentOverlay.position.copy(this.projectedContinentCenter(
+        this.continentTarget)).setZ(this.continentGripBy === null ? 0.1 : 0.56);
+    }
     if (redraw) this.onChange();
   }
   update(dt) {

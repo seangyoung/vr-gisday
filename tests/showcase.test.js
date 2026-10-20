@@ -10,10 +10,14 @@ import {
 } from "../src/showcase/cluster-model.js";
 import {
   GlobeSpin, TISSOT_LONGITUDES, continentDistortionSummary,
-  equalAreaReferencePoint, nearestTissotCircle,
+  nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "../src/showcase/projection-model.js";
+import {
+  clampContinentLatitude, projectedContinentRings,
+  projectedFootprintArea, shiftContinentPoint,
+} from "../src/showcase/continent-shift.js";
 import { orientGlobe } from "../src/showcase/projection-experience.js";
 import { CONTINENTS, continentAt } from "../src/showcase/continent-model.js";
 import { exhibitPanelHit } from "../src/showcase/pointer-targets.js";
@@ -173,41 +177,52 @@ test("land picks identify generalized continents and leave open ocean unselected
   assert.equal(CONTINENTS.length, 6);
 });
 
-test("continent-centered reference keeps the same ground area across latitudes", () => {
-  const radians = Math.PI / 180;
-  for (const latitude of [0, 30, 60]) {
-    const delta = 0.5;
-    const corners = [[10 - delta, latitude - delta],
-      [10 + delta, latitude - delta], [10 + delta, latitude + delta],
-      [10 - delta, latitude + delta]].map(([lon, lat]) =>
-      equalAreaReferencePoint(lon, lat, 20, 20));
-    const mappedArea = Math.abs(corners.reduce((sum, point, i) =>
-      sum + point.x * corners[(i + 1) % 4].y -
-      corners[(i + 1) % 4].x * point.y, 0) / 2);
-    const groundArea = 2 * delta * radians *
-      (Math.sin((latitude + delta) * radians) -
-        Math.sin((latitude - delta) * radians));
-    assert.ok(Math.abs(mappedArea / groundArea - 1) < 0.001);
-  }
-  for (const continent of CONTINENTS) {
-    const origin = equalAreaReferencePoint(...continent.center,
-      ...continent.center);
-    assert.ok(Math.abs(origin.x) < 1e-8 && Math.abs(origin.y) < 1e-8);
-  }
+test("shifting a continent rotates it on the sphere without changing ground distances", () => {
+  const australia = CONTINENTS.find((c) => c.name === "Australia");
+  const target = [15, 60];
+  const source = australia.rings[0].slice(0, 12);
+  const shifted = source.map(([lon, lat]) =>
+    shiftContinentPoint(lon, lat, australia.center, target));
+  const central = shiftContinentPoint(...australia.center,
+    australia.center, target);
+  assert.ok(Math.abs(central[0] - target[0]) < 1e-8);
+  assert.ok(Math.abs(central[1] - target[1]) < 1e-8);
+  const chord = ([lon1, lat1], [lon2, lat2]) => {
+    const radians = Math.PI / 180;
+    return Math.sin(lat1 * radians) * Math.sin(lat2 * radians) +
+      Math.cos(lat1 * radians) * Math.cos(lat2 * radians) *
+      Math.cos((lon1 - lon2) * radians);
+  };
+  for (let i = 1; i < source.length; i++)
+    assert.ok(Math.abs(chord(source[0], source[i]) -
+      chord(shifted[0], shifted[i])) < 1e-10);
 });
 
-test("continent tooltip describes local projection tradeoffs and polar limits", () => {
-  const eurasia = CONTINENTS.find((c) => c.name === "Eurasia");
-  const mercator = continentDistortionSummary(eurasia, "mercator");
-  assert.match(mercator.title, /Eurasia/i);
-  assert.match(mercator.detail, /Area ~.*local shape kept/);
-  const plate = continentDistortionSummary(eurasia, "equirectangular");
-  assert.match(plate.detail, /east–west/);
-  const equalArea = continentDistortionSummary(eurasia, "equalArea");
-  assert.match(equalArea.detail, /Area kept.*shape/);
-  const antarctica = CONTINENTS.find((c) => c.name === "Antarctica");
-  assert.match(continentDistortionSummary(antarctica, "mercator").detail,
-    /stops at 85°/);
+test("one landmass visibly expands in Mercator and keeps area in equal-area", () => {
+  const australia = CONTINENTS.find((c) => c.name === "Australia");
+  const ratio = (projection) => {
+    const home = projectedFootprintArea(projectedContinentRings(
+      australia, australia.center, projection));
+    const moved = projectedFootprintArea(projectedContinentRings(
+      australia, [15, 60], projection));
+    return moved / home;
+  };
+  assert.ok(ratio("mercator") > 3);
+  assert.ok(Math.abs(ratio("equalArea") - 1) < 0.01);
+  assert.ok(ratio("equirectangular") > 1.5);
+  assert.equal(clampContinentLatitude(australia, 60, "mercator"), 60);
+  const africa = CONTINENTS.find((c) => c.name === "Africa");
+  assert.ok(clampContinentLatitude(africa, 72, "mercator") < 60);
+});
+
+test("continent tooltip reports moved map footprint and polar limits", () => {
+  const australia = CONTINENTS.find((c) => c.name === "Australia");
+  assert.match(continentDistortionSummary(australia, "mercator", 60, 3.4).detail,
+    /3.4×/);
+  assert.match(continentDistortionSummary(australia, "equalArea", 60, 1).detail,
+    /area stays equal/i);
+  assert.match(continentDistortionSummary(australia, "mercator", 65, 4, true).detail,
+    /polar limit/i);
 });
 
 test("globe swipe coasts, settles, and resumes its default spin", () => {
