@@ -18,7 +18,7 @@ import {
   clampContinentLatitude, projectedContinentRings,
   projectedFootprintArea, shiftContinentPoint,
 } from "../src/showcase/continent-shift.js";
-import { orientGlobe } from "../src/showcase/projection-experience.js";
+import { orientGlobe, ProjectionExperience } from "../src/showcase/projection-experience.js";
 import { CONTINENTS, continentAt } from "../src/showcase/continent-model.js";
 import { exhibitPanelHit } from "../src/showcase/pointer-targets.js";
 
@@ -177,6 +177,22 @@ test("land picks identify generalized continents and leave open ocean unselected
   assert.equal(CONTINENTS.length, 6);
 });
 
+test("globe grip can select polar landmasses", () => {
+  const experience = {
+    started: true, finished: false, continentGripBy: null,
+    group: { updateWorldMatrix() {} },
+    continentOverlay: { visible: false }, globe: {},
+  };
+  const hitAt = (longitude, latitude) =>
+    ProjectionExperience.prototype.continentGripHit.call(experience, {
+      intersectObject: () => [{ uv: {
+        x: (longitude + 180) / 360, y: (latitude + 90) / 180,
+      } }],
+    });
+  assert.equal(hitAt(-100, 40)?.continent.name, "North America");
+  assert.equal(hitAt(0, -85)?.continent.name, "Antarctica");
+});
+
 test("shifting a continent rotates it on the sphere without changing ground distances", () => {
   const australia = CONTINENTS.find((c) => c.name === "Australia");
   const target = [15, 60];
@@ -213,6 +229,13 @@ test("one landmass visibly expands in Mercator and keeps area in equal-area", ()
   assert.equal(clampContinentLatitude(australia, 60, "mercator"), 60);
   const africa = CONTINENTS.find((c) => c.name === "Africa");
   assert.ok(clampContinentLatitude(africa, 72, "mercator") < 60);
+  const northAmerica = CONTINENTS.find((c) => c.name === "North America");
+  assert.equal(clampContinentLatitude(northAmerica, 30, "mercator"), 30);
+  assert.ok(clampContinentLatitude(northAmerica, 70, "mercator") < 52);
+  const antarctica = CONTINENTS.find((c) => c.name === "Antarctica");
+  assert.equal(clampContinentLatitude(antarctica, -40, "mercator"), -40);
+  assert.ok(clampContinentLatitude(antarctica, -80, "mercator") > -80);
+  assert.equal(clampContinentLatitude(antarctica, 0, "equalArea"), 0);
 });
 
 test("continent tooltip reports moved map footprint and polar limits", () => {

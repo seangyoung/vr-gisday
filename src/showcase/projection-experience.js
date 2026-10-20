@@ -387,8 +387,7 @@ export class ProjectionExperience extends TimedExhibit {
     if (!hit?.uv) return null;
     const continent = continentAt(hit.uv.x * 360 - 180,
       hit.uv.y * 180 - 90);
-    return continent && continent.name !== "Antarctica"
-      ? { ...hit, kind: "globe", continent } : null;
+    return continent ? { ...hit, kind: "globe", continent } : null;
   }
   beginContinentGrip(raycaster, source) {
     if (this.draggingBy !== null || this.continentGripBy !== null) return false;

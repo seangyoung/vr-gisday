@@ -42,31 +42,41 @@ function latitudeBounds(continent, projection) {
   const valid = (latitude) => shiftedContinentRings(continent,
     [continent.center[0], latitude]).every((ring) =>
     ring.every((point) => Math.abs(point[1]) <= cap));
-  if (!valid(sourceLatitude)) {
+  // A continent may already cross the display's polar limit at home
+  // (Greenland in Mercator, or Antarctica at the pole). Search the entire
+  // movable range instead of assuming its home latitude is valid.
+  const samples = [];
+  for (let latitude = -cap; latitude <= cap; latitude += 2)
+    samples.push(latitude);
+  if (samples.at(-1) !== cap) samples.push(cap);
+  if (valid(sourceLatitude) && !samples.includes(sourceLatitude))
+    samples.push(sourceLatitude);
+  samples.sort((a, b) => a - b);
+  const allowed = samples.map(valid);
+  // A very large landmass can have more than one valid interval after it
+  // crosses a pole. Keep the interval nearest its original position.
+  let anchor = -1;
+  for (let i = 0; i < samples.length; i++)
+    if (allowed[i] && (anchor < 0 || Math.abs(samples[i] - sourceLatitude) <
+        Math.abs(samples[anchor] - sourceLatitude))) anchor = i;
+  if (anchor < 0) {
     const bounds = [sourceLatitude, sourceLatitude];
     byProjection.set(projection, bounds);
     return bounds;
   }
-  const boundary = (end) => {
-    const step = Math.sign(end - sourceLatitude) * 2;
-    let allowed = sourceLatitude;
-    while (Math.abs(end - allowed) > 0.001) {
-      const next = Math.abs(end - allowed) < Math.abs(step)
-        ? end : allowed + step;
-      if (!valid(next)) {
-        let blocked = next;
-        for (let i = 0; i < 14; i++) {
-          const middle = (allowed + blocked) / 2;
-          if (valid(middle)) allowed = middle;
-          else blocked = middle;
-        }
-        return allowed;
-      }
-      allowed = next;
+  let first = anchor, last = anchor;
+  while (first > 0 && allowed[first - 1]) first--;
+  while (last < samples.length - 1 && allowed[last + 1]) last++;
+  const refine = (allowed, blocked) => {
+    for (let i = 0; i < 14; i++) {
+      const middle = (allowed + blocked) / 2;
+      if (valid(middle)) allowed = middle;
+      else blocked = middle;
     }
-    return end;
+    return allowed;
   };
-  const bounds = [boundary(-cap), boundary(cap)];
+  const bounds = [first === 0 ? -cap : refine(samples[first], samples[first - 1]),
+    last === samples.length - 1 ? cap : refine(samples[last], samples[last + 1])];
   byProjection.set(projection, bounds);
   return bounds;
 }
