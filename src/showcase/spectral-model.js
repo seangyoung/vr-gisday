@@ -10,3 +10,17 @@ export function displayedBandBrightness(naturalPixel, falsePixel) {
 export function nirGrayPixel(falsePixel) {
   return [falsePixel[0], falsePixel[0], falsePixel[0], 255];
 }
+
+// Convert one geographic image coordinate into matching positions on the
+// display plane and the viewer's circular canvas, independent of aspect ratio.
+export function spectralLensAlignment(sample, scene, panelWidth, panelHeight,
+  lensSize, canvasSize) {
+  return {
+    worldX: (sample.u - 0.5) * panelWidth,
+    worldY: (0.5 - sample.v) * panelHeight,
+    canvasScaleX: canvasSize * panelWidth / (lensSize * scene.width),
+    canvasScaleY: canvasSize * panelHeight / (lensSize * scene.height),
+    sourceX: sample.u * scene.width,
+    sourceY: sample.v * scene.height,
+  };
+}

@@ -364,6 +364,7 @@ function closeSoundMenu() {
 }
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
+  showcase?.endViewer?.();
   const visualRoots = [
     root, floatingModel, rain?.group, scan?.group, showcase?.model,
     ...(scan?.reticles?.flat() ?? []),
@@ -1111,7 +1112,9 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Satellites measure visible colors and near infrared (NIR).\nHealthy leaves reflect much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
+        `Satellites measure visible colors and near infrared (NIR).\nHealthy leaves reflect much NIR light, which our eyes cannot see.\n${showFallbackControls
+          ? "Compare real places with the color buttons or spectral viewer."
+          : "Grip a spectral viewer to reveal these bands over real places."}`,
         "Reveal the bands"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
@@ -1273,22 +1276,35 @@ function drawShowcaseUI() {
     }
   } else if (exhibit.kind === "spectral") {
     const modeText = {
-      natural: "Natural color: visible red, green, and blue bands",
-      false: "False color: NIR → red, red → green, green → blue",
-      nir: "Approximate near-infrared view in gray",
+      natural: "Natural color: visible red, green, and blue",
+      false: "False color: near infrared displayed in red",
+      nir: "Near-infrared brightness displayed in gray",
     };
     label(`${exhibit.sceneInfo.name} · ${exhibit.sceneInfo.sensor}`,
       0, 0.96, 2.35, 0.18, 40, "#e6f4f5", "#0b2430");
     label(exhibit.sceneInfo.prompt, 0, -0.42, 2.4, 0.12, 28,
       "#d8f3e6", "#0b2430");
-    label(modeText[exhibit.mode], 0, -0.58, 2.4, 0.12, 27,
+    label(exhibit.viewerHeldBy !== null
+      ? `${exhibit.viewerBand === "false" ? "False-color" : "Near-infrared"} lens · trigger pins sample`
+      : `${modeText[exhibit.mode]} · ${showFallbackControls
+        ? "drag image for lens" : "grip for lens"}`,
+    0, -0.58, 2.4, 0.12, 27,
       "#e6f4f5", "#0b2430");
-    button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"),
-      0.72, exhibit.mode === "natural");
-    button("False color", 0, -0.75, () => exhibit.setMode("false"),
-      0.72, exhibit.mode === "false");
-    button("Near infrared", 0.78, -0.75, () => exhibit.setMode("nir"),
-      0.72, exhibit.mode === "nir");
+    if (exhibit.viewerHeldBy !== null) {
+      button("False-color lens", -0.44, -0.75,
+        () => exhibit.setViewerBand("false"), 0.84,
+        exhibit.viewerBand === "false");
+      button("Near-infrared lens", 0.44, -0.75,
+        () => exhibit.setViewerBand("nir"), 0.84,
+        exhibit.viewerBand === "nir");
+    } else {
+      button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"),
+        0.72, exhibit.mode === "natural");
+      button("False color", 0, -0.75, () => exhibit.setMode("false"),
+        0.72, exhibit.mode === "false");
+      button("Near infrared", 0.78, -0.75, () => exhibit.setMode("nir"),
+        0.72, exhibit.mode === "nir");
+    }
     button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {
@@ -2376,6 +2392,11 @@ for (let i = 0; i < 2; i++) {
       }
       return;
     }
+    if (showcase?.kind === "spectral" && showcase.started &&
+        !showcase.finished && !soundMenuOpen && grip.visible) {
+      if (showcase.beginViewer(i, grip)) sound.click();
+      return;
+    }
     if (showcase?.kind === "projection" && showcase.started &&
         !showcase.finished && !soundMenuOpen && grip.visible) {
       const ui = intersect(c);
@@ -2403,6 +2424,7 @@ for (let i = 0; i < 2; i++) {
     scan?.grab.release(i);
     rain?.grab.release(i);
     showcase?.grab?.release(i);
+    showcase?.endViewer?.(i);
     showcase?.endContinentGrip?.(i);
     rain?.endStroke(i);
   });
@@ -2416,6 +2438,7 @@ for (let i = 0; i < 2; i++) {
     scan?.grab.release(i);
     rain?.grab.release(i);
     showcase?.grab?.release(i);
+    showcase?.endViewer?.(i);
     showcase?.endContinentGrip?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
@@ -2626,6 +2649,15 @@ renderer.setAnimationLoop((time, frame) => {
         showcase.dragContinentGrip(raycaster, active.id);
       }
     }
+    if (showcase?.kind === "spectral" && showcase.viewerHeldBy !== null) {
+      const active = controllers.find(({ id }) => id === showcase.viewerHeldBy);
+      if (!visibleSession || !active?.c.visible || !active.grip.visible || soundMenuOpen)
+        showcase.endViewer();
+      else {
+        const ui = intersect(active.c);
+        showcase.updateViewerAim(raycaster, active.id, !!ui);
+      }
+    }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
@@ -2824,6 +2856,7 @@ renderer.setAnimationLoop((time, frame) => {
           rain?.grab.hands.has(id) ||
           showcase?.grab?.hands.has(id) ||
           showcase?.continentGripBy === id ||
+          showcase?.viewerHeldBy === id ||
           rain?.stroke?.id === id
           ? 0xffca83
           : model
@@ -2962,6 +2995,13 @@ if (
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (showcase) {
+      if (showcase.kind === "spectral" && showcase.selectFromRay(raycaster) &&
+          showcase.beginViewer("preview", null)) {
+        showcase.updateViewerAim(raycaster, "preview");
+        previewSpinPointer = e.pointerId;
+        renderer.domElement.setPointerCapture(e.pointerId);
+        return;
+      }
       const picked = showcase.kind === "projection" &&
         showcase.beginContinentGrip(raycaster, "preview");
       if (picked || (["projection", "change"].includes(showcase.kind) &&
@@ -2988,6 +3028,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
+      showcase?.endViewer?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -2995,6 +3036,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
+      showcase?.endViewer?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -3014,6 +3056,7 @@ if (devPreview) {
       showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       showcase?.dragContinentGrip?.(raycaster, "preview");
+      showcase?.updateViewerAim?.(raycaster, "preview");
       previewSpinTime = e.timeStamp;
       return;
     }
