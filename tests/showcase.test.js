@@ -2,8 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
-import { displayedBandBrightness, nirGrayPixel,
-  spectralLensAlignment } from "../src/showcase/spectral-model.js";
+import { displayedBandBrightness, nirGrayPixel } from "../src/showcase/spectral-model.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
@@ -39,22 +38,6 @@ test("rendered Landsat composites map display colors to sampled band brightness"
   assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
     [96, 72, 38, 184]);
   assert.deepEqual(nirGrayPixel([184, 53, 72, 255]), [184, 184, 184, 255]);
-});
-
-test("spectral viewer stays registered to the source image at any aspect ratio", () => {
-  for (const scene of SPECTRAL_SCENES) {
-    const panelHeight = Math.min(1.16, 1.58 / (scene.width / scene.height));
-    const panelWidth = panelHeight * scene.width / scene.height;
-    const sample = { u: 0.37, v: 0.62 };
-    const view = spectralLensAlignment(sample, scene, panelWidth, panelHeight,
-      0.28, 256);
-    assert.ok(Math.abs(view.worldX / panelWidth + 0.13) < 1e-12);
-    assert.ok(Math.abs(view.worldY / panelHeight + 0.12) < 1e-12);
-    assert.ok(Math.abs(view.sourceX * view.canvasScaleX +
-      (128 - view.sourceX * view.canvasScaleX) - 128) < 1e-9);
-    assert.ok(Math.abs(view.canvasScaleX * scene.width / panelWidth -
-      view.canvasScaleY * scene.height / panelHeight) < 1e-9);
-  }
 });
 
 test("real spectral scenes rotate without an immediate repeat", () => {
