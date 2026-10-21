@@ -98,10 +98,12 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   assert.equal(demo.gripRung(0, hand), false, "the introduction does not accept climbs");
   demo.begin();
   assert.equal(demo.marker.userData.steps.visible, false, "eye level keeps a short pole without steps");
+  assert.equal(demo.marker.userData.lookout.visible, false, "eye level has no lookout deck");
   assert.equal(demo.gripRung(0, hand), false, "steps require selecting tower height");
   demo.setHeight(12);
   demo.update(1);
   assert.equal(demo.marker.userData.steps.visible, true);
+  assert.equal(demo.marker.userData.lookout.visible, true, "tower mode shows where the climb ends");
   assert.ok(demo.marker.userData.mast.scale.y > 11.9);
   demo.visitor.set(demo.observer.x, demo.observer.z);
   demo.setVisualHeight(12);
@@ -147,6 +149,7 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   demo.begin();
   demo.setHeight(12);
   demo.update(1);
+  demo.visitor.set(demo.observer.x, demo.observer.z - 0.25);
   const rung = demo.marker.userData.rungs.find((r) => r.position.y > 1.2);
   const hand = rung.getWorldPosition(new THREE.Vector3());
   assert.equal(demo.gripRung(1, hand), true);
@@ -158,6 +161,10 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   assert.equal(demo.observer.height, 12);
   assert.equal(demo.isAtTop, true);
   assert.equal(demo.isClimbing, false);
+  for (let i = 0; i < 30; i++) demo.updateClimb(new Map(), 0.016);
+  assert.ok(Math.abs(demo.visitor.x - demo.observer.x) < 0.02);
+  assert.ok(demo.visitor.y < demo.observer.z - 0.5,
+    "the lookout places the visitor in front of the mast");
   demo.update(0.016);
   assert.equal(demo.marker.userData.eye.visible, false, "the gold marker clears the lookout view");
   assert.equal(demo.walk(0, -1, 0.5, camera).distance, 0, "the top perch prevents walking off");
@@ -194,11 +201,16 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   for (let i = 0; i < 90 && demo.isClimbing; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);
   assert.equal(demo.observer.height, 12, "the chosen tower remains tall after a drop");
+  assert.ok(demo.lookoutSlide.length() < 0.01, "descending returns from the lookout offset");
+  demo.update(0.016);
+  assert.equal(demo.marker.userData.eye.visible, false, "the marker stays clear while near the pole");
+  demo.visitor.set(demo.observer.x + 2, demo.observer.z);
   demo.update(0.016);
   assert.equal(demo.marker.userData.eye.visible, true);
   demo.setHeight(2);
   demo.update(1);
   assert.equal(demo.marker.userData.steps.visible, false);
+  assert.equal(demo.marker.userData.lookout.visible, false);
   assert.ok(demo.marker.userData.mast.scale.y < 2.1);
   demo.dispose();
 });

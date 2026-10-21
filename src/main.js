@@ -975,7 +975,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the ground heights.\nCompare a river valley with a winding redrock canyon. Select Tower to extend the pole, then climb its side steps for the lookout view.",
+      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the heights.\nChoose Tower, grip its rungs, and climb to a hands-free lookout.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1028,7 +1028,14 @@ function drawViewshedUI() {
     button("Tower · 12 m", 0.64, -0.19, () => v.setHeight(12), 1.04)
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
-    label("Tower mode: grip steps to climb · Top: rest · Re-grip to descend/drop", 0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
+    label(v.isAtTop
+      ? "LOOKOUT LOCKED · Hands free · Re-grip a rung to descend"
+      : v.isClimbing
+      ? "Pull rungs down to climb · Release both grips to drop"
+      : v.observer.height === 12
+      ? "Grip rungs and pull down · The top platform holds you hands free"
+      : "Choose Tower · 12 m to reveal the rungs and lookout platform",
+    0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
   }
   label(
     `${v.visiblePercent}% nearby ground visible · Blue target ${v.trace.visible ? "VISIBLE" : "BLOCKED"} · Bare-earth DEM`,
@@ -1875,9 +1882,9 @@ function draw() {
           viewshed.visualHeight = 12;
           viewshed.setVisualHeight(12);
           viewshed.climbGroundY = viewshed.group.position.y;
-          viewshed.climbHeight = 10.4;
-          viewshed.topLocked = true;
+          viewshed.lockLookout();
           viewshed.group.position.y -= viewshed.climbHeight;
+          viewshed.updateLookout(1);
         }
         draw();
       };

@@ -11,6 +11,8 @@ import { VIEWSHED_SCENES, buildCanyonWorld } from "./scenes.js";
 const TOWER_HEIGHT = 12;
 const CLIMB_HEIGHT = TOWER_HEIGHT - 1.6;
 const RUNG_SPACING = 0.43;
+const LOOKOUT_Z = -0.54;
+const MAX_LOOKOUT_SHIFT = 0.65;
 
 const visibleColor = new THREE.Color(0x55e5a9);
 const hiddenColor = new THREE.Color(0x9176bd);
@@ -81,27 +83,71 @@ function observationMarker() {
   ring.position.y = 0.08;
   const steps = new THREE.Group();
   steps.visible = false;
-  const rungMaterial = new THREE.MeshStandardMaterial({ color: 0xe3bd77, metalness: 0.22, roughness: 0.52 });
+  const rungMaterial = new THREE.MeshStandardMaterial({
+    color: 0xb9c8c4, metalness: 0.48, roughness: 0.46,
+  });
   const rungs = [];
-  const pegGeometry = new THREE.CylinderGeometry(0.035, 0.045, 0.46, 10);
-  const tipGeometry = new THREE.SphereGeometry(0.055, 8, 6);
-  for (let y = 0.55, index = 0; y < TOWER_HEIGHT - 0.25; y += RUNG_SPACING, index++) {
+  const pegGeometry = new THREE.CylinderGeometry(0.023, 0.023, 0.42, 8);
+  const lipGeometry = new THREE.CylinderGeometry(0.019, 0.019, 0.085, 8);
+  for (let y = 0.55, index = 0; y < TOWER_HEIGHT - 0.65; y += RUNG_SPACING, index++) {
     const side = index % 2 ? 1 : -1;
     const step = new THREE.Group();
-    step.position.set(side * 0.3, y, -0.11);
+    step.position.set(side * 0.28, y, -0.11);
     const peg = new THREE.Mesh(pegGeometry, rungMaterial);
     peg.rotation.z = Math.PI / 2;
-    const tip = new THREE.Mesh(tipGeometry, rungMaterial);
-    tip.position.set(side * 0.23, 0.025, 0);
-    step.add(peg, tip);
+    const lip = new THREE.Mesh(lipGeometry, rungMaterial);
+    lip.position.set(side * 0.2, 0.035, 0);
+    step.add(peg, lip);
     steps.add(step);
     rungs.push(step);
   }
-  marker.add(base, mast, eye, ring, steps);
+  const lookout = new THREE.Group();
+  lookout.visible = false;
+  lookout.position.y = CLIMB_HEIGHT;
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.07, 0.96), dark);
+  deck.position.set(0, -0.04, LOOKOUT_Z);
+  lookout.add(deck);
+  const slatMaterial = new THREE.MeshStandardMaterial({
+    color: 0x849d9b, metalness: 0.3, roughness: 0.64,
+  });
+  for (const z of [-0.82, -0.54, -0.26]) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.012, 0.19), slatMaterial);
+    slat.position.set(0, 0.006, z);
+    lookout.add(slat);
+  }
+  const edgeMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd9bd78, emissive: 0x3d3215, roughness: 0.5,
+  });
+  for (const z of [-1.01, -0.07]) {
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.025, 0.025), edgeMaterial);
+    edge.position.set(0, 0.015, z);
+    lookout.add(edge);
+  }
+  for (const x of [-0.59, 0.59]) {
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.96), edgeMaterial);
+    edge.position.set(x, 0.015, LOOKOUT_Z);
+    lookout.add(edge);
+  }
+  for (const side of [-1, 1]) {
+    const lower = new THREE.Vector3(side * 0.08, -1.05, 0);
+    const upper = new THREE.Vector3(side * 0.42, -0.08, -0.78);
+    const direction = upper.clone().sub(lower);
+    const brace = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.019, 0.019, direction.length(), 8), rungMaterial,
+    );
+    brace.position.copy(lower).add(upper).multiplyScalar(0.5);
+    brace.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), direction.normalize(),
+    );
+    lookout.add(brace);
+  }
+  marker.add(base, mast, eye, ring, steps, lookout);
   marker.userData.mast = mast;
   marker.userData.eye = eye;
   marker.userData.rungs = rungs;
   marker.userData.steps = steps;
+  marker.userData.lookout = lookout;
+  marker.userData.lookoutEdge = edgeMaterial;
   return marker;
 }
 
@@ -126,6 +172,8 @@ export class ViewshedExperience extends LayerExperience {
     this.fallSpeed = 0;
     this.topLocked = false;
     this.topLockReady = true;
+    this.lookoutSlide = new THREE.Vector2();
+    this.lookoutGoal = new THREE.Vector2();
     this.revealAge = 1;
     this.marker = observationMarker();
     this.marker.visible = false;
@@ -270,6 +318,8 @@ export class ViewshedExperience extends LayerExperience {
     this.marker.userData.mast.position.y = height / 2;
     this.marker.userData.steps.visible = this.observer.height === TOWER_HEIGHT;
     this.marker.userData.steps.scale.y = height / TOWER_HEIGHT;
+    this.marker.userData.lookout.visible = this.observer.height === TOWER_HEIGHT;
+    this.marker.userData.lookout.position.y = CLIMB_HEIGHT * height / TOWER_HEIGHT;
   }
   get isAtTop() {
     return this.topLocked;
@@ -314,7 +364,11 @@ export class ViewshedExperience extends LayerExperience {
     if (!this.started || this.finished || this.observer.height !== TOWER_HEIGHT ||
         !this.nearestRung(handWorld)) return false;
     const firstHand = !this.climbHands.size;
-    if (this.topLocked) this.topLockReady = false;
+    if (this.topLocked) {
+      this.topLockReady = false;
+      this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
+      this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
+    }
     this.topLocked = false;
     this.climbHands.set(id, handWorld.y);
     this.fallSpeed = 0;
@@ -325,6 +379,33 @@ export class ViewshedExperience extends LayerExperience {
   releaseRung(id) {
     this.climbHands.delete(id);
     if (!this.climbHands.size && this.climbHeight > 0) this.fallSpeed = 0;
+  }
+  lockLookout() {
+    this.climbHeight = CLIMB_HEIGHT;
+    this.topLocked = true;
+    this.climbHands.clear();
+    const step = new THREE.Vector2(
+      this.visitor.x - this.observer.x,
+      this.visitor.y - (this.observer.z + LOOKOUT_Z),
+    ).clampLength(0, MAX_LOOKOUT_SHIFT);
+    this.lookoutGoal.copy(this.lookoutSlide).add(step);
+    this.marker.userData.lookoutEdge.color.setHex(0x78e4c5);
+    this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
+  }
+  updateLookout(dt) {
+    const goalX = this.topLocked ? this.lookoutGoal.x : 0;
+    const goalZ = this.topLocked ? this.lookoutGoal.y : 0;
+    const dx = THREE.MathUtils.damp(this.lookoutSlide.x, goalX, 8, dt) - this.lookoutSlide.x;
+    const dz = THREE.MathUtils.damp(this.lookoutSlide.y, goalZ, 8, dt) - this.lookoutSlide.y;
+    if (Math.abs(dx) + Math.abs(dz) < 1e-6) return;
+    const angle = this.group.rotation.y;
+    this.group.position.x += Math.cos(angle) * dx + Math.sin(angle) * dz;
+    this.group.position.z += -Math.sin(angle) * dx + Math.cos(angle) * dz;
+    this.lookoutSlide.x += dx;
+    this.lookoutSlide.y += dz;
+    this.visitor.x -= dx;
+    this.visitor.y -= dz;
+    this.updateVisitorMarkers();
   }
   updateClimb(poses, dt) {
     if (!this.started || this.finished) {
@@ -349,9 +430,7 @@ export class ViewshedExperience extends LayerExperience {
       this.fallSpeed = 0;
       if (this.climbHeight <= CLIMB_HEIGHT - 0.15) this.topLockReady = true;
       if (this.topLockReady && this.climbHeight >= CLIMB_HEIGHT - 0.01) {
-        this.climbHeight = CLIMB_HEIGHT;
-        this.topLocked = true;
-        this.climbHands.clear();
+        this.lockLookout();
         this.onEvent("reveal");
         this.onChange();
       }
@@ -364,14 +443,26 @@ export class ViewshedExperience extends LayerExperience {
       }
     }
     this.group.position.y = this.climbGroundY - this.climbHeight;
+    this.updateLookout(dt);
   }
   cancelClimb() {
+    const angle = this.group.rotation.y;
+    this.group.position.x -= Math.cos(angle) * this.lookoutSlide.x +
+      Math.sin(angle) * this.lookoutSlide.y;
+    this.group.position.z -= -Math.sin(angle) * this.lookoutSlide.x +
+      Math.cos(angle) * this.lookoutSlide.y;
+    this.visitor.add(this.lookoutSlide);
+    this.lookoutSlide.set(0, 0);
+    this.lookoutGoal.set(0, 0);
     this.climbHands.clear();
     this.climbHeight = 0;
     this.fallSpeed = 0;
     this.topLocked = false;
     this.topLockReady = true;
     this.group.position.y = this.climbGroundY;
+    this.updateVisitorMarkers();
+    this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
+    this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
   }
   update(dt) {
     if (!this.started) return;
