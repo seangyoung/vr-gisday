@@ -1117,7 +1117,7 @@ function drawShowcaseUI() {
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nTry Tissot circles, or grip Australia and move it north or south to see its map shape change.",
+        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nAim at land. Hold GRIP and drag it north or south on the map.",
         "Flatten the globe"],
       change: ["What Changed?",
         "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
@@ -1308,6 +1308,9 @@ function drawShowcaseUI() {
     button("Takeaway", 0, -1.08, () => exhibit.finish(), 1.1);
   } else {
     label("Make the World Flat", 0, 0.98, 2.35, 0.17, 46, "#e6f4f5", "#0b2430");
+    if (exhibit.flat && !exhibit.selectedContinent && !exhibit.tissot)
+      label("↓ GRIP A CONTINENT", -0.84, 0.81, 1.45, 0.13, 38,
+        "#a6f5d9", "#0b2430");
     label(!exhibit.flat
       ? exhibit.selectedContinent
         ? "Flatten the map to compare your selected continent."
@@ -1318,9 +1321,8 @@ function drawShowcaseUI() {
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
       ? "Tissot's circles start equally sized on Earth. Select one to see its distortion."
-      : `${exhibit.projection === "equalArea" ? "Equal-area" :
-      exhibit.projection === "mercator" ? "Mercator" : "Plate Carrée"}: equal land area at 60° N looks ${exhibit.areaAt60}× equator`,
-    0, -0.36, 2.45, 0.13, 28, "#e6f4f5", "#0b2430");
+      : "GRIP land on globe → drag north or south on map.",
+    0, -0.36, 2.45, 0.14, 35, "#e6f4f5", "#0b2430");
     button("Plate Carrée", -0.8, -0.57,
       () => exhibit.setProjection("equirectangular"), 0.7,
       exhibit.projection === "equirectangular");
@@ -1338,7 +1340,7 @@ function drawShowcaseUI() {
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
     label(exhibit.selectedContinent
       ? "Cyan: home position · gold: same landmass moved on the globe."
-      : `Center ${Math.round(exhibit.centralMeridian)}° · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
+      : `60° N area: ${exhibit.areaAt60}× equator · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
       0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);
   }
