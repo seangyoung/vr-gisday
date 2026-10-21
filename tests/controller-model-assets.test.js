@@ -32,7 +32,7 @@ test("bundled Quest controller profiles place labels on actual button nodes", ()
         "xr_standard_squeeze_pressed_value",
         ...(handedness === "left"
           ? ["xr_standard_thumbstick_pressed_value", "x_button_pressed_value", "y_button_pressed_value"]
-          : ["a_button_pressed_value", "b_button_pressed_value"]),
+          : ["xr_standard_thumbstick_pressed_value", "a_button_pressed_value", "b_button_pressed_value"]),
       ];
       for (const node of required)
         assert.ok(nodes.has(node), `${name}/${handedness} missing ${node}`);

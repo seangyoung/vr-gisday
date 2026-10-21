@@ -1346,7 +1346,7 @@ function drawShowcaseUI() {
 function drawRainChoiceCard(kind, x, title, subtitle) {
   const card = new THREE.Mesh(
     new THREE.PlaneGeometry(1.1, 1.22),
-    new THREE.MeshBasicMaterial({ color: kind === "erosion" ? 0x47362f : 0x193e47,
+    new THREE.MeshBasicMaterial({ color: kind === "erosion" ? 0x294046 : 0x193e47,
       side: THREE.DoubleSide }),
   );
   card.position.set(x, -0.08, 0.01);
@@ -1355,6 +1355,7 @@ function drawRainChoiceCard(kind, x, title, subtitle) {
     startRain(kind, true);
   };
   card.userData.label = title;
+  card.userData.hoverColor = 0x477b91;
   buttons.push(card);
   uiParent.add(card);
   const thumbnail = rainThumbnail(kind);
@@ -1934,6 +1935,7 @@ function controllerGuideContext(hand) {
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
+  const teleportHint = hand === "right" ? "↑ Teleport" : null;
   if (rain?.stage === 1) {
     return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
       "Move/size", onMenu, exitLabel];
@@ -1941,7 +1943,10 @@ function controllerGuideContext(hand) {
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
-    return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu, exitLabel];
+    return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu,
+      exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
+  if ((layers?.started && !layers.finished) || (pixels?.started && !pixels.finished))
+    return ["Select", null, onMenu, exitLabel, teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     showcase.kind === "projection" ? "Grab land" :

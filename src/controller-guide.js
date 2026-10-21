@@ -13,6 +13,7 @@ const anchorNames = {
   b: "b_button_pressed_value",
   trigger: "xr_standard_trigger_pressed_value",
   grip: "xr_standard_squeeze_pressed_value",
+  stick: "xr_standard_thumbstick_pressed_value",
 };
 const leftButtons = [
   ["x", "X", "Restart", "y", 0.025],
@@ -68,6 +69,7 @@ export class ControllerGuide {
     this.gripAction = null;
     this.onMenu = false;
     this.exitLabel = "Exit demo";
+    this.stickAction = null;
     this.dwell = 0;
     this.hold = 0;
     this.labels = [];
@@ -85,13 +87,16 @@ export class ControllerGuide {
     this.clearLabels();
   }
 
-  setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo") {
+  setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo",
+    stickAction = null) {
     if (trigger === this.trigger && gripAction === this.gripAction &&
-        onMenu === this.onMenu && exitLabel === this.exitLabel) return;
+        onMenu === this.onMenu && exitLabel === this.exitLabel &&
+        stickAction === this.stickAction) return;
     this.trigger = trigger;
     this.gripAction = gripAction;
     this.onMenu = onMenu;
     this.exitLabel = exitLabel;
+    this.stickAction = stickAction;
     this.clearLabels();
   }
 
@@ -118,7 +123,7 @@ export class ControllerGuide {
       });
       this.materialsPrepared = true;
     }
-    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}`;
+    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}`;
     if (this.labelKey === key) return this.labels.length > 0;
     this.clearLabels();
     const buttons = this.handedness === "left"
@@ -129,6 +134,8 @@ export class ControllerGuide {
       ...buttons,
       ...(this.trigger ? [["trigger", "TRIG", this.trigger, "grip", 0.032]] : []),
       ...(this.gripAction ? [["grip", "GRIP", this.gripAction, "trigger", 0.032]] : []),
+      ...(this.stickAction && this.handedness === "right"
+        ? [["stick", "STICK", this.stickAction, "a", 0.035]] : []),
     ];
     for (const [id, face, action, neighborId, spacing] of specs) {
       const node = this.model.getObjectByName(anchorNames[id]);
