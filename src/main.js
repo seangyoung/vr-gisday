@@ -1594,7 +1594,8 @@ function drawRainUI() {
 }
 function next() {
   preservePose =
-    ((isSpatial() && step < GNSS_SPATIAL_END - 1) || isGnssObject()) &&
+    ((isSpatial() && step < GNSS_SPATIAL_END - 1) ||
+      (isGnssObject() && step > GNSS_SATELLITE)) &&
       floatingModel && step < stages.length - 1
       ? {
           position: floatingModel.position.clone(),
@@ -1707,13 +1708,16 @@ function resetModelView() {
   forward.y = 0;
   if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
   forward.normalize();
+  const gnss = isGnssObject();
+  const inspecting = step === GNSS_SATELLITE;
   cam.getWorldPosition(floatingModel.position);
-  floatingModel.position.addScaledVector(forward, 1.3);
-  floatingModel.position.y += isGnssObject() ? 0.4 : 0.2;
+  floatingModel.position.addScaledVector(forward, gnss ? 1.45 : 1.3);
+  floatingModel.position.y += inspecting ? 0.18 : gnss ? 0.4 : 0.2;
   floatingModel.quaternion.setFromEuler(
-    new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.72, 0, "YXZ"),
+    new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) +
+      (gnss ? 0.22 : 0.72), 0, "YXZ"),
   );
-  floatingModel.scale.setScalar(isGnssObject() ? 0.78 : 0.35);
+  floatingModel.scale.setScalar(inspecting ? 0.66 : gnss ? 0.74 : 0.35);
 }
 function gnssObject() {
   gnssDisplay = new GnssScene(step, {
@@ -2346,8 +2350,8 @@ function drawScene() {
     }
     if (step === GNSS_CLOCK) {
       label(gnssClockCorrected
-        ? "Clock bias removed · corrected ranges meet at the receiver"
-        : `+1 μs on the receiver clock adds ${Math.round(clockBiasMeters(1))} m to each pseudorange`,
+        ? "4 signals · solve receiver position and clock bias together"
+        : `3 signals · +1 μs clock bias adds ${Math.round(clockBiasMeters(1))} m to each pseudorange`,
       0, GUIDED_INFO_Y, 2.35, 0.13, 28,
       gnssClockCorrected ? "#a6f5d9" : "#ffdc83", "#0b2430");
       button(gnssClockCorrected ? "Test sky view" : "Use fourth signal",
@@ -2357,6 +2361,7 @@ function drawScene() {
             keepGnssPose();
             gnssClockCorrected = true;
             draw();
+            gnssDisplay.revealFourth();
             sound.cue("correct");
           }
         }, 1.55);
@@ -2369,15 +2374,15 @@ function drawScene() {
           : "Choose both sky conditions to compare the signal paths.",
       0, GUIDED_INFO_Y, 2.35, 0.13, 28, "#b6d1d9", "#0b2430");
       for (const [name, environment, x] of [
-        ["Open sky", "open", -0.74], ["City canyon", "canyon", 0],
+        ["Open sky", "open", -0.9], ["City canyon", "canyon", 0],
       ]) button(name, x, GUIDED_ACTION_Y, () => {
         keepGnssPose();
         gnssEnvironment = environment;
         gnssEnvironmentsSeen.add(environment);
         draw();
-      }, 1.1, gnssEnvironment === environment);
+      }, 0.78, gnssEnvironment === environment);
       if (gnssEnvironmentsSeen.size === 2)
-        button("Takeaway", 0.74, GUIDED_ACTION_Y, next, 1.1);
+        button("Takeaway", 0.9, GUIDED_ACTION_Y, next, 0.78);
     }
     return;
   }
@@ -2637,6 +2642,7 @@ function rainHit(c) {
 function modelHit(c) {
   if (!floatingModel) return null;
   intersect(c); // Set the ray from the controller pose.
+  if (isGnssObject()) return gnssDisplay?.hitSurface(raycaster) ?? null;
   floatingModel.updateWorldMatrix(true, true);
   return raycaster.intersectObjects(floatingModel.children, false)[0];
 }

@@ -71,3 +71,31 @@ test("new GNSS interactions follow the exact-range shell lesson", () => {
   assert.match(stages[GNSS_CLOCK].body, /fourth satellite/i);
   assert.match(stages[GNSS_MULTIPATH].body, /multipath/i);
 });
+
+test("GNSS pointer reaches spacecraft through the decorative radio halo", async () => {
+  const { Raycaster, Vector3 } = await import("three");
+  const { GnssScene } = await import("../src/gnss/scene.js");
+  const display = new GnssScene(GNSS_SATELLITE);
+  const ray = new Raycaster(new Vector3(-0.13, 0.3, 3),
+    new Vector3(0, 0, -1));
+  assert.match(display.pickPart(ray), /Clock & radio/);
+  const hit = display.hitSurface(ray);
+  assert.ok(hit && hit.distance > 2.5, "ray reaches the spacecraft behind halo");
+  assert.ok(hit.object.userData.gnssPart);
+});
+
+test("clock correction introduces a fourth spacecraft and reflected route takes longer", async () => {
+  const { GnssScene } = await import("../src/gnss/scene.js");
+  const before = new GnssScene(GNSS_CLOCK);
+  const after = new GnssScene(GNSS_CLOCK, { clockCorrected: true });
+  assert.equal(before.satelliteCount, 3);
+  assert.equal(after.satelliteCount, 4);
+  after.revealFourth();
+  assert.ok(after.fourth.scale.x < 0.01);
+  after.update(1);
+  assert.ok(Math.abs(after.fourth.scale.x - 0.32) < 1e-12);
+  const open = new GnssScene(GNSS_MULTIPATH, { environment: "open" });
+  const canyon = new GnssScene(GNSS_MULTIPATH, { environment: "canyon" });
+  assert.ok(canyon.pathRatio > 1.2);
+  assert.ok(canyon.signalDuration > open.signalDuration);
+});

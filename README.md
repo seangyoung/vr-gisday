@@ -42,10 +42,10 @@ Every dedicated takeaway screen also shows **Restart** and **Exit to Menu** butt
 6. Add a second shell. A bright circle highlights the positions where both exact distances agree; it fades in after the new shell expands.
 7. Add a third shell. It cuts the two-shell intersection at two white candidate points; the highlighted circle disappears so the candidates stand out. Only the new shell expands; the earlier shells stay in place.
 8. Add a fourth noncoplanar shell. Only the new shell expands, resolving the exact-range example while preserving your model position, rotation, and scale.
-9. Grip and turn an original procedural GPS-satellite model. Inspect its solar wings, spacecraft bus, and Earth-facing antenna while the lesson introduces its atomic clock.
+9. Grip and turn an original procedural, GPS III-inspired satellite model. Trigger-select its segmented solar wings, insulated bus, or Earth-facing antenna deck to identify their roles. The controller ray passes through the decorative radio halo to the solid part being inspected.
 10. Press **Send pulse** to launch an expanding radio wavefront toward a model receiver. The pulse animation is slowed for viewing; a 20,200 km example takes about 67.4 ms at light speed. **Send again** repeats it.
-11. Compare a receiver clock that is 1 microsecond fast (about 300 m added to each pseudorange) with a corrected solution by selecting **Use fourth signal**.
-12. Select **Open sky** and **City canyon** to compare direct and reflected paths. A longer multipath route arrives later; buildings can also block the direct signal. Both choices reveal **Takeaway**.
+11. Compare a receiver clock that is 1 microsecond fast (about 300 m added to each pseudorange) with a corrected solution by selecting **Use fourth signal**. Three spacecraft are present initially; the fourth appears only on correction.
+12. Select **Open sky** and **City canyon** to compare animated direct and reflected signal routes. In the canyon, one building interrupts the straight path while the longer route reflects off another facade and arrives later. Both choices reveal **Takeaway**.
 
 The guided portion transitions to takeaways after 300 seconds of visible XR frame time. It can be completed sooner; paused/hidden sessions do not consume that time. Controller shortcuts for Restart, Reset View, Sound, and Exit demo remain available throughout. In 3D, Y/Reset View restores the default model pose and controls in front of the viewer. The assembly has a shared center; individual beacons cannot be moved independently because that would invalidate the measured-distance relationships. Tracking loss, hidden sessions, reset, or stage changes release active grips.
 
