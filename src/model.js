@@ -59,10 +59,48 @@ export const stages = [
   },
   {
     title: "Four ranges. One common position.",
-    body: "Here the fourth beacon selects one exact position.\nGNSS estimates ranges from timed satellite signals;\na fourth signal also helps correct the receiver's clock.",
-    action: "Finish",
+    body: "Here an extra off-plane beacon selects one exact point.\nThis model assumes exact distances. Real GNSS receivers\nalso solve for their own clock error with a fourth signal.",
+    action: "Meet a GPS satellite",
+  },
+  {
+    title: "Meet a GPS satellite.",
+    body: "Point and trigger to identify parts; grip to turn.\nSolar panels supply power; an atomic clock keeps time.\nIts Earth-facing antenna broadcasts a timed radio signal.",
+    action: "Follow a signal",
+  },
+  {
+    title: "A signal carries a time stamp.",
+    body: "Send a pulse and watch the radio wavefront spread.\nThe message gives the satellite's position and send time.\nTravel time × light speed gives an estimated range.",
+    action: null,
+  },
+  {
+    title: "A tiny clock error makes a big range error.",
+    body: "The receiver's clock may be 1 microsecond fast.\nThat adds about 300 meters to every measured range.\nUse a fourth satellite to solve position and clock bias.",
+    action: null,
+  },
+  {
+    title: "What if the sky is blocked?",
+    body: "Compare an open sky with a building-lined street.\nA reflected signal takes longer to arrive: multipath.\nWalls also block signals, especially indoors.",
+    action: null,
   },
 ];
+export const GNSS_SPATIAL_END = 8;
+export const GNSS_SATELLITE = 8;
+export const GNSS_SIGNAL = 9;
+export const GNSS_CLOCK = 10;
+export const GNSS_MULTIPATH = 11;
+export const LIGHT_SPEED_M_PER_S = 299792458;
+export function travelTimeMs(distanceKm) {
+  return distanceKm * 1000 / LIGHT_SPEED_M_PER_S * 1000;
+}
+export function clockBiasMeters(microseconds) {
+  return microseconds * 1e-6 * LIGHT_SPEED_M_PER_S;
+}
+export function pathLength(points) {
+  let length = 0;
+  for (let i = 1; i < points.length; i++)
+    length += Math.hypot(...points[i].map((v, axis) => v - points[i - 1][axis]));
+  return length;
+}
 export const beacons3D = [
   { x: -0.45, y: -0.15, z: 0 },
   { x: 0.45, y: -0.15, z: 0 },

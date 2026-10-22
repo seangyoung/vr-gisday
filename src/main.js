@@ -9,7 +9,15 @@ import {
   beacons3D,
   target3D,
   shellIntersection,
+  GNSS_SPATIAL_END,
+  GNSS_SATELLITE,
+  GNSS_SIGNAL,
+  GNSS_CLOCK,
+  GNSS_MULTIPATH,
+  travelTimeMs,
+  clockBiasMeters,
 } from "./model.js";
+import { GnssScene } from "./gnss/scene.js";
 import "./style.css";
 import { landingMarkup } from "./landing.js";
 import { LabSound } from "./sound.js";
@@ -124,6 +132,12 @@ let floatingModel = null,
 let rangeAnimations = [];
 let animationAge = 0;
 let lastAnimatedRangeStep = null;
+let gnssDisplay = null;
+let gnssPart = null;
+let gnssPulseSent = false;
+let gnssClockCorrected = false;
+let gnssEnvironment = null;
+let gnssEnvironmentsSeen = new Set();
 let uiFadeMeshes = [];
 let uiFadeAge = 1;
 let lastUIKey = "";
@@ -133,10 +147,12 @@ let soundButtons = [];
 let soundHiddenVisuals = [];
 let soundPreviousBackground = null;
 let soundBackgroundSaved = false;
-const isSpatial = () => step >= 4 && step < stages.length;
+const isSpatial = () => step >= 4 && step < GNSS_SPATIAL_END;
+const isGnssObject = () => step >= GNSS_SATELLITE && step <= GNSS_MULTIPATH;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase && !quiz;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
+  gnssDisplay = null;
   clusterReadout = null;
   rangeAnimations = [];
   animationAge = 0;
@@ -588,6 +604,11 @@ function start() {
   }
   preservePose = null;
   step = -2;
+  gnssPulseSent = false;
+  gnssPart = null;
+  gnssClockCorrected = false;
+  gnssEnvironment = null;
+  gnssEnvironmentsSeen = new Set();
   lastAnimatedRangeStep = null;
   elapsed = 0;
   noisy = false;
@@ -1573,7 +1594,8 @@ function drawRainUI() {
 }
 function next() {
   preservePose =
-    isSpatial() && floatingModel && step < stages.length - 1
+    ((isSpatial() && step < GNSS_SPATIAL_END - 1) || isGnssObject()) &&
+      floatingModel && step < stages.length - 1
       ? {
           position: floatingModel.position.clone(),
           quaternion: floatingModel.quaternion.clone(),
@@ -1582,7 +1604,7 @@ function next() {
       : null;
   step++;
   draw();
-  sound.cue(isSpatial() ? "reveal" : "measure");
+  sound.cue(isSpatial() || isGnssObject() ? "reveal" : "measure");
 }
 function planar() {
   const first = content.children.length;
@@ -1687,11 +1709,44 @@ function resetModelView() {
   forward.normalize();
   cam.getWorldPosition(floatingModel.position);
   floatingModel.position.addScaledVector(forward, 1.3);
-  floatingModel.position.y += 0.2;
+  floatingModel.position.y += isGnssObject() ? 0.4 : 0.2;
   floatingModel.quaternion.setFromEuler(
     new THREE.Euler(0.12, Math.atan2(-forward.x, -forward.z) + 0.72, 0, "YXZ"),
   );
-  floatingModel.scale.setScalar(0.35);
+  floatingModel.scale.setScalar(isGnssObject() ? 0.78 : 0.35);
+}
+function gnssObject() {
+  gnssDisplay = new GnssScene(step, {
+    clockCorrected: gnssClockCorrected,
+    environment: gnssEnvironment,
+  });
+  floatingModel = gnssDisplay.group;
+  scene.add(floatingModel);
+  grab = new ModelGrab(floatingModel, 0.48, 1.35);
+  resetModelView();
+  if (preservePose) {
+    floatingModel.position.copy(preservePose.position);
+    floatingModel.quaternion.copy(preservePose.quaternion);
+    floatingModel.scale.copy(preservePose.scale);
+    preservePose = null;
+  }
+}
+function keepGnssPose() {
+  if (!floatingModel) return;
+  preservePose = {
+    position: floatingModel.position.clone(),
+    quaternion: floatingModel.quaternion.clone(),
+    scale: floatingModel.scale.clone(),
+  };
+}
+function inspectGnssPart(ray) {
+  const part = gnssDisplay?.pickPart(ray);
+  if (!part) return false;
+  gnssPart = part;
+  keepGnssPose();
+  draw();
+  sound.cue("measure");
+  return true;
 }
 function spatial() {
   const group = new THREE.Group();
@@ -2103,7 +2158,7 @@ function drawScene() {
     return;
   }
   // Only the planar lesson uses a backdrop; the 3D assembly lives in world space.
-  if (!isSpatial() && (step !== -1 || xrMode === "immersive-ar")) {
+  if (!isSpatial() && !isGnssObject() && (step !== -1 || xrMode === "immersive-ar")) {
     const back = new THREE.Mesh(
       new THREE.PlaneGeometry(3.6, 3.9),
       new THREE.MeshBasicMaterial({ color: 0x0b2430, side: THREE.DoubleSide }),
@@ -2254,7 +2309,7 @@ function drawScene() {
       43,
     );
     label(
-      "Satellites broadcast their positions and times.\nA GNSS receiver uses those signals to calculate\nits 3D position and estimate its clock error.",
+      "Radio travel time gives a range; four or more signals\nlet a receiver solve 3D position and clock bias.\nOpen sky helps preserve a direct signal path.",
       0,
       -0.3,
       2,
@@ -2266,6 +2321,66 @@ function drawScene() {
     return;
   }
   const s = stages[step];
+  if (isGnssObject()) {
+    gnssObject();
+    lessonCard(s.title, s.body);
+    if (step === GNSS_SATELLITE) {
+      label(gnssPart ?? "Point at the wings, body, or antenna and press a trigger.",
+        0, GUIDED_INFO_Y, 2.35, 0.13, 30, "#b6d1d9", "#0b2430");
+      button(s.action, 0, GUIDED_ACTION_Y, next, 1.55);
+    }
+    if (step === GNSS_SIGNAL) {
+      label(gnssPulseSent
+        ? `Example: 20,200 km takes about ${travelTimeMs(20200).toFixed(1)} ms. Animation slowed for viewing.`
+        : "Point to Send pulse. Grip the model to inspect it from another angle.",
+      0, GUIDED_INFO_Y, 2.36, 0.13, 28, "#b6d1d9", "#0b2430");
+      button(gnssPulseSent ? "Send again" : "Send pulse", gnssPulseSent ? -0.55 : 0,
+        GUIDED_ACTION_Y, () => {
+          gnssPulseSent = true;
+          keepGnssPose();
+          draw();
+          gnssDisplay.fire();
+          sound.cue("measure");
+        }, gnssPulseSent ? 1.0 : 1.25);
+      if (gnssPulseSent) button("Clock bias", 0.55, GUIDED_ACTION_Y, next, 1.0);
+    }
+    if (step === GNSS_CLOCK) {
+      label(gnssClockCorrected
+        ? "Clock bias removed · corrected ranges meet at the receiver"
+        : `+1 μs on the receiver clock adds ${Math.round(clockBiasMeters(1))} m to each pseudorange`,
+      0, GUIDED_INFO_Y, 2.35, 0.13, 28,
+      gnssClockCorrected ? "#a6f5d9" : "#ffdc83", "#0b2430");
+      button(gnssClockCorrected ? "Test sky view" : "Use fourth signal",
+        0, GUIDED_ACTION_Y, () => {
+          if (gnssClockCorrected) next();
+          else {
+            keepGnssPose();
+            gnssClockCorrected = true;
+            draw();
+            sound.cue("correct");
+          }
+        }, 1.55);
+    }
+    if (step === GNSS_MULTIPATH) {
+      label(gnssEnvironment === "canyon"
+        ? `Reflected route ${gnssDisplay.pathRatio.toFixed(1)}× longer here; arrival is late.`
+        : gnssEnvironment === "open"
+          ? "Open sky: a clear direct path reaches the receiver"
+          : "Choose both sky conditions to compare the signal paths.",
+      0, GUIDED_INFO_Y, 2.35, 0.13, 28, "#b6d1d9", "#0b2430");
+      for (const [name, environment, x] of [
+        ["Open sky", "open", -0.74], ["City canyon", "canyon", 0],
+      ]) button(name, x, GUIDED_ACTION_Y, () => {
+        keepGnssPose();
+        gnssEnvironment = environment;
+        gnssEnvironmentsSeen.add(environment);
+        draw();
+      }, 1.1, gnssEnvironment === environment);
+      if (gnssEnvironmentsSeen.size === 2)
+        button("Takeaway", 0.74, GUIDED_ACTION_Y, next, 1.1);
+    }
+    return;
+  }
   if (isSpatial()) {
     spatial();
     lessonCard(s.title, s.body);
@@ -2380,6 +2495,7 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (soundMenuOpen) return;
+    if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
     if (viewshed) {
       if (viewshed.placeFromRay(raycaster)) sound.click();
       return;
@@ -2663,6 +2779,7 @@ renderer.setAnimationLoop((time, frame) => {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.1) : 0;
   lastTime = time;
   updateRangeAnimations(dt);
+  if (!soundMenuOpen) gnssDisplay?.update(dt);
   updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
   if (renderer.xr.isPresenting && frame) {
@@ -2692,7 +2809,7 @@ renderer.setAnimationLoop((time, frame) => {
       !soundMenuOpen
     ) {
       elapsed += dt;
-      if (elapsed >= 240) {
+      if (elapsed >= 300) {
         step = stages.length;
         draw();
       }
@@ -3081,6 +3198,7 @@ if (
     const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
     if (ui) ui.object.userData.action?.(ui);
     else if (soundMenuOpen) return;
+    else if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) pixels.placeFromRay(raycaster);
     else if (showcase) {

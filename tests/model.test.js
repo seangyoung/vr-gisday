@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { target, alternative, residual, candidates } from "../src/model.js";
+import { target, alternative, residual, candidates, stages,
+  GNSS_SATELLITE, GNSS_SIGNAL, GNSS_CLOCK, GNSS_MULTIPATH,
+  travelTimeMs, clockBiasMeters, pathLength } from "../src/model.js";
 test("two ranges permit reflected candidates, third disambiguates", () => {
   assert.ok(residual(target, 2) < 1e-12);
   assert.ok(residual(alternative, 2) < 1e-12);
@@ -53,4 +55,19 @@ test("the first two 3D ranges intersect in a circle through both candidates", ()
     assert.ok(Math.abs(Math.hypot(fromCenter.x, fromCenter.y, fromCenter.z) - ring.radius) < 1e-12);
   }
   assert.equal(shellIntersection(a, b, 0.1, 0.1), null);
+});
+
+test("GNSS signal timing and receiver clock bias use light speed", () => {
+  assert.ok(Math.abs(travelTimeMs(20200) - 67.38) < 0.1);
+  assert.ok(Math.abs(clockBiasMeters(1) - 299.792458) < 1e-6);
+  assert.ok(Math.abs(pathLength([[0, 0, 0], [3, 4, 0]]) - 5) < 1e-12);
+  assert.ok(pathLength([[0, 0], [2, 2], [4, 0]]) >
+    pathLength([[0, 0], [4, 0]]));
+});
+
+test("new GNSS interactions follow the exact-range shell lesson", () => {
+  assert.equal(stages[GNSS_SATELLITE].action, "Follow a signal");
+  assert.match(stages[GNSS_SIGNAL].body, /light speed/i);
+  assert.match(stages[GNSS_CLOCK].body, /fourth satellite/i);
+  assert.match(stages[GNSS_MULTIPATH].body, /multipath/i);
 });
