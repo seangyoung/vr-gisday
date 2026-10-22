@@ -176,23 +176,32 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   assert.equal(demo.clipboard.visible, true, "the clipboard returns at the top");
   const topRung = demo.marker.userData.rungs.at(-1);
   const topHand = topRung.getWorldPosition(new THREE.Vector3());
-  assert.equal(demo.gripRung(0, topHand), true, "gripping a step resumes climbing");
+  const perchedY = demo.group.position.y;
+  assert.equal(demo.gripRung(0, topHand), true, "gripping the pole resumes climbing");
   assert.equal(demo.isAtTop, false);
   demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(topHand)]]), 0.016);
-  assert.equal(demo.isAtTop, false, "a stationary re-grip does not immediately re-lock");
+  assert.ok(demo.group.position.y > perchedY &&
+    demo.group.position.y < demo.climbGroundY - 9.8,
+  "the view begins descending smoothly toward the rungs");
   assert.equal(demo.isClimbing, true);
   assert.equal(demo.clipboard.visible, false);
+  for (let i = 0; i < 45; i++)
+    demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(topHand)]]), 0.016);
+  assert.ok(Math.abs(demo.climbHeight - 9.85) < 0.01);
+  assert.ok(demo.lookoutSlide.length() < 0.01,
+    "the view has returned from the platform to the rung side");
   demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
-    topHand.clone().add(new THREE.Vector3(0, -0.02, 0)),
+    topHand.clone().add(new THREE.Vector3(0, 0.02, 0)),
   )]]), 0.016);
-  assert.equal(demo.isAtTop, false, "small hand jitter at the top does not re-lock");
+  assert.equal(demo.isAtTop, false, "small hand jitter does not re-lock the platform");
   demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
     topHand.clone().add(new THREE.Vector3(0, 0.2, 0)),
   )]]), 0.016);
-  assert.ok(demo.climbHeight < 10.3, "lifting the hand lowers the visitor");
-  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
-    topHand.clone().add(new THREE.Vector3(0, -0.25, 0)),
-  )]]), 0.016);
+  assert.ok(demo.climbHeight < 9.8, "lifting the hand lowers the visitor");
+  for (let i = 1; i <= 5; i++)
+    demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(
+      topHand.clone().add(new THREE.Vector3(0, 0.2 - 0.2 * i, 0)),
+    )]]), 0.016);
   assert.equal(demo.isAtTop, true, "climbing upward again can restore the top perch");
   topRung.getWorldPosition(topHand);
   assert.equal(demo.gripRung(0, topHand), true);
@@ -212,6 +221,55 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   assert.equal(demo.marker.userData.steps.visible, false);
   assert.equal(demo.marker.userData.lookout.visible, false);
   assert.ok(demo.marker.userData.mast.scale.y < 2.1);
+  demo.dispose();
+});
+
+test("gripping the platform rim pulls the view onto it, and pole grip eases back to the rungs", () => {
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
+  demo.visitor.set(demo.observer.x, demo.observer.z - 0.25);
+  demo.climbHeight = 9.3;
+  demo.group.position.y = demo.climbGroundY - demo.climbHeight;
+  demo.marker.updateWorldMatrix(true, true);
+  const rim = demo.marker.userData.lookoutRims[1];
+  const hand = rim.getWorldPosition(new THREE.Vector3());
+  assert.equal(demo.gripRung(0, hand.clone().add(new THREE.Vector3(2, 0, 0))), false);
+  assert.equal(demo.gripRung(0, hand), true);
+  assert.equal(demo.lookoutTransition?.kind, "pull");
+  const startingY = demo.group.position.y;
+  demo.updateClimb(new Map(), 0.2);
+  assert.ok(demo.group.position.y < startingY &&
+    demo.group.position.y > demo.climbGroundY - 10.4,
+  "the player rises through intermediate viewpoints");
+  assert.equal(demo.isAtTop, false);
+  demo.updateClimb(new Map(), 0.7);
+  assert.equal(demo.isAtTop, true);
+  assert.equal(demo.climbHeight, 10.4);
+  assert.ok(demo.lookoutSlide.length() > 0.2);
+  demo.updateClipboard(null, camera, true);
+  assert.equal(demo.clipboard.visible, true);
+
+  demo.marker.updateWorldMatrix(true, false);
+  const pole = demo.marker.localToWorld(new THREE.Vector3(0, 10.7, 0));
+  const topY = demo.group.position.y;
+  assert.equal(demo.gripRung(1, pole), true);
+  assert.equal(demo.lookoutTransition?.kind, "return");
+  assert.equal(demo.group.position.y, topY, "gripping the pole starts without a jump");
+  demo.updateClimb(new Map([[1, new THREE.Matrix4().setPosition(pole)]]), 0.2);
+  assert.ok(demo.group.position.y > topY &&
+    demo.group.position.y < demo.climbGroundY - 9.85,
+  "the player descends through intermediate viewpoints");
+  demo.updateClimb(new Map([[1, new THREE.Matrix4().setPosition(pole)]]), 0.5);
+  assert.equal(demo.lookoutTransition, null);
+  assert.equal(demo.isClimbing, true);
+  assert.ok(demo.lookoutSlide.length() < 0.01);
+  assert.ok(Math.abs(demo.climbHeight - 9.85) < 0.01);
+  demo.releaseRung(1);
   demo.dispose();
 });
 

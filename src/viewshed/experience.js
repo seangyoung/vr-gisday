@@ -13,6 +13,9 @@ const CLIMB_HEIGHT = TOWER_HEIGHT - 1.6;
 const RUNG_SPACING = 0.43;
 const LOOKOUT_Z = -0.54;
 const MAX_LOOKOUT_SHIFT = 0.65;
+const LOOKOUT_PULL_SECONDS = 0.85;
+const LOOKOUT_RETURN_SECONDS = 0.7;
+const RETURN_RUNG_DROP = 0.55;
 
 const visibleColor = new THREE.Color(0x55e5a9);
 const hiddenColor = new THREE.Color(0x9176bd);
@@ -118,15 +121,18 @@ function observationMarker() {
   const edgeMaterial = new THREE.MeshStandardMaterial({
     color: 0xd9bd78, emissive: 0x3d3215, roughness: 0.5,
   });
+  const lookoutRims = [];
   for (const z of [-1.01, -0.07]) {
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.025, 0.025), edgeMaterial);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.035, 0.035), edgeMaterial);
     edge.position.set(0, 0.015, z);
     lookout.add(edge);
+    lookoutRims.push(edge);
   }
   for (const x of [-0.59, 0.59]) {
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.96), edgeMaterial);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.96), edgeMaterial);
     edge.position.set(x, 0.015, LOOKOUT_Z);
     lookout.add(edge);
+    lookoutRims.push(edge);
   }
   for (const side of [-1, 1]) {
     const lower = new THREE.Vector3(side * 0.08, -1.05, 0);
@@ -147,6 +153,7 @@ function observationMarker() {
   marker.userData.rungs = rungs;
   marker.userData.steps = steps;
   marker.userData.lookout = lookout;
+  marker.userData.lookoutRims = lookoutRims;
   marker.userData.lookoutEdge = edgeMaterial;
   return marker;
 }
@@ -172,6 +179,7 @@ export class ViewshedExperience extends LayerExperience {
     this.fallSpeed = 0;
     this.topLocked = false;
     this.topLockReady = true;
+    this.lookoutTransition = null;
     this.lookoutSlide = new THREE.Vector2();
     this.lookoutGoal = new THREE.Vector2();
     this.revealAge = 1;
@@ -325,7 +333,8 @@ export class ViewshedExperience extends LayerExperience {
     return this.topLocked;
   }
   get isClimbing() {
-    return this.climbHands.size > 0 || (this.climbHeight > 0 && !this.topLocked);
+    return this.lookoutTransition !== null || this.climbHands.size > 0 ||
+      (this.climbHeight > 0 && !this.topLocked);
   }
   begin() {
     this.marker.visible = true;
@@ -360,15 +369,34 @@ export class ViewshedExperience extends LayerExperience {
     }
     return nearest?.rung ?? null;
   }
+  nearLookoutRim(handWorld) {
+    if (!handWorld?.isVector3 || !this.marker.userData.lookout.visible ||
+        this.visualHeight < TOWER_HEIGHT - 0.5) return false;
+    this.marker.updateWorldMatrix(true, true);
+    return this.marker.userData.lookoutRims.some((rim) =>
+      new THREE.Box3().setFromObject(rim).distanceToPoint(handWorld) < 0.42);
+  }
+  nearTowerPole(handWorld) {
+    if (!handWorld?.isVector3 || !this.marker.userData.steps.visible) return false;
+    this.marker.updateWorldMatrix(true, false);
+    const local = this.marker.worldToLocal(handWorld.clone());
+    return local.y > 0.4 && local.y < TOWER_HEIGHT + 0.25 &&
+      Math.hypot(local.x, local.z) < 0.42;
+  }
   gripRung(id, handWorld) {
     if (!this.started || this.finished || this.observer.height !== TOWER_HEIGHT ||
-        !this.nearestRung(handWorld)) return false;
-    const firstHand = !this.climbHands.size;
+        this.lookoutTransition) return false;
     if (this.topLocked) {
-      this.topLockReady = false;
-      this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
-      this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
+      if (!this.nearTowerPole(handWorld) && !this.nearestRung(handWorld)) return false;
+      this.returnToRungs(id);
+      return true;
     }
+    if (this.nearLookoutRim(handWorld)) {
+      this.pullOntoLookout();
+      return true;
+    }
+    if (!this.nearestRung(handWorld)) return false;
+    const firstHand = !this.climbHands.size;
     this.topLocked = false;
     this.climbHands.set(id, handWorld.y);
     this.fallSpeed = 0;
@@ -377,18 +405,51 @@ export class ViewshedExperience extends LayerExperience {
     return true;
   }
   releaseRung(id) {
+    if (this.lookoutTransition?.kind === "return" &&
+        this.lookoutTransition.handId === id)
+      this.lookoutTransition.released = true;
     this.climbHands.delete(id);
     if (!this.climbHands.size && this.climbHeight > 0) this.fallSpeed = 0;
+  }
+  lookoutTarget() {
+    const step = new THREE.Vector2(
+      this.visitor.x - this.observer.x,
+      this.visitor.y - (this.observer.z + LOOKOUT_Z),
+    ).clampLength(0, MAX_LOOKOUT_SHIFT);
+    return this.lookoutSlide.clone().add(step);
+  }
+  pullOntoLookout() {
+    this.lookoutTransition = {
+      kind: "pull", age: 0, duration: LOOKOUT_PULL_SECONDS,
+      fromHeight: this.climbHeight, toHeight: CLIMB_HEIGHT,
+      fromSlide: this.lookoutSlide.clone(), toSlide: this.lookoutTarget(),
+    };
+    this.climbHands.clear();
+    this.fallSpeed = 0;
+    this.clipboard.visible = false;
+    this.onChange();
+  }
+  returnToRungs(id) {
+    this.lookoutTransition = {
+      kind: "return", age: 0, duration: LOOKOUT_RETURN_SECONDS,
+      fromHeight: this.climbHeight, toHeight: CLIMB_HEIGHT - RETURN_RUNG_DROP,
+      fromSlide: this.lookoutSlide.clone(), toSlide: new THREE.Vector2(),
+      handId: id, released: false,
+    };
+    this.topLocked = false;
+    this.topLockReady = false;
+    this.climbHands.clear();
+    this.fallSpeed = 0;
+    this.clipboard.visible = false;
+    this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
+    this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
+    this.onChange();
   }
   lockLookout() {
     this.climbHeight = CLIMB_HEIGHT;
     this.topLocked = true;
     this.climbHands.clear();
-    const step = new THREE.Vector2(
-      this.visitor.x - this.observer.x,
-      this.visitor.y - (this.observer.z + LOOKOUT_Z),
-    ).clampLength(0, MAX_LOOKOUT_SHIFT);
-    this.lookoutGoal.copy(this.lookoutSlide).add(step);
+    this.lookoutGoal.copy(this.lookoutTarget());
     this.marker.userData.lookoutEdge.color.setHex(0x78e4c5);
     this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
   }
@@ -398,18 +459,51 @@ export class ViewshedExperience extends LayerExperience {
     const dx = THREE.MathUtils.damp(this.lookoutSlide.x, goalX, 8, dt) - this.lookoutSlide.x;
     const dz = THREE.MathUtils.damp(this.lookoutSlide.y, goalZ, 8, dt) - this.lookoutSlide.y;
     if (Math.abs(dx) + Math.abs(dz) < 1e-6) return;
+    this.moveLookoutSlide(this.lookoutSlide.clone().add(new THREE.Vector2(dx, dz)));
+  }
+  moveLookoutSlide(next) {
+    const dx = next.x - this.lookoutSlide.x;
+    const dz = next.y - this.lookoutSlide.y;
+    if (Math.abs(dx) + Math.abs(dz) < 1e-8) return;
     const angle = this.group.rotation.y;
     this.group.position.x += Math.cos(angle) * dx + Math.sin(angle) * dz;
     this.group.position.z += -Math.sin(angle) * dx + Math.cos(angle) * dz;
-    this.lookoutSlide.x += dx;
-    this.lookoutSlide.y += dz;
+    this.lookoutSlide.copy(next);
     this.visitor.x -= dx;
     this.visitor.y -= dz;
     this.updateVisitorMarkers();
   }
+  advanceLookoutTransition(poses, dt) {
+    const transition = this.lookoutTransition;
+    transition.age = Math.min(transition.duration, transition.age + dt);
+    const progress = transition.age / transition.duration;
+    const eased = progress * progress * (3 - 2 * progress);
+    this.climbHeight = THREE.MathUtils.lerp(
+      transition.fromHeight, transition.toHeight, eased);
+    this.group.position.y = this.climbGroundY - this.climbHeight;
+    this.moveLookoutSlide(transition.fromSlide.clone().lerp(transition.toSlide, eased));
+    if (progress < 1) return;
+    this.lookoutTransition = null;
+    if (transition.kind === "pull") {
+      this.topLocked = true;
+      this.lookoutGoal.copy(transition.toSlide);
+      this.marker.userData.lookoutEdge.color.setHex(0x78e4c5);
+      this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
+      this.onEvent("reveal");
+    } else if (!transition.released && poses.has(transition.handId)) {
+      const handY = new THREE.Vector3().setFromMatrixPosition(
+        poses.get(transition.handId)).y;
+      this.climbHands.set(transition.handId, handY);
+    }
+    this.onChange();
+  }
   updateClimb(poses, dt) {
     if (!this.started || this.finished) {
       this.cancelClimb();
+      return;
+    }
+    if (this.lookoutTransition) {
+      this.advanceLookoutTransition(poses, dt);
       return;
     }
     const deltas = [];
@@ -455,6 +549,7 @@ export class ViewshedExperience extends LayerExperience {
     this.lookoutSlide.set(0, 0);
     this.lookoutGoal.set(0, 0);
     this.climbHands.clear();
+    this.lookoutTransition = null;
     this.climbHeight = 0;
     this.fallSpeed = 0;
     this.topLocked = false;

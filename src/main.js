@@ -1001,7 +1001,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the heights.\nChoose Tower, grip its rungs, and climb to a hands-free lookout.",
+      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the heights.\nChoose Tower, climb its rungs, then grip the platform rim to pull up.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1055,11 +1055,15 @@ function drawViewshedUI() {
       .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
     button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
     label(v.isAtTop
-      ? "LOOKOUT LOCKED · Hands free · Re-grip a rung to descend"
+      ? "LOOKOUT LOCKED · Grip the pole to return to the rungs"
+      : v.lookoutTransition?.kind === "pull"
+      ? "Pulling onto the lookout"
+      : v.lookoutTransition?.kind === "return"
+      ? "Moving back to the rungs · Keep holding the pole"
       : v.isClimbing
       ? "Pull rungs down to climb · Release both grips to drop"
       : v.observer.height === 12
-      ? "Grip rungs and pull down · The top platform holds you hands free"
+      ? "Grip rungs to climb · Grip the rim to pull onto the platform"
       : "Choose Tower · 12 m to reveal the rungs and lookout platform",
     0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
   }
@@ -1984,7 +1988,8 @@ function controllerGuideContext(hand) {
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
-    return [viewshed.isClimbing ? null : "Place tower", "Grip rung", onMenu,
+    return [viewshed.isClimbing ? null : "Place tower",
+      viewshed.isAtTop ? "Grip pole" : "Grip rung / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if ((layers?.started && !layers.finished) || (pixels?.started && !pixels.finished))
     return ["Select", null, onMenu, exitLabel, teleportHint];
