@@ -1,4 +1,5 @@
-import { projectMetric } from "./projection-model.js";
+import { geoProject } from "d3-geo-projection";
+import { createD3Projection, projectMetric } from "./projection-model.js";
 
 const DEG = Math.PI / 180;
 const RAD = 180 / Math.PI;
@@ -88,10 +89,24 @@ export function clampContinentLatitude(continent, requestedLatitude,
 }
 
 export function projectedContinentRings(continent, targetCenter, projection,
-  standardParallel = 0) {
+  standardParallel = 0, centralMeridian = 0) {
   const [targetLongitude, targetLatitude] = targetCenter;
-  const reference = projectMetric(0, targetLatitude,
+  const cylindrical = ["equirectangular", "mercator", "equalArea"]
+    .includes(projection);
+  const relativeCenter = wrapLongitude(targetLongitude - centralMeridian);
+  const reference = projectMetric(cylindrical ? 0 : relativeCenter, targetLatitude,
     projection, standardParallel);
+  if (!cylindrical) {
+    // D3 streams polygon edges through antimeridian and interrupted-lobe
+    // clipping. Projecting each vertex alone would join across those cuts.
+    const geometry = { type: "MultiPolygon",
+      coordinates: shiftedContinentRings(continent, targetCenter)
+        .map((ring) => [[...ring, ring[0]]]) };
+    const projected = geoProject(geometry,
+      createD3Projection(projection, centralMeridian));
+    return projected.coordinates.flatMap((polygon) => polygon.map((ring) =>
+      ring.map(([x, y]) => [x - reference.x, -y - reference.y])));
+  }
   const xFactor = projection === "equalArea"
     ? Math.cos(standardParallel * DEG) : 1;
   return shiftedContinentRings(continent, targetCenter).map((ring) => {
@@ -103,12 +118,6 @@ export function projectedContinentRings(continent, targetCenter, projection,
         while (relative - previous < -180) relative += 360;
       }
       previous = relative;
-      if (!["equirectangular", "mercator", "equalArea"].includes(projection)) {
-        const projected = projectMetric(Math.max(-180, Math.min(180, relative)),
-          lat, projection, standardParallel);
-        return [projected.x - reference.x,
-          projected.y - reference.y];
-      }
       return [relative * DEG * xFactor,
         projectMetric(0, lat, projection, standardParallel).y - reference.y];
     });

@@ -79,9 +79,14 @@ const d3Cache = new Map();
 const extentCache = new Map();
 
 function d3Projection(name) {
-  if (!d3Cache.has(name)) d3Cache.set(name,
-    d3Projections[name]().scale(1).translate([0, 0]).center([0, 0]));
+  if (!d3Cache.has(name)) d3Cache.set(name, createD3Projection(name));
   return d3Cache.get(name);
+}
+
+export function createD3Projection(name, centralMeridian = 0) {
+  if (!d3Projections[name]) throw new RangeError(`Unknown D3 projection: ${name}`);
+  return d3Projections[name]().scale(1).translate([0, 0]).center([0, 0])
+    .rotate([-centralMeridian, 0]);
 }
 
 export function projectionExtent(projection, standardParallel = 0) {

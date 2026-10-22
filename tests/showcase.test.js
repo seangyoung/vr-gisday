@@ -285,6 +285,23 @@ test("one landmass visibly expands in Mercator and keeps area in equal-area", ()
   assert.equal(clampContinentLatitude(antarctica, 0, "equalArea"), 0);
 });
 
+test("curved-projection continent overlays clip at the map seam", () => {
+  const eurasia = CONTINENTS.find((continent) => continent.name === "Eurasia");
+  const home = projectedContinentRings(eurasia, eurasia.center, "mollweide");
+  const moved = projectedContinentRings(eurasia,
+    [eurasia.center[0], eurasia.center[1] - 10], "mollweide");
+  assert.ok(home.length > eurasia.rings.length,
+    "the landmass crossing the map seam should split into drawable pieces");
+  assert.ok(Math.abs(projectedFootprintArea(moved) /
+    projectedFootprintArea(home) - 1) < 0.01);
+  const australia = CONTINENTS.find((continent) => continent.name === "Australia");
+  const goodeHome = projectedFootprintArea(projectedContinentRings(
+    australia, australia.center, "goode"));
+  const goodeMoved = projectedFootprintArea(projectedContinentRings(
+    australia, [australia.center[0], 60], "goode"));
+  assert.ok(Math.abs(goodeMoved / goodeHome - 1) < 0.01);
+});
+
 test("continent tooltip reports moved map footprint and polar limits", () => {
   const australia = CONTINENTS.find((c) => c.name === "Australia");
   assert.match(continentDistortionSummary(australia, "mercator", 60, 3.4).detail,

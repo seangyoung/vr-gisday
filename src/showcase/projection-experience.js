@@ -201,7 +201,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.continentFootprintRatio = 1;
     this.continentAtLimit = false;
     this.continentHomeKey = null;
-    this.continentRenderedLatitude = null;
+    this.continentRenderedTarget = null;
     this.continentHomeArea = 1;
     this.continentGripBy = null;
     this.continentGrip = null;
@@ -316,7 +316,7 @@ export class ProjectionExperience extends TimedExhibit {
     this.continentFootprintRatio = 1;
     this.continentAtLimit = false;
     this.continentHomeKey = null;
-    this.continentRenderedLatitude = null;
+    this.continentRenderedTarget = null;
     this.continentGripBy = null;
     this.continentGrip = null;
     this.continentOverlay.visible = false;
@@ -332,26 +332,27 @@ export class ProjectionExperience extends TimedExhibit {
     const continent = this.selectedContinent;
     if (!continent || !this.continentTarget) return;
     const scale = projectionFitScale(this.projection, this.standardParallel);
-    const homeKey = `${continent.name}:${this.projection}:${this.standardParallel}`;
+    const homeKey = `${continent.name}:${this.projection}:${this.standardParallel}:${this.centralMeridian}`;
     if (this.continentHomeKey !== homeKey) {
       const home = projectedContinentRings(continent, continent.center,
-        this.projection, this.standardParallel);
+        this.projection, this.standardParallel, this.centralMeridian);
       this.continentHomeArea = projectedFootprintArea(home);
       paintLandmassShape(this.continentHome, this.continentHomeCanvas,
         home.map((ring) => ring.map(([x, y]) => [x * scale, y * scale])),
         "#80ecf5", "#80ecf51a");
       this.continentHomeKey = homeKey;
-      this.continentRenderedLatitude = null;
+      this.continentRenderedTarget = null;
     }
-    if (this.continentRenderedLatitude !== this.continentTarget[1]) {
+    const targetKey = this.continentTarget.join(":");
+    if (this.continentRenderedTarget !== targetKey) {
       const moved = projectedContinentRings(continent, this.continentTarget,
-        this.projection, this.standardParallel);
+        this.projection, this.standardParallel, this.centralMeridian);
       this.continentFootprintRatio = this.continentHomeArea > 0
         ? projectedFootprintArea(moved) / this.continentHomeArea : 1;
       paintLandmassShape(this.continentOverlay, this.continentCanvas,
         moved.map((ring) => ring.map(([x, y]) => [x * scale, y * scale])),
         "#fff3d2", "#ffd17b66");
-      this.continentRenderedLatitude = this.continentTarget[1];
+      this.continentRenderedTarget = targetKey;
     }
     this.continentHome.position.copy(this.projectedContinentCenter(
       continent.center)).setZ(0.08);
@@ -416,7 +417,7 @@ export class ProjectionExperience extends TimedExhibit {
       this.continentTarget = [...hit.continent.center];
       this.continentAtLimit = false;
       this.continentHomeKey = null;
-      this.continentRenderedLatitude = null;
+      this.continentRenderedTarget = null;
       this.spin.end();
       this.spin.yawVelocity = this.spin.pitchVelocity = 0;
       const longitude = (hit.uv.x * 360 - 180) * Math.PI / 180;
@@ -576,7 +577,10 @@ export class ProjectionExperience extends TimedExhibit {
       const longitude = (((gesture.uv.x + offset) % 1 + 1) % 1) * 360 - 180;
       const latitude = gesture.uv.y * 180 - 90;
       this.selectCircle(nearestTissotCircle(longitude, latitude));
-    } else if (gesture.kind === "map") this.onChange();
+    } else if (gesture.kind === "map") {
+      if (this.selectedContinent) this.paintContinentOverlay();
+      this.onChange();
+    }
   }
   selectCircle(circle) {
     if (!this.started || this.finished || !this.tissot) return;
@@ -757,10 +761,13 @@ export class ProjectionExperience extends TimedExhibit {
     if (this.selectedCircle) this.updateTooltip();
     else this.positionTooltip();
     if (this.selectedContinent) {
-      this.continentHome.position.copy(this.projectedContinentCenter(
-        this.selectedContinent.center)).setZ(0.08);
-      this.continentOverlay.position.copy(this.projectedContinentCenter(
-        this.continentTarget)).setZ(this.continentGripBy === null ? 0.1 : 0.56);
+      if (redraw) this.paintContinentOverlay();
+      else {
+        this.continentHome.position.copy(this.projectedContinentCenter(
+          this.selectedContinent.center)).setZ(0.08);
+        this.continentOverlay.position.copy(this.projectedContinentCenter(
+          this.continentTarget)).setZ(this.continentGripBy === null ? 0.1 : 0.56);
+      }
     }
     if (redraw) this.onChange();
   }
