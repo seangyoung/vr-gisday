@@ -371,7 +371,8 @@ function closeSoundMenu() {
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
   const visualRoots = [
-    root, floatingModel, rain?.group, scan?.group, showcase?.model, quiz?.group,
+    root, floatingModel, rain?.group, scan?.group, showcase?.model,
+    quiz?.group, quiz?.letterField, quiz?.effects,
     ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
     ...[layers, viewshed, pixels].flatMap((demo) =>

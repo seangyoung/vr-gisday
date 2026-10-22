@@ -1,11 +1,11 @@
 import * as THREE from "three";
 import { QuizSession } from "./session.js";
 import { makeQuizRound } from "./questions.js";
-import { sweptBladeHits } from "./slice-hit.js";
+import { sweptBladeHitFraction } from "./slice-hit.js";
+import { initialTilePose, answerBlockPose } from "./layout.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
-const up = new THREE.Vector3(0, 1, 0);
 
 function wrapLines(ctx, text, maxWidth) {
   const lines = [];
@@ -22,35 +22,41 @@ function wrapLines(ctx, text, maxWidth) {
 }
 
 function textCanvas(text, color = "#f3fffc", background = "#123541",
-  fontScale = 1) {
+  fontScale = 1, targetAspect = null) {
   const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 384;
+  canvas.width = targetAspect ? text.length === 1 ? 256 : 512 : 1024;
+  canvas.height = targetAspect
+    ? Math.round(canvas.width / targetAspect) : 384;
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = "#72c7c0";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(5, 5, 1014, 374);
-  let size = 96 * fontScale;
+  ctx.lineWidth = Math.max(3, canvas.width / 128);
+  const inset = ctx.lineWidth / 2 + 2;
+  ctx.strokeRect(inset, inset, canvas.width - inset * 2,
+    canvas.height - inset * 2);
+  let size = targetAspect ? canvas.height * 0.25 * fontScale : 96 * fontScale;
   let lines;
   do {
     ctx.font = `600 ${size}px system-ui, sans-serif`;
-    lines = wrapLines(ctx, text, 930);
-    if (lines.length <= 3 && lines.length * size * 1.17 <= 332) break;
-    size -= 5;
-  } while (size > 45);
+    lines = wrapLines(ctx, text, canvas.width * 0.91);
+    if (lines.length <= 3 && lines.length * size * 1.17 <=
+        canvas.height * 0.87) break;
+    size -= targetAspect ? 2 : 5;
+  } while (size > (targetAspect ? 14 : 45));
   ctx.fillStyle = color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((line, index) =>
-    ctx.fillText(line, 512, 192 + (index - (lines.length - 1) / 2) * size * 1.17, 936));
+    ctx.fillText(line, canvas.width / 2,
+      canvas.height / 2 + (index - (lines.length - 1) / 2) * size * 1.17,
+      canvas.width * 0.91));
   return canvas;
 }
 
 function panel(text, width, height, x, y, options = {}) {
   const canvas = textCanvas(text, options.color, options.background,
-    options.fontScale);
+    options.fontScale, options.targetAspect ? width / height : null);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
@@ -81,8 +87,11 @@ export class QuizExperience {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.screen = new THREE.Group();
+    this.group.add(this.screen);
+    this.letterField = new THREE.Group();
+    scene.add(this.letterField);
     this.effects = new THREE.Group();
-    this.group.add(this.screen, this.effects);
+    scene.add(this.effects);
     this.blades = controllers.map(({ grip, id }) => {
       const blade = new THREE.Group();
       const color = id === 0 ? 0x79eaff : 0xffd184;
@@ -131,6 +140,8 @@ export class QuizExperience {
     this.group.position.copy(eye).addScaledVector(forward, 1.32);
     this.group.position.y = eye.y - 0.03;
     this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
+    this.letterField.position.copy(eye);
+    this.letterField.rotation.y = Math.atan2(-forward.x, -forward.z);
   }
 
   addPanel(text, width, height, x, y, options) {
@@ -139,7 +150,7 @@ export class QuizExperience {
     return mesh;
   }
 
-  addTarget(text, x, y, width, height, color, action) {
+  addTarget(text, x, y, width, height, color, action, parent = this.screen) {
     const group = new THREE.Group();
     group.position.set(x, y, 0);
     const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.12),
@@ -148,39 +159,42 @@ export class QuizExperience {
       new THREE.LineBasicMaterial({ color: 0xd4f6f1 }));
     const face = panel(text, width - 0.024, height - 0.024, 0, 0,
       { z: 0.064, background: `#${color.toString(16).padStart(6, "0")}`,
-        fontScale: text.length === 1 ? 1.6 : height < 0.25 ? 1.0 : 1 });
+        fontScale: text.length === 1 ? 1.6 : 1, targetAspect: true });
     group.add(body, edge, face);
-    this.screen.add(group);
-    const target = { group, face, text, x, y, width, height, color, action,
-      box: { min: { x: x - width / 2, y: y - height / 2, z: -0.08 },
-        max: { x: x + width / 2, y: y + height / 2, z: 0.08 } } };
+    parent.add(group);
+    const target = { group, face, text, width, height, color, action,
+      box: { min: { x: -width / 2, y: -height / 2, z: -0.08 },
+        max: { x: width / 2, y: height / 2, z: 0.08 } } };
     this.targets.push(target);
     return target;
   }
 
   render() {
     while (this.screen.children.length) disposeTree(this.screen.children[0]);
+    while (this.letterField.children.length)
+      disposeTree(this.letterField.children[0]);
     this.targets = [];
     this.timerShown = -1;
     if (!this.session) {
       this.addPanel("GEOSLICE · THE GIS DAY CHALLENGE", 2.15, 0.25,
         0, 0.87, { color: "#a6f5d9" });
-      this.addPanel("Slice answers fast. Correct answers earn more points when you respond quickly.", 2.08, 0.22,
+      this.addPanel("Turn to collect three initials. Slice Start. Fast correct answers earn more points.", 2.08, 0.22,
         0, 0.60);
       this.addPanel(`Your initials: ${this.initials.padEnd(3, "_").split("").join("  ")}`,
         0.78, 0.19, 0, 0.40, { color: "#ffdc89" });
       const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
       for (let index = 0; index < letters.length; index++) {
-        const column = index % 7;
-        const row = Math.floor(index / 7);
         const letter = letters[index];
-        this.addTarget(letter, (column - 3) * 0.30, 0.17 - row * 0.22,
-          0.245, 0.17, 0x2b7084, () => {
+        const pose = initialTilePose(index, letters.length);
+        const tile = this.addTarget(letter, pose.x, pose.y,
+          0.215, 0.23, 0x2b7084, () => {
             if (this.initials.length >= 3) return;
             this.initials += letter;
             this.sound.slice(true);
             this.render();
-          });
+          }, this.letterField);
+        tile.group.position.z = pose.z;
+        tile.group.rotation.y = pose.yaw;
       }
       this.addTarget("Erase", -0.55, -0.78, 0.48, 0.18, 0x6b5c82, () => {
         this.initials = this.initials.slice(0, -1);
@@ -252,10 +266,11 @@ export class QuizExperience {
     }
     this.timerPanel = this.addPanel("18 seconds", 0.95, 0.15, 0, 0.13,
       { color: "#ffdc89", fontScale: 0.9 });
-    question.choices.forEach((choice, index) =>
-      this.addTarget(choice, index % 2 ? 0.55 : -0.55,
-        index < 2 ? -0.19 : -0.60,
-        0.98, 0.31, ANSWER_COLORS[index], () => this.choose(index)));
+    question.choices.forEach((choice, index) => {
+      const pose = answerBlockPose(index);
+      this.addTarget(choice, pose.x, pose.y, 0.49, 0.43,
+        ANSWER_COLORS[index], () => this.choose(index));
+    });
   }
 
   begin() {
@@ -302,8 +317,10 @@ export class QuizExperience {
   }
 
   split(target) {
+    target.group.updateWorldMatrix(true, false);
     const fragmentGroup = new THREE.Group();
-    fragmentGroup.position.set(target.x, target.y, 0);
+    target.group.getWorldPosition(fragmentGroup.position);
+    target.group.getWorldQuaternion(fragmentGroup.quaternion);
     for (const side of [-1, 1]) {
       const half = new THREE.Group();
       half.position.x = side * target.width / 4;
@@ -327,21 +344,33 @@ export class QuizExperience {
   }
 
   updateBlades(dt, allowHit) {
-    this.group.updateWorldMatrix(true, false);
     for (const hand of this.blades) {
       hand.blade.visible = hand.grip.visible;
       if (!hand.grip.visible) { hand.previous = null; continue; }
       hand.grip.updateWorldMatrix(true, false);
       const current = BLADE_SAMPLES.map((z) =>
-        this.group.worldToLocal(hand.grip.localToWorld(new THREE.Vector3(0, 0, z))));
+        hand.grip.localToWorld(new THREE.Vector3(0, 0, z)));
       if (allowHit && hand.previous && dt > 0) {
         const tip = current.at(-1);
         const oldTip = hand.previous.at(-1);
         const speed = tip.distanceTo(oldTip) / dt;
         if (speed > 1.2 && speed < 15) this.sound.whoosh();
         if (this.age - this.lastHit > 0.35) {
-          const target = this.targets.find((item) =>
-            sweptBladeHits(hand.previous, current, item.box, dt));
+          let target = null;
+          let firstContact = Infinity;
+          for (const item of this.targets) {
+            item.group.updateWorldMatrix(true, false);
+            const previousLocal = hand.previous.map((point) =>
+              item.group.worldToLocal(point.clone()));
+            const currentLocal = current.map((point) =>
+              item.group.worldToLocal(point.clone()));
+            const fraction = sweptBladeHitFraction(previousLocal, currentLocal,
+              item.box, dt);
+            if (fraction !== null && fraction < firstContact) {
+              firstContact = fraction;
+              target = item;
+            }
+          }
           if (target) {
             this.lastHit = this.age;
             this.split(target);
@@ -418,6 +447,8 @@ export class QuizExperience {
     this.clearMotion();
     for (const { blade } of this.blades) disposeTree(blade);
     disposeTree(this.group);
+    disposeTree(this.letterField);
+    disposeTree(this.effects);
     this.targets = [];
     this.fragments = [];
   }
