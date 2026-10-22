@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { QuizSession } from "./session.js";
 import { makeQuizRound } from "./questions.js";
-import { sweptBladeHitFraction } from "./slice-hit.js";
+import { sweptBladeContact, bladeCutAtContact } from "./slice-hit.js";
 import { initialTilePose, answerBlockPose } from "./layout.js";
+import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
@@ -21,12 +22,13 @@ function wrapLines(ctx, text, maxWidth) {
   return lines;
 }
 
-function textCanvas(text, color = "#f3fffc", background = "#123541",
-  fontScale = 1, targetAspect = null) {
+function textCanvas(text, width, height, color = "#f3fffc",
+  background = "#123541", fontScale = 1) {
   const canvas = document.createElement("canvas");
-  canvas.width = targetAspect ? text.length === 1 ? 256 : 512 : 1024;
-  canvas.height = targetAspect
-    ? Math.round(canvas.width / targetAspect) : 384;
+  const pixelsPerMeter = width < 0.3 ? 1100 : 850;
+  canvas.width = Math.min(2048, Math.max(256, Math.round(width * pixelsPerMeter)));
+  canvas.height = Math.min(1024, Math.max(128,
+    Math.round(canvas.width * height / width)));
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = background;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -35,28 +37,28 @@ function textCanvas(text, color = "#f3fffc", background = "#123541",
   const inset = ctx.lineWidth / 2 + 2;
   ctx.strokeRect(inset, inset, canvas.width - inset * 2,
     canvas.height - inset * 2);
-  let size = targetAspect ? canvas.height * 0.25 * fontScale : 96 * fontScale;
+  let size = canvas.height * 0.49 * fontScale;
   let lines;
   do {
-    ctx.font = `600 ${size}px system-ui, sans-serif`;
-    lines = wrapLines(ctx, text, canvas.width * 0.91);
+    ctx.font = `600 ${Math.round(size)}px system-ui, sans-serif`;
+    lines = wrapLines(ctx, text, canvas.width * 0.85);
     if (lines.length <= 3 && lines.length * size * 1.17 <=
-        canvas.height * 0.87) break;
-    size -= targetAspect ? 2 : 5;
-  } while (size > (targetAspect ? 14 : 45));
+        canvas.height * 0.84 && lines.every((line) =>
+      ctx.measureText(line).width <= canvas.width * 0.85)) break;
+    size -= 2;
+  } while (size > 18);
   ctx.fillStyle = color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((line, index) =>
     ctx.fillText(line, canvas.width / 2,
-      canvas.height / 2 + (index - (lines.length - 1) / 2) * size * 1.17,
-      canvas.width * 0.91));
+      canvas.height / 2 + (index - (lines.length - 1) / 2) * size * 1.17));
   return canvas;
 }
 
 function panel(text, width, height, x, y, options = {}) {
-  const canvas = textCanvas(text, options.color, options.background,
-    options.fontScale, options.targetAspect ? width / height : null);
+  const canvas = textCanvas(text, width, height, options.color,
+    options.background, options.fontScale);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
@@ -65,6 +67,37 @@ function panel(text, width, height, x, y, options = {}) {
   mesh.position.set(x, y, options.z ?? 0.07);
   mesh.userData.canvas = canvas;
   return mesh;
+}
+
+function cutPieceGeometry(polygon, center, width, height) {
+  const depth = 0.12;
+  const positions = [];
+  const uvs = [];
+  const push = (vertex, z) => {
+    positions.push(vertex.x - center.x, vertex.y - center.y, z);
+    uvs.push(vertex.x / width + 0.5, vertex.y / height + 0.5);
+  };
+  const triangle = (a, b, c, z) => {
+    push(a, z); push(b, z); push(c, z);
+  };
+  for (let index = 1; index < polygon.length - 1; index++)
+    triangle(polygon[0], polygon[index], polygon[index + 1], depth / 2);
+  const frontCount = positions.length / 3;
+  for (let index = 1; index < polygon.length - 1; index++)
+    triangle(polygon[0], polygon[index + 1], polygon[index], -depth / 2);
+  for (let index = 0; index < polygon.length; index++) {
+    const a = polygon[index];
+    const b = polygon[(index + 1) % polygon.length];
+    push(a, -depth / 2); push(b, -depth / 2); push(b, depth / 2);
+    push(a, -depth / 2); push(b, depth / 2); push(a, depth / 2);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.addGroup(0, frontCount, 0);
+  geometry.addGroup(frontCount, positions.length / 3 - frontCount, 1);
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function disposeTree(root) {
@@ -127,6 +160,7 @@ export class QuizExperience {
     this.leaderboardRows = [];
     this.gisDayRows = [];
     this.submitted = false;
+    this.feedbackRevealAt = 0;
     this.disposed = false;
     this.render();
   }
@@ -159,7 +193,7 @@ export class QuizExperience {
       new THREE.LineBasicMaterial({ color: 0xd4f6f1 }));
     const face = panel(text, width - 0.024, height - 0.024, 0, 0,
       { z: 0.064, background: `#${color.toString(16).padStart(6, "0")}`,
-        fontScale: text.length === 1 ? 1.6 : 1, targetAspect: true });
+        fontScale: text.length === 1 ? 1.6 : 1 });
     group.add(body, edge, face);
     parent.add(group);
     const target = { group, face, text, width, height, color, action,
@@ -170,6 +204,7 @@ export class QuizExperience {
   }
 
   render() {
+    this.feedbackRevealAt = 0;
     while (this.screen.children.length) disposeTree(this.screen.children[0]);
     while (this.letterField.children.length)
       disposeTree(this.letterField.children[0]);
@@ -286,7 +321,11 @@ export class QuizExperience {
     const result = this.session.answer(index);
     if (!result) return;
     this.sound.slice(result.correct);
-    this.render();
+    // Hold the board briefly so the cut can open before feedback covers it.
+    for (const target of this.targets) target.group.visible = false;
+    this.targets = [];
+    if (this.timerPanel) this.timerPanel.visible = false;
+    this.feedbackRevealAt = this.age + 0.82;
   }
 
   requestQuit() {
@@ -316,31 +355,32 @@ export class QuizExperience {
     for (const blade of this.blades) blade.previous = null;
   }
 
-  split(target) {
+  split(target, cut = { point: { x: 0, y: 0 },
+    direction: { x: 1, y: 1 } }) {
     target.group.updateWorldMatrix(true, false);
     const fragmentGroup = new THREE.Group();
     target.group.getWorldPosition(fragmentGroup.position);
     target.group.getWorldQuaternion(fragmentGroup.quaternion);
-    for (const side of [-1, 1]) {
-      const half = new THREE.Group();
-      half.position.x = side * target.width / 4;
-      half.add(new THREE.Mesh(
-        new THREE.BoxGeometry(target.width / 2 - 0.004, target.height, 0.12),
-        new THREE.MeshBasicMaterial({ color: target.color })));
+    const { polygons, normal } = splitRectangle(target.width,
+      target.height, cut.point, cut.direction);
+    const pieces = [];
+    for (const [index, polygon] of polygons.entries()) {
+      const center = polygonCentroid(polygon);
       const texture = new THREE.CanvasTexture(target.face.userData.canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      const geometry = new THREE.PlaneGeometry(target.width / 2 - 0.012,
-        target.height - 0.024);
-      const uv = geometry.attributes.uv;
-      for (let i = 0; i < uv.count; i++)
-        uv.setX(i, side < 0 ? uv.getX(i) * 0.5 : 0.5 + uv.getX(i) * 0.5);
-      half.add(new THREE.Mesh(geometry,
-        new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })));
-      half.children[1].position.z = 0.065;
-      fragmentGroup.add(half);
+      const piece = new THREE.Mesh(
+        cutPieceGeometry(polygon, center, target.width, target.height), [
+          new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+          new THREE.MeshBasicMaterial({ color: target.color,
+            side: THREE.DoubleSide }),
+        ]);
+      piece.position.set(center.x, center.y, 0);
+      fragmentGroup.add(piece);
+      pieces.push({ mesh: piece, side: index === 0 ? -1 : 1,
+        start: center });
     }
     this.effects.add(fragmentGroup);
-    this.fragments.push({ group: fragmentGroup, age: 0 });
+    this.fragments.push({ group: fragmentGroup, pieces, normal, age: 0 });
   }
 
   updateBlades(dt, allowHit) {
@@ -358,22 +398,24 @@ export class QuizExperience {
         if (this.age - this.lastHit > 0.35) {
           let target = null;
           let firstContact = Infinity;
+          let cut = null;
           for (const item of this.targets) {
             item.group.updateWorldMatrix(true, false);
             const previousLocal = hand.previous.map((point) =>
               item.group.worldToLocal(point.clone()));
             const currentLocal = current.map((point) =>
               item.group.worldToLocal(point.clone()));
-            const fraction = sweptBladeHitFraction(previousLocal, currentLocal,
+            const contact = sweptBladeContact(previousLocal, currentLocal,
               item.box, dt);
-            if (fraction !== null && fraction < firstContact) {
-              firstContact = fraction;
+            if (contact && contact.fraction < firstContact) {
+              firstContact = contact.fraction;
               target = item;
+              cut = bladeCutAtContact(previousLocal, currentLocal, contact);
             }
           }
           if (target) {
             this.lastHit = this.age;
-            this.split(target);
+            this.split(target, cut);
             target.action();
             if (this.disposed) return;
           }
@@ -406,18 +448,25 @@ export class QuizExperience {
     this.age += dt;
     for (const fragment of [...this.fragments]) {
       fragment.age += dt;
-      const [left, right] = fragment.group.children;
-      for (const [half, side] of [[left, -1], [right, 1]]) {
-        half.position.x += side * dt * 0.25;
-        half.position.y -= dt * (0.16 + fragment.age * 1.3);
-        half.rotation.z += side * dt * 2.4;
+      for (const { mesh, side, start } of fragment.pieces) {
+        mesh.position.x = start.x + side * fragment.normal.x * fragment.age * 0.34;
+        mesh.position.y = start.y + side * fragment.normal.y * fragment.age * 0.34 -
+          fragment.age * fragment.age * 0.55;
+        mesh.rotation.z = side * fragment.age * 1.35;
       }
-      if (fragment.age > 0.8) {
+      if (fragment.age > 1.18) {
         disposeTree(fragment.group);
         this.fragments.splice(this.fragments.indexOf(fragment), 1);
       }
     }
     if (!active) { this.clearMotion(); return; }
+    if (this.feedbackRevealAt) {
+      if (this.age < this.feedbackRevealAt) {
+        this.updateBlades(dt, false);
+        return;
+      }
+      this.render();
+    }
     const oldPhase = this.session?.phase;
     const oldIndex = this.session?.index;
     this.session?.update(dt);
