@@ -70,6 +70,7 @@ export class ControllerGuide {
     this.onMenu = false;
     this.exitLabel = "Exit demo";
     this.stickAction = null;
+    this.quizMode = false;
     this.dwell = 0;
     this.hold = 0;
     this.labels = [];
@@ -88,15 +89,16 @@ export class ControllerGuide {
   }
 
   setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo",
-    stickAction = null) {
+    stickAction = null, quizMode = false) {
     if (trigger === this.trigger && gripAction === this.gripAction &&
         onMenu === this.onMenu && exitLabel === this.exitLabel &&
-        stickAction === this.stickAction) return;
+        stickAction === this.stickAction && quizMode === this.quizMode) return;
     this.trigger = trigger;
     this.gripAction = gripAction;
     this.onMenu = onMenu;
     this.exitLabel = exitLabel;
     this.stickAction = stickAction;
+    this.quizMode = quizMode;
     this.clearLabels();
   }
 
@@ -123,11 +125,11 @@ export class ControllerGuide {
       });
       this.materialsPrepared = true;
     }
-    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}`;
+    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}:${this.quizMode}`;
     if (this.labelKey === key) return this.labels.length > 0;
     this.clearLabels();
     const buttons = this.handedness === "left"
-      ? leftButtons.filter(([id]) => !this.onMenu || id !== "x")
+      ? this.quizMode ? [] : leftButtons.filter(([id]) => !this.onMenu || id !== "x")
       : rightButtons.map((spec) => spec[0] === "b"
         ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec);
     const specs = [

@@ -97,6 +97,7 @@ export class LabSound {
     this.active = true;
     this.lastScan = -Infinity;
     this.lastCue = -Infinity;
+    this.lastWhoosh = -Infinity;
   }
   unlock() {
     try {
@@ -111,6 +112,7 @@ export class LabSound {
         this.effectsBus.gain.value = this.effectsEnabled ? 1 : 0;
         this.effectsBus.connect(this.master);
         const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+        this.effectNoise = buffer;
         const data = buffer.getChannelData(0);
         for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
         const noise = ctx.createBufferSource();
@@ -275,6 +277,45 @@ export class LabSound {
   click() {
     this.unlock();
     this.tone(620);
+  }
+  noiseBurst(duration, startFrequency, endFrequency, peak) {
+    if (!this.context || this.context.state !== "running" || this.muted ||
+        !this.active || !this.effectsEnabled || this.volume === 0) return;
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const source = ctx.createBufferSource();
+    source.buffer = this.effectNoise;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.Q.value = 0.7;
+    filter.frequency.setValueAtTime(startFrequency, now);
+    filter.frequency.exponentialRampToValueAtTime(endFrequency, now + duration);
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.001, now);
+    envelope.gain.linearRampToValueAtTime(peak, now + Math.min(0.035, duration * 0.25));
+    envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    source.connect(filter);
+    filter.connect(envelope);
+    envelope.connect(this.effectsBus);
+    source.onended = () => {
+      source.disconnect(); filter.disconnect(); envelope.disconnect();
+    };
+    source.start(now);
+    source.stop(now + duration);
+  }
+  whoosh() {
+    this.unlock();
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    if (now - this.lastWhoosh < 0.25) return;
+    this.lastWhoosh = now;
+    this.noiseBurst(0.24, 410, 2300, 0.075);
+  }
+  slice(correct) {
+    this.unlock();
+    this.noiseBurst(0.18, 2100, 540, 0.17);
+    this.tone(correct ? 870 : 310, 0.16, 0.12);
+    if (correct) this.tone(1305, 0.12, 0.06);
   }
   scan(distance = 1) {
     if (!this.context) return;

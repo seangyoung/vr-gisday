@@ -43,6 +43,8 @@ import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
+import { QuizExperience } from "./quiz/experience.js";
+import { QuizLeaderboard } from "./quiz/leaderboard.js";
 import { exhibitPanelHit } from "./showcase/pointer-targets.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { hasQuestShortcuts } from "./input-layout.js";
@@ -50,6 +52,8 @@ import { ControllerGuide } from "./controller-guide.js";
 import { addControllerIllustrations } from "./controller-splash.js";
 import { initRecommendedVideos } from "./videos.js";
 const nextScanScene = createSceneRotation();
+let quizLeaderboard = null;
+try { quizLeaderboard = new QuizLeaderboard(localStorage); } catch {}
 const devPreview =
   import.meta.env.DEV && new URLSearchParams(location.search).has("preview");
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
@@ -96,6 +100,7 @@ let layers = null;
 let viewshed = null;
 let pixels = null;
 let showcase = null;
+let quiz = null;
 let xrMode = null;
 let pendingRoomHandoff = false;
 let rightTurnReady = true;
@@ -123,7 +128,7 @@ let soundHiddenVisuals = [];
 let soundPreviousBackground = null;
 let soundBackgroundSaved = false;
 const isSpatial = () => step >= 4 && step < stages.length;
-const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase;
+const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase && !quiz;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clear() {
   clusterReadout = null;
@@ -361,11 +366,13 @@ function closeSoundMenu() {
   if (soundBackgroundSaved) scene.background = soundPreviousBackground;
   soundPreviousBackground = null;
   soundBackgroundSaved = false;
+  quiz?.resumeAudio();
 }
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
   const visualRoots = [
-    root, floatingModel, rain?.group, scan?.group, showcase?.model,
+    root, floatingModel, rain?.group, scan?.group, showcase?.model, quiz?.group,
+    ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
     ...[layers, viewshed, pixels].flatMap((demo) =>
       demo ? [demo.group, demo.clipboard] : []),
@@ -435,6 +442,7 @@ function toggleSoundMenu() {
     return;
   }
   stopRainInput();
+  quiz?.pauseForAudio();
   grab?.cancel();
   if (viewshed?.isClimbing) viewshed.cancelClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
@@ -500,6 +508,8 @@ function openMenu() {
   pixels = null;
   showcase?.dispose();
   showcase = null;
+  quiz?.dispose();
+  quiz = null;
   root.scale.setScalar(1);
   rain?.dispose();
   rain = null;
@@ -522,9 +532,14 @@ function runControllerShortcut(action) {
   if (action === "exit") {
     sound.click();
     if (isMenu()) renderer.xr.getSession()?.end();
+    else if (quiz) {
+      if (soundMenuOpen) closeSoundMenu();
+      quiz.requestQuit();
+    }
     else openMenu();
     return;
   }
+  if (quiz) return;
   if (action === "restart" && (isMenu() || step === -3)) return;
   sound.click();
   if (action === "restart") start();
@@ -571,6 +586,16 @@ function start() {
   noisy = false;
   prediction = "";
   draw();
+}
+
+function startQuiz() {
+  closeSoundMenu();
+  stopRainInput();
+  quiz?.dispose();
+  quiz = new QuizExperience(scene, controllers, sound, openMenu, quizLeaderboard);
+  step = -1;
+  draw();
+  place();
 }
 function stopRainInput() {
   teleport.cancel();
@@ -1750,7 +1775,7 @@ function spatial() {
   }
 }
 function drawFallbackToolbar() {
-  if (!showFallbackControls || soundMenuOpen) return;
+  if (!showFallbackControls || soundMenuOpen || quiz) return;
   const onClipboard = uiParent !== content;
   const actions = [
     ...(!isMenu() && step !== -3 ? [["Restart", "restart"]] : []),
@@ -1804,6 +1829,11 @@ function draw() {
       document.body.append(panel);
     }
     panel.replaceChildren();
+    if (quiz) {
+      panel.style.display = "none";
+    } else {
+      panel.style.display = "block";
+    }
     if (scan?.stage === 1 && !scan.room) {
       for (const [name, z] of [
         ["Scan front", 3],
@@ -1941,6 +1971,7 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
+  if (quiz) return [null, null, false, "Quit", null, true];
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
@@ -2003,6 +2034,7 @@ function updateUIFade(dt) {
 function drawScene() {
   (pixels ?? viewshed ?? layers)?.clearVisitorMarkers();
   clear();
+  if (quiz) return;
   const key = showcase ? `showcase:${showcase.kind}:${showcase.started}:${showcase.finished}:${showcase.mode ?? showcase.projection}` :
     pixels ? `pixels:${pixels.started}:${pixels.finished}` :
     viewshed ? `viewshed:${viewshed.view}:${viewshed.started}:${viewshed.finished}` :
@@ -2170,6 +2202,9 @@ function drawScene() {
         category: "Interpolation", preview: "Estimate rainfall between measured locations.",
         glyph: "⌁", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
+      { title: "GeoSlice Challenge", lines: ["GeoSlice", "Challenge"],
+        category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
+        glyph: "✧", color: "#83e2de", action: startQuiz },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
@@ -2233,6 +2268,7 @@ function place() {
   viewshed?.place(cam);
   pixels?.place(cam);
   showcase?.place?.(cam);
+  quiz?.place(cam);
 }
 const controllers = [];
 for (let i = 0; i < 2; i++) {
@@ -2263,6 +2299,7 @@ for (let i = 0; i < 2; i++) {
     if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
+    if (quiz && !soundMenuOpen) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing) return;
     if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
@@ -2341,6 +2378,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.scanning = false;
   });
   c.addEventListener("squeezestart", () => {
+    if (quiz) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (soundMenuOpen) return;
     if (viewshed?.started && grip.visible) {
@@ -2503,6 +2541,8 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
     pixels = null;
     showcase?.dispose();
     showcase = null;
+    quiz?.dispose();
+    quiz = null;
     rain?.dispose();
     rain = null;
     stopRainInput();
@@ -2543,6 +2583,8 @@ renderer.xr.addEventListener("sessionend", () => {
   pixels = null;
   showcase?.dispose();
   showcase = null;
+  quiz?.dispose();
+  quiz = null;
   if (scan?.room) {
     scan.dispose();
     scan = null;
@@ -2641,6 +2683,7 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
+    quiz?.update(dt, visibleSession && !soundMenuOpen);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
       if (visible && !soundMenuOpen) landscapeDemo.update(dt);
@@ -2796,6 +2839,11 @@ renderer.setAnimationLoop((time, frame) => {
       b.material.color.copy(b.userData.baseColor);
     }
     for (const { c, beam, targetBeam, id } of controllers) {
+      if (quiz && !soundMenuOpen) {
+        beam.visible = false;
+        targetBeam.visible = false;
+        continue;
+      }
       const hit = intersect(c);
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) ||
         scanHit(c) || (showcase?.kind === "interpolation" ? null :
@@ -2856,6 +2904,8 @@ renderer.setAnimationLoop((time, frame) => {
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
     showcase.update(dt);
+  if (devPreview && quiz && !renderer.xr.isPresenting)
+    quiz.update(dt, !soundMenuOpen);
   if (devPreview && rain && !renderer.xr.isPresenting && !soundMenuOpen) {
     rain.update(dt, previewRaining);
     if (previewRaining || rain.pouring) waterSoundUntil = time + 350;
@@ -2932,6 +2982,8 @@ if (
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
     startRain();
+  else if (new URLSearchParams(location.search).get("demo") === "quiz")
+    startQuiz();
   else if (new URLSearchParams(location.search).get("demo") === "scan")
     startScan(
       SCAN_SCENES.find(
@@ -2970,6 +3022,15 @@ if (
       ),
       camera,
     );
+    if (quiz && !soundMenuOpen) {
+      const target = quiz.targets.find((item) =>
+        raycaster.intersectObject(item.group, true).length);
+      if (target) {
+        quiz.split(target);
+        target.action();
+      }
+      return;
+    }
     const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
     if (ui) ui.object.userData.action?.(ui);
     else if (soundMenuOpen) return;
