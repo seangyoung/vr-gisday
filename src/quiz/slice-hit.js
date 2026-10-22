@@ -60,12 +60,21 @@ export function bladeCutAtContact(previous, current, contact) {
   const point = interpolate(previous[sampleIndex], current[sampleIndex]);
   const root = interpolate(previous[0], current[0]);
   const tip = interpolate(previous.at(-1), current.at(-1));
-  let direction = { x: tip.x - root.x, y: tip.y - root.y };
-  if (Math.hypot(direction.x, direction.y) < 0.08)
-    direction = {
-      x: current[sampleIndex].x - previous[sampleIndex].x,
-      y: current[sampleIndex].y - previous[sampleIndex].y,
-    };
+  const travel = (index) => ({
+    x: current[index].x - previous[index].x,
+    y: current[index].y - previous[index].y,
+    z: current[index].z - previous[index].z,
+  });
+  const projectedSwing = (motion) =>
+    Math.hypot(motion.x, motion.y) >= Math.max(0.003,
+      Math.hypot(motion.x, motion.y, motion.z) * 0.18);
+  // The visible seam follows the swipe across the block face. For a nearly
+  // straight-in thrust, use the blade's projected angle instead of tiny jitter.
+  let motion = travel(sampleIndex);
+  if (!projectedSwing(motion)) motion = travel(current.length - 1);
+  let direction = projectedSwing(motion)
+    ? { x: motion.x, y: motion.y }
+    : { x: tip.x - root.x, y: tip.y - root.y };
   if (Math.hypot(direction.x, direction.y) < 0.01)
     direction = { x: 1, y: 1 };
   return { point, direction };
