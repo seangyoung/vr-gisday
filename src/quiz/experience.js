@@ -7,6 +7,38 @@ import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
+const SABER_COLORS = {
+  grip: 0x283a32,
+  metal: 0x929d8d,
+  blade: 0xb4cba5,
+  glow: 0x789c73,
+};
+
+function makeSaber() {
+  const saber = new THREE.Group();
+  const cylinder = (top, bottom, length, color, z, options = {}) => {
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(top, bottom, length, 16),
+      new THREE.MeshBasicMaterial({ color, ...options }),
+    );
+    mesh.rotation.x = Math.PI / 2;
+    mesh.position.z = z;
+    saber.add(mesh);
+    return mesh;
+  };
+  // A narrow, matte hilt keeps the blade's purpose clear in either hand.
+  cylinder(0.029, 0.033, 0.17, SABER_COLORS.grip, -0.085);
+  cylinder(0.034, 0.034, 0.016, SABER_COLORS.metal, -0.006);
+  cylinder(0.036, 0.036, 0.024, SABER_COLORS.metal, -0.174);
+  cylinder(0.026, 0.031, 0.68, SABER_COLORS.glow, -0.51,
+    { transparent: true, opacity: 0.14, depthWrite: false });
+  cylinder(0.010, 0.013, 0.66, SABER_COLORS.blade, -0.51);
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.010, 12, 8),
+    new THREE.MeshBasicMaterial({ color: SABER_COLORS.blade }));
+  tip.position.z = -0.84;
+  saber.add(tip);
+  return saber;
+}
 
 function wrapLines(ctx, text, maxWidth) {
   const lines = [];
@@ -125,27 +157,8 @@ export class QuizExperience {
     scene.add(this.letterField);
     this.effects = new THREE.Group();
     scene.add(this.effects);
-    this.blades = controllers.map(({ grip, id }) => {
-      const blade = new THREE.Group();
-      const color = id === 0 ? 0x79eaff : 0xffd184;
-      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.033, 0.039, 0.16, 12),
-        new THREE.MeshBasicMaterial({ color: 0x19313e }));
-      handle.rotation.x = Math.PI / 2;
-      handle.position.z = -0.08;
-      const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.032, 12),
-        new THREE.MeshBasicMaterial({ color: 0x9dc4cc }));
-      guard.rotation.x = Math.PI / 2;
-      guard.position.z = -0.17;
-      const core = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.022, 0.66, 12),
-        new THREE.MeshBasicMaterial({ color }));
-      core.rotation.x = Math.PI / 2;
-      core.position.z = -0.51;
-      const glow = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.045, 0.68, 12),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.22,
-          depthWrite: false }));
-      glow.rotation.x = Math.PI / 2;
-      glow.position.z = -0.51;
-      blade.add(handle, guard, glow, core);
+    this.blades = controllers.map(({ grip }) => {
+      const blade = makeSaber();
       grip.add(blade);
       return { grip, blade, previous: null };
     });
