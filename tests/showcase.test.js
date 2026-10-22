@@ -9,7 +9,7 @@ import {
   aggregationFor, blockAt, wardFor,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, TISSOT_LONGITUDES, continentDistortionSummary,
+  GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, continentDistortionSummary,
   nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale, tissotDistortion,
@@ -118,6 +118,53 @@ test("projection examples preserve distinct distortion tradeoffs", () => {
   const equal0 = projectNormalized(90, 60, "equalArea", 0);
   const equal30 = projectNormalized(90, 60, "equalArea", 30);
   assert.ok(equal30.x < equal0.x && equal30.y > equal0.y);
+});
+
+test("added world projections fit the same physical map space and keep their character", () => {
+  for (const name of Object.keys(PROJECTIONS)) {
+    const scale = projectionFitScale(name);
+    assert.ok(Number.isFinite(scale) && scale > 0);
+    for (const latitude of [-90, -60, 0, 60, 90])
+      for (const longitude of [-180, -120, -60, 0, 60, 120, 180]) {
+        const point = projectMetric(longitude, latitude, name);
+        assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y), name);
+        assert.ok(Math.abs(point.x * scale) <= 0.861, name);
+        assert.ok(Math.abs(point.y * scale) <= 0.531, name);
+      }
+  }
+  const nearCut = projectMetric(-40 - 0.001, 60, "goode");
+  const beyondCut = projectMetric(-40 + 0.001, 60, "goode");
+  assert.ok(Math.abs(nearCut.x - beyondCut.x) > 0.8,
+    "Goode's northern ocean cut should open a real gap");
+  assert.ok(Math.abs(projectMetric(-40 - 0.001, 0, "goode").x -
+    projectMetric(-40 + 0.001, 0, "goode").x) < 0.01,
+  "the interrupted lobes should meet at the equator");
+  assert.notDeepEqual(projectMetric(90, 60, "bonne"),
+    projectMetric(90, 60, "mollweide"));
+});
+
+test("new equal-area projections preserve ground area; Winkel Tripel compromises", () => {
+  const localArea = (name, longitude, latitude) => {
+    const delta = 0.001, radians = Math.PI / 180;
+    const e = projectMetric(longitude + delta, latitude, name);
+    const w = projectMetric(longitude - delta, latitude, name);
+    const n = projectMetric(longitude, latitude + delta, name);
+    const s = projectMetric(longitude, latitude - delta, name);
+    const xLon = (e.x - w.x) / (2 * delta * radians);
+    const yLon = (e.y - w.y) / (2 * delta * radians);
+    const xLat = (n.x - s.x) / (2 * delta * radians);
+    const yLat = (n.y - s.y) / (2 * delta * radians);
+    return Math.abs(xLon * yLat - yLon * xLat) /
+      Math.cos(latitude * radians);
+  };
+  for (const name of ["sinusoidal", "bonne", "mollweide", "goode"]) {
+    for (const [longitude, latitude] of [[0, 0], [30, 30], [60, -45]])
+      assert.ok(Math.abs(localArea(name, longitude, latitude) - 1) < 0.01,
+        `${name} should preserve area at ${longitude},${latitude}`);
+    assert.equal(relativeAreaScale(name, 60), 1);
+  }
+  assert.ok(relativeAreaScale("winkel", 60) > 1.2);
+  assert.ok(tissotDistortion("winkel", 60).shapeRatio > 1.1);
 });
 
 test("Tissot axes reflect shape and area without display stretching", () => {
@@ -246,6 +293,10 @@ test("continent tooltip reports moved map footprint and polar limits", () => {
     /area stays equal/i);
   assert.match(continentDistortionSummary(australia, "mercator", 65, 4, true).detail,
     /polar limit/i);
+  assert.match(continentDistortionSummary(australia, "bonne", 60, 1).detail,
+    /area stays equal/i);
+  assert.match(continentDistortionSummary(australia, "goode", 60, 1).detail,
+    /ocean cuts/i);
 });
 
 test("globe swipe coasts, settles, and resumes its default spin", () => {

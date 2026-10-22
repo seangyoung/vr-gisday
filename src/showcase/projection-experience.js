@@ -10,7 +10,7 @@ import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, TISSOT_LATITUDES,
   continentDistortionSummary,
   nearestTissotCircle, projectMetric,
-  projectionFitScale, relativeAreaScale, tissotDistortion,
+  projectionExtent, projectionFitScale, relativeAreaScale, tissotDistortion,
 } from "./projection-model.js";
 
 function drawTissot(ctx, canvas, selectedCircle) {
@@ -103,26 +103,43 @@ function earthCanvas() {
 }
 
 function meshGeometry() {
-  const lonSteps = 96, latSteps = 48;
-  const vertices = [], uvs = [], indices = [];
-  for (let row = 0; row <= latSteps; row++)
-    for (let col = 0; col <= lonSteps; col++) {
-      const u = col / lonSteps, v = row / latSteps;
-      const lon = (u * 2 - 1) * Math.PI;
-      const lat = (v * 2 - 1) * Math.PI / 2;
-      const radius = 0.49;
-      vertices.push(radius * Math.cos(lat) * Math.sin(lon),
-        radius * Math.sin(lat), radius * Math.cos(lat) * Math.cos(lon));
-      uvs.push(u, v);
-      if (row < latSteps && col < lonSteps) {
-        const a = row * (lonSteps + 1) + col;
-        indices.push(a, a + 1, a + lonSteps + 1,
-          a + 1, a + lonSteps + 2, a + lonSteps + 1);
-      }
+  // Duplicate vertices at Goode's lobe boundaries. The pieces meet on
+  // the globe and separate without triangles spanning the cuts on the map.
+  const hemispheres = [
+    { cuts: [-180, -40, 180], lat0: 0, lat1: 90 },
+    { cuts: [-180, -100, -20, 80, 180], lat0: -90, lat1: 0 },
+  ];
+  const vertices = [], uvs = [], projectionLongitudes = [], indices = [];
+  for (const { cuts, lat0, lat1 } of hemispheres)
+    for (let lobe = 0; lobe < cuts.length - 1; lobe++) {
+      const left = cuts[lobe], right = cuts[lobe + 1];
+      const cols = Math.ceil((right - left) / 3.75), rows = 24;
+      const first = vertices.length / 3;
+      for (let row = 0; row <= rows; row++)
+        for (let col = 0; col <= cols; col++) {
+          const longitude = left + (right - left) * col / cols;
+          const latitude = lat0 + (lat1 - lat0) * row / rows;
+          const lon = longitude * Math.PI / 180;
+          const lat = latitude * Math.PI / 180;
+          const radius = 0.49;
+          vertices.push(radius * Math.cos(lat) * Math.sin(lon),
+            radius * Math.sin(lat), radius * Math.cos(lat) * Math.cos(lon));
+          uvs.push((longitude + 180) / 360, (latitude + 90) / 180);
+          projectionLongitudes.push(col === 0 && lobe > 0
+            ? longitude + 0.00001 : col === cols && lobe < cuts.length - 2
+              ? longitude - 0.00001 : longitude);
+          if (row < rows && col < cols) {
+            const a = first + row * (cols + 1) + col;
+            indices.push(a, a + 1, a + cols + 1,
+              a + 1, a + cols + 2, a + cols + 1);
+          }
+        }
     }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
   geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute("projectionLongitude",
+    new THREE.Float32BufferAttribute(projectionLongitudes, 1));
   geometry.setIndex(indices);
   return geometry;
 }
@@ -173,6 +190,7 @@ export class ProjectionExperience extends TimedExhibit {
     super(root, onChange);
     this.kind = "projection";
     this.projection = "equirectangular";
+    this.projectionPickerOpen = false;
     this.standardParallel = 0;
     this.centralMeridian = 0;
     this.flat = false;
@@ -538,9 +556,9 @@ export class ProjectionExperience extends TimedExhibit {
       const x = this.mapRayX(raycaster);
       if (x === null || gesture.lastX === null) return;
       if (Math.abs(x - gesture.startX) > 0.015) gesture.moved = true;
-      const width = 2 * Math.PI * projectionFitScale(this.projection,
-        this.standardParallel) * (this.projection === "equalArea"
-          ? Math.cos(this.standardParallel * Math.PI / 180) : 1);
+      const width = 2 * projectionExtent(this.projection,
+        this.standardParallel).maxX * projectionFitScale(this.projection,
+        this.standardParallel);
       this.turnCenter(-(x - gesture.lastX) / width * 360, false);
       gesture.lastX = x;
     }
@@ -576,7 +594,8 @@ export class ProjectionExperience extends TimedExhibit {
       return;
     }
     const { shapeRatio, longerAxis, relativeArea } = tissotDistortion(
-      this.projection, circle.latitude, this.standardParallel);
+      this.projection, circle.latitude, this.standardParallel,
+      ((circle.longitude - this.centralMeridian + 540) % 360) - 180);
     const ctx = this.tooltipCanvas.getContext("2d");
     ctx.fillStyle = "#0b2430";
     ctx.fillRect(0, 0, 1024, 500);
@@ -594,7 +613,8 @@ export class ProjectionExperience extends TimedExhibit {
     ctx.fillStyle = "#e6f4f5";
     ctx.font = "500 57px system-ui, sans-serif";
     const shape = shapeRatio < 1.05 ? "round · local shape kept" :
-      `≈${shapeRatio.toFixed(1)}× ${longerAxis === "east-west" ? "wider" : "taller"}`;
+      `≈${shapeRatio.toFixed(1)}× ${longerAxis === "east-west" ? "wider" :
+        longerAxis === "north-south" ? "taller" : "stretched diagonally"}`;
     ctx.fillText(`Shape: ${shape}`, 46, 190, 930);
     ctx.fillText(relativeArea === 1 ? "Area: preserved (1.0× equator)" :
       `Area: ≈${relativeArea.toFixed(1)}× map area at equator`,
@@ -673,10 +693,13 @@ export class ProjectionExperience extends TimedExhibit {
   }
   targetVertices(flat, projection = this.projection) {
     const uvs = this.map.geometry.attributes.uv.array;
+    const projectionLongitudes =
+      this.map.geometry.attributes.projectionLongitude.array;
     const result = new Float32Array(this.map.geometry.attributes.position.array.length);
     const scale = projectionFitScale(projection, this.standardParallel);
     for (let i = 0; i < uvs.length / 2; i++) {
-      const lon = (uvs[i * 2] * 2 - 1) * 180;
+      const lon = projection === "goode" ? projectionLongitudes[i]
+        : (uvs[i * 2] * 2 - 1) * 180;
       const lat = (uvs[i * 2 + 1] * 2 - 1) * 90;
       if (flat) {
         const projected = projectMetric(lon, lat, projection, this.standardParallel);
@@ -705,6 +728,7 @@ export class ProjectionExperience extends TimedExhibit {
   }
   setProjection(projection) {
     if (!this.started || this.finished || !PROJECTIONS[projection]) return;
+    this.projectionPickerOpen = false;
     this.projection = projection;
     if (this.selectedContinent) {
       this.continentTarget[1] = clampContinentLatitude(this.selectedContinent,
@@ -713,6 +737,11 @@ export class ProjectionExperience extends TimedExhibit {
       this.paintContinentOverlay();
     }
     this.transitionTo(true);
+  }
+  toggleProjectionPicker() {
+    if (!this.started || this.finished) return;
+    this.projectionPickerOpen = !this.projectionPickerOpen;
+    this.onChange();
   }
   setStandardParallel(parallel) {
     if (!this.started || this.finished || this.projection !== "equalArea" ||
@@ -725,7 +754,8 @@ export class ProjectionExperience extends TimedExhibit {
     if (!this.started || this.finished) return;
     this.centralMeridian = ((this.centralMeridian + delta + 540) % 360) - 180;
     this.map.material.map.offset.x = this.centralMeridian / 360;
-    this.positionTooltip();
+    if (this.selectedCircle) this.updateTooltip();
+    else this.positionTooltip();
     if (this.selectedContinent) {
       this.continentHome.position.copy(this.projectedContinentCenter(
         this.selectedContinent.center)).setZ(0.08);

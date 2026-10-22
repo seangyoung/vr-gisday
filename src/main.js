@@ -41,6 +41,7 @@ import { ClusterExperience } from "./showcase/cluster-experience.js";
 import { ChangeExperience } from "./change/experience.js";
 import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
+import { PROJECTIONS, PROJECTION_GROUPS, PROJECTION_NOTES } from "./showcase/projection-model.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
 import { QuizExperience } from "./quiz/experience.js";
@@ -1206,7 +1207,7 @@ function drawShowcaseUI() {
       cluster: ["Same deaths, new boundaries",
         "The same 489 deaths can look concentrated or nearly uniform.\nPlans A–C change six ward boundaries; Plan D uses four broad wards.\nThis is MAUP: the modifiable areal unit problem."],
       projection: ["Every flat map makes a choice",
-        "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nMercator keeps local shape; equal-area keeps relative area."],
+        "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nEqual-area, conformal, and compromise projections serve different map goals."],
       interpolation: ["Spatial interpolation fills the gaps",
         "Spatial interpolation estimates values between gauges.\nIDW favors nearby readings; a smooth trend may miss points.\nNearest-gauge zones make steps. Check held-out gauges."],
       suitability: ["The chosen site depends on priorities",
@@ -1354,7 +1355,7 @@ function drawShowcaseUI() {
     if (exhibit.flat && !exhibit.selectedContinent && !exhibit.tissot)
       label("↓ GRIP A CONTINENT", -0.84, 0.81, 1.45, 0.13, 38,
         "#a6f5d9", "#0b2430");
-    label(!exhibit.flat
+    if (!exhibit.projectionPickerOpen) label(!exhibit.flat
       ? exhibit.selectedContinent
         ? "Flatten the map to compare your selected continent."
         : "Wrapped globe · choose Flatten to compare projections."
@@ -1364,16 +1365,34 @@ function drawShowcaseUI() {
       ? "The selected circle starts round on Earth. Its map shape and size show distortion."
       : exhibit.tissot
       ? "Tissot's circles start equally sized on Earth. Select one to see its distortion."
-      : "GRIP land on globe → drag north or south on map.",
+      : "GRIP land on globe → drag north or south on map. Drag the map to recenter.",
     0, -0.36, 2.45, 0.14, 35, "#e6f4f5", "#0b2430");
-    button("Plate Carrée", -0.8, -0.57,
-      () => exhibit.setProjection("equirectangular"), 0.7,
-      exhibit.projection === "equirectangular");
-    button("Mercator", 0, -0.57, () => exhibit.setProjection("mercator"), 0.7,
-      exhibit.projection === "mercator");
-    button("Equal-area", 0.8, -0.57, () => exhibit.setProjection("equalArea"), 0.7,
-      exhibit.projection === "equalArea");
+    if (exhibit.projectionPickerOpen) {
+      label("Choose a projection · point and press trigger", 0, -0.35,
+        2.45, 0.14, 32, "#e6f4f5", "#0b2430");
+      const choices = Object.keys(PROJECTIONS);
+      choices.forEach((projection, index) => {
+        const x = -0.9 + (index % 4) * 0.6;
+        const y = -0.59 - Math.floor(index / 4) * 0.25;
+        const name = projection === "equalArea" ? "Cyl. equal-area" :
+          projection === "goode" ? "Goode Homolosine" : PROJECTIONS[projection];
+        const selected = exhibit.projection === projection;
+        const card = label(`${name}\n${PROJECTION_GROUPS[projection]}`,
+          x, y, 0.56, 0.22, 31, selected ? "#eafff9" : "#d1e6e7",
+          selected ? "#276b70" : "#173c48");
+        card.position.z = 0.08;
+        card.userData.action = () => { sound.click(); exhibit.setProjection(projection); };
+        card.userData.label = name;
+        card.userData.hoverColor = 0x3e7482;
+        buttons.push(card);
+      });
+      button("Close choices", 0, -1.13,
+        () => exhibit.toggleProjectionPicker(), 1.2);
+      return;
+    }
     const equalArea = exhibit.projection === "equalArea";
+    button(`Projection · ${PROJECTIONS[exhibit.projection]} ▾`, 0, -0.57,
+      () => exhibit.toggleProjectionPicker(), 1.8);
     button(exhibit.flat ? "Wrap" : "Flatten", equalArea ? -0.78 : -0.52, -0.79,
       () => exhibit.transitionTo(!exhibit.flat), equalArea ? 0.7 : 0.85);
     button(exhibit.tissot ? "Tissot ✓" : "Tissot circles", equalArea ? 0 : 0.52, -0.79,
@@ -1383,7 +1402,7 @@ function drawShowcaseUI() {
         () => exhibit.setStandardParallel(exhibit.standardParallel === 0 ? 30 : 0), 0.7);
     label(exhibit.selectedContinent
       ? "Cyan: home position · gold: same landmass moved on the globe."
-      : `60° N area: ${exhibit.areaAt60}× equator · drag map to recenter${exhibit.projection === "equalArea" ? ` · true-scale latitude ${exhibit.standardParallel}°` : ""}`,
+      : `${PROJECTION_NOTES[exhibit.projection]} · 60° N area ${exhibit.areaAt60}× equator${exhibit.projection === "equalArea" ? ` · true-scale ${exhibit.standardParallel}°` : ""}`,
       0, -1.0, 2.35, 0.12, 25, "#b6d1d9", "#0b2430");
     button("Takeaway", 0, -1.22, () => exhibit.finish(), 1.1);
   }

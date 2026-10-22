@@ -1,8 +1,44 @@
+import {
+  geoBonne, geoInterruptedHomolosine, geoMollweide, geoSinusoidal,
+  geoWinkel3,
+} from "d3-geo-projection";
+
 export const PROJECTIONS = Object.freeze({
   equirectangular: "Plate Carrée",
   mercator: "Mercator",
   equalArea: "Cylindrical equal-area",
+  sinusoidal: "Sinusoidal",
+  bonne: "Bonne",
+  mollweide: "Mollweide",
+  goode: "Interrupted Goode Homolosine",
+  winkel: "Winkel Tripel",
 });
+
+export const PROJECTION_GROUPS = Object.freeze({
+  equirectangular: "equidistant grid",
+  mercator: "conformal",
+  equalArea: "equal-area",
+  sinusoidal: "equal-area",
+  bonne: "equal-area",
+  mollweide: "equal-area",
+  goode: "interrupted · equal-area",
+  winkel: "compromise",
+});
+
+export const PROJECTION_NOTES = Object.freeze({
+  equirectangular: "Straight grid; high latitudes widen",
+  mercator: "Local angles stay true; polar areas grow",
+  equalArea: "Relative land area stays true; shapes flatten",
+  sinusoidal: "Area stays true; meridians curve toward the poles",
+  bonne: "Area stays true; parallels bend around 45° N",
+  mollweide: "An equal-area ellipse for the full world",
+  goode: "Ocean cuts separate lobes while land area stays true",
+  winkel: "A compromise that balances several distortions",
+});
+
+export const isEqualAreaProjection = (projection) =>
+  ["equalArea", "sinusoidal", "bonne", "mollweide", "goode"]
+    .includes(projection);
 
 // The two edge entries are one meridian shown on both sides of the texture;
 // together they complete the sixth circle column across the Pacific seam.
@@ -32,11 +68,57 @@ export function nearestTissotCircle(longitude, latitude) {
 const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
 const mercatorLimit = mercatorY(85 * deg);
+const d3Projections = {
+  sinusoidal: geoSinusoidal,
+  bonne: geoBonne,
+  mollweide: geoMollweide,
+  goode: geoInterruptedHomolosine,
+  winkel: geoWinkel3,
+};
+const d3Cache = new Map();
+const extentCache = new Map();
+
+function d3Projection(name) {
+  if (!d3Cache.has(name)) d3Cache.set(name,
+    d3Projections[name]().scale(1).translate([0, 0]).center([0, 0]));
+  return d3Cache.get(name);
+}
+
+export function projectionExtent(projection, standardParallel = 0) {
+  const key = `${projection}:${standardParallel}`;
+  if (extentCache.has(key)) return extentCache.get(key);
+  let maxX = 0, maxY = 0;
+  if (d3Projections[projection]) {
+    for (let latitude = -90; latitude <= 90; latitude += 2)
+      for (let longitude = -180; longitude <= 180; longitude += 2) {
+        const point = projectMetric(longitude, latitude, projection, standardParallel);
+        if (Number.isFinite(point.x) && Number.isFinite(point.y)) {
+          maxX = Math.max(maxX, Math.abs(point.x));
+          maxY = Math.max(maxY, Math.abs(point.y));
+        }
+      }
+  } else {
+    const cosine = Math.cos(standardParallel * deg);
+    maxX = Math.PI * (projection === "equalArea" ? cosine : 1);
+    maxY = projection === "mercator" ? mercatorLimit :
+      projection === "equalArea" ? 1 / cosine : Math.PI / 2;
+  }
+  const extent = { maxX, maxY };
+  extentCache.set(key, extent);
+  return extent;
+}
 
 // The display mesh must use one scale on both axes. Stretching every
 // projection into the same rectangle would add false shape distortion.
 export function projectMetric(longitudeDegrees, latitudeDegrees,
   projection = "equirectangular", standardParallel = 0) {
+  if (d3Projections[projection]) {
+    const [x, y] = d3Projection(projection)([
+      Math.max(-180, Math.min(180, longitudeDegrees)),
+      Math.max(-90, Math.min(90, latitudeDegrees)),
+    ]);
+    return { x, y: -y };
+  }
   const point = projectNormalized(longitudeDegrees, latitudeDegrees,
     projection, standardParallel);
   return {
@@ -48,16 +130,46 @@ export function projectMetric(longitudeDegrees, latitudeDegrees,
 
 export function projectionFitScale(projection = "equirectangular",
   standardParallel = 0) {
-  const cosine = Math.cos(standardParallel * deg);
-  const maxX = Math.PI * (projection === "equalArea" ? cosine : 1);
-  const maxY = projection === "mercator" ? mercatorLimit :
-    projection === "equalArea" ? 1 / cosine : Math.PI / 2;
+  const { maxX, maxY } = projectionExtent(projection, standardParallel);
   return Math.min(0.86 / maxX, 0.53 / maxY);
+}
+
+function localJacobian(projection, latitudeDegrees, standardParallel = 0,
+  longitudeDegrees = 0) {
+  const step = 0.001;
+  const east = projectMetric(longitudeDegrees + step, latitudeDegrees,
+    projection, standardParallel);
+  const west = projectMetric(longitudeDegrees - step, latitudeDegrees,
+    projection, standardParallel);
+  const north = projectMetric(longitudeDegrees, latitudeDegrees + step,
+    projection, standardParallel);
+  const south = projectMetric(longitudeDegrees, latitudeDegrees - step,
+    projection, standardParallel);
+  const factor = 2 * step * deg;
+  const cosine = Math.max(0.01, Math.cos(latitudeDegrees * deg));
+  return {
+    east: [(east.x - west.x) / factor / cosine,
+      (east.y - west.y) / factor / cosine],
+    north: [(north.x - south.x) / factor,
+      (north.y - south.y) / factor],
+  };
+}
+
+function localAreaScale(projection, latitudeDegrees, standardParallel = 0,
+  longitudeDegrees = 0) {
+  const { east, north } = localJacobian(projection, latitudeDegrees,
+    standardParallel, longitudeDegrees);
+  return Math.abs(east[0] * north[1] - east[1] * north[0]);
 }
 
 // Local horizontal and vertical scale factors relative to the source globe.
 export function indicatrixAxes(projection, latitudeDegrees,
   standardParallel = 0) {
+  if (d3Projections[projection]) {
+    const { east, north } = localJacobian(projection, latitudeDegrees,
+      standardParallel);
+    return { horizontal: Math.hypot(...east), vertical: Math.hypot(...north) };
+  }
   const cosine = Math.cos(latitudeDegrees * deg);
   const standardCosine = Math.cos(standardParallel * deg);
   if (projection === "mercator")
@@ -72,7 +184,22 @@ export function indicatrixAxes(projection, latitudeDegrees,
 // ratio describes local shape change; area is compared with the same circle
 // at the equator, so the readout does not depend on display zoom.
 export function tissotDistortion(projection, latitudeDegrees,
-  standardParallel = 0) {
+  standardParallel = 0, longitudeDegrees = 0) {
+  if (d3Projections[projection]) {
+    const { east, north } = localJacobian(projection, latitudeDegrees,
+      standardParallel, longitudeDegrees);
+    const a = east[0] ** 2 + east[1] ** 2;
+    const b = north[0] ** 2 + north[1] ** 2;
+    const cross = east[0] * north[0] + east[1] * north[1];
+    const delta = Math.sqrt((a - b) ** 2 + 4 * cross ** 2);
+    const major = Math.sqrt(Math.max(0, (a + b + delta) / 2));
+    const minor = Math.sqrt(Math.max(1e-12, (a + b - delta) / 2));
+    return { shapeRatio: major / minor,
+      longerAxis: Math.abs(cross) > 0.1 ? "oblique" :
+        a > b ? "east-west" : b > a ? "north-south" : null,
+      relativeArea: relativeAreaScale(projection, latitudeDegrees,
+        longitudeDegrees) };
+  }
   const { horizontal, vertical } = indicatrixAxes(projection,
     latitudeDegrees, standardParallel);
   return {
@@ -83,9 +210,15 @@ export function tissotDistortion(projection, latitudeDegrees,
   };
 }
 
-// Coordinates are normalized for display; all three are cylindrical projections.
+// Coordinates are normalized for display; metric coordinates drive the mesh.
 export function projectNormalized(longitudeDegrees, latitudeDegrees,
   projection = "equirectangular", standardParallel = 0) {
+  if (d3Projections[projection]) {
+    const { maxX, maxY } = projectionExtent(projection, standardParallel);
+    const point = projectMetric(longitudeDegrees, latitudeDegrees,
+      projection, standardParallel);
+    return { x: point.x / maxX, y: point.y / maxY };
+  }
   const lon = Math.max(-180, Math.min(180, longitudeDegrees)) * deg;
   const lat = Math.max(-90, Math.min(90, latitudeDegrees)) * deg;
   if (projection === "mercator") return {
@@ -100,7 +233,14 @@ export function projectNormalized(longitudeDegrees, latitudeDegrees,
 }
 
 // Ratio of an infinitesimal mapped area's scale at this latitude to the equator.
-export function relativeAreaScale(projection, latitudeDegrees) {
+export function relativeAreaScale(projection, latitudeDegrees,
+  longitudeDegrees = 0) {
+  if (d3Projections[projection]) {
+    if (isEqualAreaProjection(projection))
+      return 1;
+    return localAreaScale(projection, latitudeDegrees, 0,
+      longitudeDegrees) / localAreaScale(projection, 0, 0, longitudeDegrees);
+  }
   const cosine = Math.cos(latitudeDegrees * deg);
   if (projection === "mercator") return 1 / (cosine * cosine);
   if (projection === "equalArea") return 1;
@@ -113,10 +253,12 @@ export function continentDistortionSummary(continent, projection,
   const title = `${continent.name.toUpperCase()} · ${place}`;
   if (Math.abs(latitude - continent.center[1]) < 2)
     return { title, detail: "Grip and move north or south" };
-  if (projection === "equalArea")
+  if (isEqualAreaProjection(projection))
     return { title, detail: atLimit
       ? "Map area equal · polar limit reached"
-      : "Map area stays equal · shape shifts" };
+      : projection === "goode"
+        ? "Area stays equal · ocean cuts divide the map"
+        : "Map area stays equal · shape shifts" };
   return { title,
     detail: atLimit
       ? `Footprint ~${footprintRatio.toFixed(1)}× · polar limit reached`

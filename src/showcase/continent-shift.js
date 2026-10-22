@@ -90,8 +90,8 @@ export function clampContinentLatitude(continent, requestedLatitude,
 export function projectedContinentRings(continent, targetCenter, projection,
   standardParallel = 0) {
   const [targetLongitude, targetLatitude] = targetCenter;
-  const referenceY = projectMetric(0, targetLatitude,
-    projection, standardParallel).y;
+  const reference = projectMetric(0, targetLatitude,
+    projection, standardParallel);
   const xFactor = projection === "equalArea"
     ? Math.cos(standardParallel * DEG) : 1;
   return shiftedContinentRings(continent, targetCenter).map((ring) => {
@@ -103,8 +103,14 @@ export function projectedContinentRings(continent, targetCenter, projection,
         while (relative - previous < -180) relative += 360;
       }
       previous = relative;
+      if (!["equirectangular", "mercator", "equalArea"].includes(projection)) {
+        const projected = projectMetric(Math.max(-180, Math.min(180, relative)),
+          lat, projection, standardParallel);
+        return [projected.x - reference.x,
+          projected.y - reference.y];
+      }
       return [relative * DEG * xFactor,
-        projectMetric(0, lat, projection, standardParallel).y - referenceY];
+        projectMetric(0, lat, projection, standardParallel).y - reference.y];
     });
   });
 }
