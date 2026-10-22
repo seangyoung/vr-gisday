@@ -42,6 +42,34 @@ export const landingMarkup = `
         <a class="certificate-link" href="https://osph.utsouthwestern.edu/degree-programs/certificate-programs.html#geospatial-public-health" target="_blank" rel="noopener noreferrer">View program details <span aria-hidden="true">↗</span></a>
       </section>
     </div>
+    <section class="leaderboard-card" aria-labelledby="leaderboard-title">
+      <div class="leaderboard-heading">
+        <div>
+          <div class="eyebrow">GeoSlice · the GIS Day challenge</div>
+          <h2 id="leaderboard-title">Leaderboard</h2>
+        </div>
+        <p>Slice the answers in VR. Scores here are saved in this browser.</p>
+      </div>
+      <div class="leaderboard-grid">
+        <div class="leaderboard-board">
+          <div class="leaderboard-board-heading">
+            <h3>Today’s top scores</h3>
+            <span id="leaderboard-date"></span>
+          </div>
+          <ol id="leaderboard-today" class="leaderboard-list" aria-label="Today's top scores"></ol>
+          <p id="leaderboard-today-empty" class="leaderboard-empty">No scores yet today. Be the first to play.</p>
+        </div>
+        <div class="leaderboard-board">
+          <div class="leaderboard-board-heading">
+            <h3>GIS Day best</h3>
+            <span>Nov 18, 2026</span>
+          </div>
+          <ol id="leaderboard-gisday" class="leaderboard-list" aria-label="GIS Day best scores"></ol>
+          <p id="leaderboard-gisday-empty" class="leaderboard-empty">Top GIS Day scores will appear here.</p>
+        </div>
+      </div>
+      <p class="leaderboard-footnote">The daily board resets at midnight Chicago time. GIS Day best scores remain saved in this browser.</p>
+    </section>
   </main>
   <footer>Spatial Discovery Lab · A GIS Day learning experience</footer>
 `;

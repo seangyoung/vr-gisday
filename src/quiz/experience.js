@@ -285,7 +285,7 @@ export class QuizExperience {
         { color: "#a6f5d9" });
       this.addPanel(`${this.initials} · ${this.session.score} points · ${this.session.correctCount}/10 correct`,
         2.05, 0.24, 0, 0.47);
-      this.addPanel("TODAY'S TOP SCORES · THIS HEADSET", 1.93, 0.17,
+      this.addPanel("TODAY'S TOP SCORES · THIS BROWSER", 1.93, 0.17,
         0, 0.22, { color: "#a6f5d9", fontScale: 0.61 });
       const board = this.leaderboardRows.length
         ? this.leaderboardRows.slice(0, 5).map((row, index) =>
@@ -295,7 +295,7 @@ export class QuizExperience {
       this.addPanel(this.gisDayRows.length
         ? `GIS DAY 2026 BEST: ${this.gisDayRows.slice(0, 3).map((row, index) =>
           `${index + 1}. ${row.initials} ${row.score}`).join("   ")}`
-        : "Scores stay on this headset; the daily board resets at Chicago midnight.",
+        : "Scores stay in this browser; the daily board resets at Chicago midnight.",
         2.14, 0.21, 0, -0.39, { fontScale: 0.73 });
       this.addTarget("Play again", -0.50, -0.75, 0.78, 0.27, 0x2c836d,
         () => { this.session = null; this.initials = ""; this.submitted = false;
@@ -321,8 +321,16 @@ export class QuizExperience {
       this.addRoundPanel(resultText, 1.6, 0.24, 0, 0.04,
         { color: result.correct ? "#a6f5d9" : "#ffcc96" });
       this.addRoundPanel(`Answer: ${question.choices[question.correct]}`,
-        1.9, 0.19, 0, -0.24, { color: "#ffdc89" });
-      this.addRoundPanel(result.explanation, 2.17, 0.35, 0, -0.55);
+        1.9, 0.19, 0, -0.20, { color: "#ffdc89" });
+      this.addRoundPanel(result.explanation, 2.17, 0.31, 0, -0.44);
+      this.addTarget(this.session.index === this.session.questions.length - 1
+        ? "See Results" : "Next Question", 0, -0.76, 0.97, 0.26, 0x2c836d,
+      () => {
+        if (!this.session.advance()) return;
+        this.sound.click();
+        if (this.session.complete) this.submitScore();
+        else this.render();
+      });
       return;
     }
     this.timerPanel = this.addRoundPanel("18 seconds", 0.95, 0.15, 0, 0.13,
@@ -457,7 +465,7 @@ export class QuizExperience {
     if (this.submitted || !this.session?.complete) return;
     this.submitted = true;
     if (!this.leaderboard) {
-      this.leaderboardState = "This headset's leaderboard is unavailable";
+      this.leaderboardState = "This browser's leaderboard is unavailable";
       this.render();
       return;
     }
@@ -465,7 +473,7 @@ export class QuizExperience {
       const board = this.leaderboard.submit(this.session);
       this.leaderboardRows = board.today;
       this.gisDayRows = board.gisDay;
-      this.leaderboardState = "This headset's daily leaderboard";
+      this.leaderboardState = "This browser's daily leaderboard";
     } catch {
       this.leaderboardState = "Local storage unavailable · score shown above";
     }

@@ -188,6 +188,106 @@ p {
   outline: 3px solid #ffdc83;
   outline-offset: 4px;
 }
+.leaderboard-card {
+  margin-top: 24px;
+  padding: clamp(24px, 3vw, 36px);
+  border: 1px solid #3a6369;
+  border-radius: 20px;
+  background: linear-gradient(125deg, #11343f, #102b37 58%, #123b3b);
+}
+.leaderboard-heading,
+.leaderboard-board-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+}
+.leaderboard-heading h2 {
+  margin: 8px 0 0;
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+.leaderboard-heading p {
+  max-width: 300px;
+  margin: 0;
+  font-size: 14px;
+}
+.leaderboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 26px;
+}
+.leaderboard-board {
+  min-width: 0;
+  padding: 21px 22px;
+  border: 1px solid #37616a;
+  border-radius: 15px;
+  background: #0b2833;
+}
+.leaderboard-board-heading {
+  border-bottom: 1px solid #31545d;
+  padding-bottom: 13px;
+}
+.leaderboard-board-heading h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.leaderboard-board-heading span {
+  flex: none;
+  color: #a6cfcb;
+  font-size: 12px;
+}
+.leaderboard-list {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.leaderboard-list li {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  color: #d7e8e9;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.leaderboard-list li:first-child {
+  background: #204d4d;
+  color: #e8fff2;
+}
+.leaderboard-list li:nth-child(even):not(:first-child) {
+  background: #153641;
+}
+.leaderboard-rank {
+  color: #a7c7ca;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.leaderboard-initials {
+  letter-spacing: 0.14em;
+}
+.leaderboard-score {
+  color: #b7ebd8;
+  font-weight: 650;
+}
+.leaderboard-empty {
+  margin: 16px 0 0;
+  color: #b7cccf;
+  font-size: 14px;
+}
+.leaderboard-footnote {
+  margin: 19px 2px 0;
+  color: #9cbabf;
+  font-size: 12px;
+}
 button {
   font: inherit;
   border: 0;
@@ -275,5 +375,14 @@ footer {
   }
   .tag {
     display: none;
+  }
+  .leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .leaderboard-heading {
+    display: block;
+  }
+  .leaderboard-heading p {
+    margin-top: 12px;
   }
 }

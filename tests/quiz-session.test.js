@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { QuizSession, validateQuestion } from "../src/quiz/session.js";
+import { QuizSession, PROMPT_SECONDS, validateQuestion } from "../src/quiz/session.js";
 
 const approved = (id = "q1") => ({
   id,
@@ -22,13 +22,17 @@ test("quick correct answers score more and each question resolves only once", ()
   const quiz = new QuizSession([approved()], "GIS");
   quiz.start();
   assert.equal(quiz.phase, "prompt");
-  quiz.update(2.6);
+  quiz.update(PROMPT_SECONDS);
   assert.equal(quiz.phase, "question");
   assert.equal(quiz.remaining, 18);
   quiz.update(3);
   assert.equal(quiz.answer(0).gained, 183);
   assert.equal(quiz.answer(0), null);
-  quiz.update(3);
+  quiz.update(30);
+  assert.equal(quiz.phase, "feedback");
+  assert.equal(quiz.finalScore(), null);
+  assert.equal(quiz.advance(), true);
+  assert.equal(quiz.advance(), false);
   assert.deepEqual(quiz.finalScore(), { initials: "GIS", score: 183, correct: 1, total: 1 });
 });
 
@@ -37,13 +41,15 @@ test("audio and quit pauses freeze time; quitting discards progress", () => {
   quiz.start();
   quiz.pause("audio");
   quiz.update(30);
-  assert.equal(quiz.promptRemaining, 2.6);
+  assert.equal(quiz.promptRemaining, PROMPT_SECONDS);
   assert.equal(quiz.remaining, 18);
   assert.equal(quiz.answer(0), null);
   quiz.resume();
-  quiz.update(2.6);
+  quiz.update(PROMPT_SECONDS);
   quiz.answer(0);
-  quiz.update(3);
+  quiz.update(30);
+  assert.equal(quiz.phase, "feedback");
+  quiz.advance();
   assert.equal(quiz.phase, "prompt");
   quiz.pause("quit");
   quiz.update(30);
@@ -53,13 +59,15 @@ test("audio and quit pauses freeze time; quitting discards progress", () => {
   assert.equal(quiz.finalScore(), null);
 });
 
-test("timeout earns no points and advances after feedback", () => {
+test("timeout earns no points and waits for a slice to advance", () => {
   const quiz = new QuizSession([approved()], "GEO");
   quiz.start();
-  quiz.update(2.6);
+  quiz.update(PROMPT_SECONDS);
   quiz.update(18);
   assert.equal(quiz.results[0].choice, null);
   assert.equal(quiz.results[0].gained, 0);
-  quiz.update(3);
+  quiz.update(30);
+  assert.equal(quiz.phase, "feedback");
+  quiz.advance();
   assert.equal(quiz.complete, true);
 });

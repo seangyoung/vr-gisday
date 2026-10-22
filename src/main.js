@@ -45,6 +45,7 @@ import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
 import { QuizExperience } from "./quiz/experience.js";
 import { QuizLeaderboard } from "./quiz/leaderboard.js";
+import { renderLandingLeaderboard } from "./quiz/landing-leaderboard.js";
 import { exhibitPanelHit } from "./showcase/pointer-targets.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
 import { hasQuestShortcuts } from "./input-layout.js";
@@ -59,6 +60,10 @@ const devPreview =
 const previewGuide = devPreview && new URLSearchParams(location.search).has("guide");
 const app = document.querySelector("#app");
 app.innerHTML = landingMarkup;
+const refreshLandingLeaderboard = () => renderLandingLeaderboard(app, quizLeaderboard);
+refreshLandingLeaderboard();
+window.addEventListener("focus", refreshLandingLeaderboard);
+window.addEventListener("storage", refreshLandingLeaderboard);
 initRecommendedVideos(app);
 const status = document.querySelector("#status");
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -2601,6 +2606,7 @@ renderer.xr.addEventListener("sessionend", () => {
   grab?.cancel();
   stopRainInput();
   document.body.classList.remove("xr-active");
+  refreshLandingLeaderboard();
   const arButton = document.getElementById("ar");
   if (pendingRoomHandoff) {
     if (!arButton.disabled) arButton.textContent = "Open room scan in MR";

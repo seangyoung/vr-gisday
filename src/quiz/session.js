@@ -1,6 +1,5 @@
 export const ROUND_SECONDS = 18;
-export const PROMPT_SECONDS = 2.6;
-export const FEEDBACK_SECONDS = 3;
+export const PROMPT_SECONDS = 3.4;
 
 export function validateQuestion(question) {
   if (!question || typeof question.id !== "string" || !question.id.trim())
@@ -36,16 +35,13 @@ export class QuizSession {
     this.initials = initials;
     this.roundSeconds = options.roundSeconds ?? ROUND_SECONDS;
     this.promptSeconds = options.promptSeconds ?? PROMPT_SECONDS;
-    this.feedbackSeconds = options.feedbackSeconds ?? FEEDBACK_SECONDS;
     if (!Number.isFinite(this.roundSeconds) || !(this.roundSeconds > 0) ||
-        !Number.isFinite(this.promptSeconds) || !(this.promptSeconds >= 0) ||
-        !Number.isFinite(this.feedbackSeconds) || !(this.feedbackSeconds >= 0))
+        !Number.isFinite(this.promptSeconds) || !(this.promptSeconds >= 0))
       throw new RangeError("Quiz durations must be finite and nonnegative");
     this.phase = "ready";
     this.index = 0;
     this.remaining = this.roundSeconds;
     this.promptRemaining = this.promptSeconds;
-    this.feedbackRemaining = 0;
     this.pausedFrom = null;
     this.score = 0;
     this.correctCount = 0;
@@ -113,8 +109,19 @@ export class QuizSession {
     };
     this.results.push(result);
     this.phase = "feedback";
-    this.feedbackRemaining = this.feedbackSeconds;
     return result;
+  }
+
+  advance() {
+    if (this.phase !== "feedback") return false;
+    this.index++;
+    if (this.index === this.questions.length) this.phase = "complete";
+    else {
+      this.remaining = this.roundSeconds;
+      this.promptRemaining = this.promptSeconds;
+      this.phase = this.promptSeconds ? "prompt" : "question";
+    }
+    return true;
   }
 
   update(dt) {
@@ -125,17 +132,6 @@ export class QuizSession {
     } else if (this.phase === "question") {
       this.remaining = Math.max(0, this.remaining - dt);
       if (this.remaining === 0) this.resolve(null);
-    } else if (this.phase === "feedback") {
-      this.feedbackRemaining = Math.max(0, this.feedbackRemaining - dt);
-      if (this.feedbackRemaining === 0) {
-        this.index++;
-        if (this.index === this.questions.length) this.phase = "complete";
-        else {
-          this.remaining = this.roundSeconds;
-          this.promptRemaining = this.promptSeconds;
-          this.phase = this.promptSeconds ? "prompt" : "question";
-        }
-      }
     }
   }
 
