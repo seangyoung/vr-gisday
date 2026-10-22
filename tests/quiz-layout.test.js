@@ -18,8 +18,14 @@ test("the 26 initials encircle the player at one reachable height", () => {
 test("four answer blocks share one row with space between them", () => {
   const poses = Array.from({ length: 4 }, (_, index) => answerBlockPose(index));
   assert.deepEqual(poses.map((pose) => pose.y), [-0.42, -0.42, -0.42, -0.42]);
+  assert.deepEqual(poses.map((pose) => pose.z), [0, 0, 0, 0],
+    "all blade targets stay at their original reach distance");
   for (const [index, expected] of [-0.84, -0.28, 0.28, 0.84].entries())
     assert.ok(Math.abs(poses[index].x - expected) < 1e-10);
   for (let i = 1; i < poses.length; i++)
     assert.ok(poses[i].x - poses[i - 1].x > 0.49);
+  assert.ok(poses[0].yaw > 0 && poses[3].yaw < 0,
+    "the two outside faces turn inward toward the viewer");
+  assert.equal(poses[1].yaw, 0);
+  assert.equal(poses[2].yaw, 0);
 });

@@ -7,6 +7,7 @@ import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
+const ROUND_INFO_Z = -0.4;
 const SABER_COLORS = {
   grip: 0x283a32,
   metal: 0x929d8d,
@@ -197,6 +198,11 @@ export class QuizExperience {
     return mesh;
   }
 
+  addRoundPanel(text, width, height, x, y, options = {}) {
+    return this.addPanel(text, width, height, x, y,
+      { ...options, z: ROUND_INFO_Z });
+  }
+
   addTarget(text, x, y, width, height, color, action, parent = this.screen) {
     const group = new THREE.Group();
     group.position.set(x, y, 0);
@@ -292,12 +298,12 @@ export class QuizExperience {
       return;
     }
     const question = this.session.question;
-    this.addPanel(`${question.category.toUpperCase()} · ${this.session.index + 1}/10 · ${this.session.score} PTS`,
+    this.addRoundPanel(`${question.category.toUpperCase()} · ${this.session.index + 1}/10 · ${this.session.score} PTS`,
       2.15, 0.19, 0, 0.89, { color: "#a6f5d9", fontScale: 0.56 });
-    this.addPanel(question.prompt, 2.23, 0.51, 0, 0.50,
+    this.addRoundPanel(question.prompt, 2.23, 0.51, 0, 0.50,
       { color: "#ffffff", fontScale: 0.95 });
     if (this.session.phase === "prompt") {
-      this.statusPanel = this.addPanel("Think first · answers incoming",
+      this.statusPanel = this.addRoundPanel("Think first · answers incoming",
         1.78, 0.20, 0, -0.05, { color: "#ffdc89" });
       return;
     }
@@ -305,19 +311,21 @@ export class QuizExperience {
       const result = this.session.results.at(-1);
       const resultText = result.choice === null ? "TIME'S UP" :
         result.correct ? `CORRECT · +${result.gained}` : "NOT QUITE";
-      this.addPanel(resultText, 1.6, 0.24, 0, 0.04,
+      this.addRoundPanel(resultText, 1.6, 0.24, 0, 0.04,
         { color: result.correct ? "#a6f5d9" : "#ffcc96" });
-      this.addPanel(`Answer: ${question.choices[question.correct]}`,
+      this.addRoundPanel(`Answer: ${question.choices[question.correct]}`,
         1.9, 0.19, 0, -0.24, { color: "#ffdc89" });
-      this.addPanel(result.explanation, 2.17, 0.35, 0, -0.55);
+      this.addRoundPanel(result.explanation, 2.17, 0.35, 0, -0.55);
       return;
     }
-    this.timerPanel = this.addPanel("18 seconds", 0.95, 0.15, 0, 0.13,
+    this.timerPanel = this.addRoundPanel("18 seconds", 0.95, 0.15, 0, 0.13,
       { color: "#ffdc89", fontScale: 0.9 });
     question.choices.forEach((choice, index) => {
       const pose = answerBlockPose(index);
-      this.addTarget(choice, pose.x, pose.y, 0.49, 0.43,
+      const target = this.addTarget(choice, pose.x, pose.y, 0.49, 0.43,
         ANSWER_COLORS[index], () => this.choose(index));
+      target.group.position.z = pose.z;
+      target.group.rotation.y = pose.yaw;
     });
   }
 
@@ -495,7 +503,8 @@ export class QuizExperience {
         if (this.timerPanel) {
           const old = this.timerPanel;
           this.timerPanel = panel(`${seconds} seconds`, 0.95, 0.15, 0, 0.13,
-            { color: seconds <= 5 ? "#ffb194" : "#ffdc89", fontScale: 0.9 });
+            { color: seconds <= 5 ? "#ffb194" : "#ffdc89", fontScale: 0.9,
+              z: ROUND_INFO_Z });
           this.screen.add(this.timerPanel);
           disposeTree(old);
         }
