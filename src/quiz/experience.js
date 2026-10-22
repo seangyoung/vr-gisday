@@ -2,12 +2,12 @@ import * as THREE from "three";
 import { QuizSession } from "./session.js";
 import { makeQuizRound } from "./questions.js";
 import { sweptBladeContact, bladeCutAtContact } from "./slice-hit.js";
-import { initialTilePose, answerBlockPose } from "./layout.js";
+import { initialTilePose, answerBlockPose, QUIZ_SCREEN_DISTANCE } from "./layout.js";
 import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
-const ROUND_INFO_Z = -0.4;
+const ROUND_INFO_Z = -0.58;
 const SABER_COLORS = {
   grip: 0x283a32,
   metal: 0x929d8d,
@@ -185,11 +185,18 @@ export class QuizExperience {
     forward.y = 0;
     if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
     forward.normalize();
-    this.group.position.copy(eye).addScaledVector(forward, 1.32);
+    this.group.position.copy(eye).addScaledVector(forward, QUIZ_SCREEN_DISTANCE);
     this.group.position.y = eye.y - 0.03;
     this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
     this.letterField.position.copy(eye);
     this.letterField.rotation.y = Math.atan2(-forward.x, -forward.z);
+  }
+
+  snapTurnInitials(angle) {
+    if (this.session || !Number.isFinite(angle) || !angle) return false;
+    this.letterField.rotation.y += angle;
+    this.clearMotion();
+    return true;
   }
 
   addPanel(text, width, height, x, y, options) {
@@ -232,7 +239,7 @@ export class QuizExperience {
     if (!this.session) {
       this.addPanel("GEOSLICE · THE GIS DAY CHALLENGE", 2.15, 0.25,
         0, 0.87, { color: "#a6f5d9" });
-      this.addPanel("Turn to collect three initials. Slice Start. Fast correct answers earn more points.", 2.08, 0.22,
+      this.addPanel("Turn or snap-turn with the right stick to find three initials. Slice Start to play.", 2.08, 0.22,
         0, 0.60);
       this.addPanel(`Your initials: ${this.initials.padEnd(3, "_").split("").join("  ")}`,
         0.78, 0.19, 0, 0.40, { color: "#ffdc89" });
@@ -250,16 +257,16 @@ export class QuizExperience {
         tile.group.position.z = pose.z;
         tile.group.rotation.y = pose.yaw;
       }
-      this.addTarget("Erase", -0.55, -0.78, 0.48, 0.18, 0x6b5c82, () => {
+      this.addTarget("Erase", -0.55, -0.58, 0.48, 0.18, 0x6b5c82, () => {
         this.initials = this.initials.slice(0, -1);
         this.sound.click();
         this.render();
       });
       if (this.initials.length === 3)
-        this.addTarget("Start", 0.55, -0.78, 0.48, 0.18, 0x3c9470, () =>
+        this.addTarget("Start", 0.55, -0.58, 0.48, 0.18, 0x3c9470, () =>
           this.begin());
       else this.addPanel("Slice three letters, then Start", 0.98, 0.15,
-        0.55, -0.78, { fontScale: 0.72 });
+        0.55, -0.58, { fontScale: 0.72 });
       return;
     }
     if (this.session.phase === "quit-paused") {
@@ -321,7 +328,7 @@ export class QuizExperience {
     this.timerPanel = this.addRoundPanel("18 seconds", 0.95, 0.15, 0, 0.13,
       { color: "#ffdc89", fontScale: 0.9 });
     question.choices.forEach((choice, index) => {
-      const pose = answerBlockPose(index);
+      const pose = answerBlockPose(index, question.choices.length);
       const target = this.addTarget(choice, pose.x, pose.y, 0.49, 0.43,
         ANSWER_COLORS[index], () => this.choose(index));
       target.group.position.z = pose.z;

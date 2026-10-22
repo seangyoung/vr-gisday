@@ -594,6 +594,7 @@ function startQuiz() {
   stopRainInput();
   quiz?.dispose();
   quiz = new QuizExperience(scene, controllers, sound, openMenu, quizLeaderboard);
+  rightTurnReady = true;
   step = -1;
   draw();
   place();
@@ -1976,7 +1977,8 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
-  if (quiz) return [null, null, false, "Quit", null, true];
+  if (quiz) return [null, null, false, "Quit",
+    hand === "right" && !quiz.session ? "Turn letters" : null, true];
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
@@ -2649,6 +2651,9 @@ renderer.setAnimationLoop((time, frame) => {
       );
       if (actions.length) runControllerShortcut(actions[0]);
     } else controllerShortcuts.reset();
+    if (quiz)
+      for (const { guide } of controllers)
+        guide.setContext(...controllerGuideContext(guide.handedness));
     updateControllerGuides(renderer.xr.getCamera(), visibleSession, dt);
     if (
       !rain &&
@@ -2689,6 +2694,17 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
+    if (quiz && !quiz.session && visibleSession && !soundMenuOpen) {
+      const right = controllers.find(({ c, grip }) =>
+        c.userData.xrInput?.handedness === "right" && c.visible && grip.visible);
+      const pad = right?.c.userData.xrInput?.gamepad;
+      const rightX = pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0;
+      if (Math.abs(rightX) < 0.3) rightTurnReady = true;
+      else if (rightTurnReady && Math.abs(rightX) > 0.7) {
+        quiz.snapTurnInitials(Math.sign(rightX) * Math.PI / 6);
+        rightTurnReady = false;
+      }
+    }
     quiz?.update(dt, visibleSession && !soundMenuOpen);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
