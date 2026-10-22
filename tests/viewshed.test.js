@@ -111,6 +111,14 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   assert.ok(rung.position.x !== 0 &&
     Math.sign(rung.position.x) !== Math.sign(demo.marker.userData.rungs[1].position.x),
   "side-mounted steps alternate around the pole");
+  for (const step of demo.marker.userData.rungs) {
+    assert.equal(step.position.z, 0, "pegs emerge in the mast's own plane");
+    assert.ok(Math.abs(Math.abs(step.position.x) - 0.21) < 0.09,
+      "each peg's inner end penetrates the mast rather than floating beside it");
+  }
+  const topRungHeight = demo.marker.userData.rungs.at(-1).position.y;
+  assert.ok(topRungHeight < 10.5 && topRungHeight > 10,
+    "the rungs end at the deck opening");
   rung.getWorldPosition(hand);
   assert.equal(demo.gripRung(0, hand.clone().add(new THREE.Vector3(2, 0, 0))), false);
   assert.equal(demo.gripRung(0, hand), true);

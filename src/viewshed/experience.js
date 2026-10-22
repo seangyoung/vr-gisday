@@ -2,6 +2,7 @@ import * as THREE from "three";
 import {
   LANDSCAPE_EXTENT,
   LayerExperience,
+  TELEPORT_MAX_DISTANCE,
   landscapeHeight,
 } from "../layers/experience.js";
 import { renderLayerMap } from "../layers/map.js";
@@ -11,7 +12,7 @@ import { VIEWSHED_SCENES, buildCanyonWorld } from "./scenes.js";
 const TOWER_HEIGHT = 12;
 const CLIMB_HEIGHT = TOWER_HEIGHT - 1.6;
 const RUNG_SPACING = 0.43;
-const LOOKOUT_Z = -0.54;
+const LOOKOUT_Z = -0.65;
 const MAX_LOOKOUT_SHIFT = 0.65;
 const LOOKOUT_PULL_SECONDS = 0.85;
 const LOOKOUT_RETURN_SECONDS = 0.7;
@@ -92,10 +93,11 @@ function observationMarker() {
   const rungs = [];
   const pegGeometry = new THREE.CylinderGeometry(0.023, 0.023, 0.42, 8);
   const lipGeometry = new THREE.CylinderGeometry(0.019, 0.019, 0.085, 8);
-  for (let y = 0.55, index = 0; y < TOWER_HEIGHT - 0.65; y += RUNG_SPACING, index++) {
+  for (let y = 0.55, index = 0; y < CLIMB_HEIGHT - 0.1; y += RUNG_SPACING, index++) {
     const side = index % 2 ? 1 : -1;
     const step = new THREE.Group();
-    step.position.set(side * 0.28, y, -0.11);
+    // Bury the inner end of each peg in the mast so it visibly grows from it.
+    step.position.set(side * 0.245, y, 0);
     const peg = new THREE.Mesh(pegGeometry, rungMaterial);
     peg.rotation.z = Math.PI / 2;
     const lip = new THREE.Mesh(lipGeometry, rungMaterial);
@@ -107,30 +109,51 @@ function observationMarker() {
   const lookout = new THREE.Group();
   lookout.visible = false;
   lookout.position.y = CLIMB_HEIGHT;
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.07, 0.96), dark);
-  deck.position.set(0, -0.04, LOOKOUT_Z);
-  lookout.add(deck);
+  // Four deck pieces leave an actual opening around the pole and the top rung.
+  const deckMeshes = [];
+  for (const [width, depth, x, z] of [
+    [0.35, 1.5, -0.425, -0.30], [0.35, 1.5, 0.425, -0.30],
+    [0.5, 0.8, 0, -0.65], [0.5, 0.2, 0, 0.35],
+  ]) {
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(width, 0.07, depth), dark);
+    deck.position.set(x, -0.04, z);
+    lookout.add(deck);
+    deckMeshes.push(deck);
+  }
   const slatMaterial = new THREE.MeshStandardMaterial({
     color: 0x849d9b, metalness: 0.3, roughness: 0.64,
   });
-  for (const z of [-0.82, -0.54, -0.26]) {
-    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.012, 0.19), slatMaterial);
+  for (const z of [-0.89, -0.65, -0.41]) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.04, 0.012, 0.16), slatMaterial);
     slat.position.set(0, 0.006, z);
     lookout.add(slat);
+    deckMeshes.push(slat);
   }
   const edgeMaterial = new THREE.MeshStandardMaterial({
     color: 0xd9bd78, emissive: 0x3d3215, roughness: 0.5,
   });
   const lookoutRims = [];
-  for (const z of [-1.01, -0.07]) {
+  for (const z of [-1.05, 0.45]) {
     const edge = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.035, 0.035), edgeMaterial);
     edge.position.set(0, 0.015, z);
     lookout.add(edge);
     lookoutRims.push(edge);
   }
-  for (const x of [-0.59, 0.59]) {
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 0.96), edgeMaterial);
-    edge.position.set(x, 0.015, LOOKOUT_Z);
+  for (const x of [-0.6, 0.6]) {
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.035, 1.5), edgeMaterial);
+    edge.position.set(x, 0.015, -0.3);
+    lookout.add(edge);
+    lookoutRims.push(edge);
+  }
+  for (const z of [-0.25, 0.25]) {
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.025, 0.025), edgeMaterial);
+    edge.position.set(0, 0.015, z);
+    lookout.add(edge);
+    lookoutRims.push(edge);
+  }
+  for (const x of [-0.25, 0.25]) {
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.025, 0.5), edgeMaterial);
+    edge.position.set(x, 0.015, 0);
     lookout.add(edge);
     lookoutRims.push(edge);
   }
@@ -153,6 +176,7 @@ function observationMarker() {
   marker.userData.rungs = rungs;
   marker.userData.steps = steps;
   marker.userData.lookout = lookout;
+  marker.userData.deckMeshes = deckMeshes;
   marker.userData.lookoutRims = lookoutRims;
   marker.userData.lookoutEdge = edgeMaterial;
   return marker;
@@ -350,6 +374,42 @@ export class ViewshedExperience extends LayerExperience {
     const movement = super.walk(stickX, stickY, dt, camera);
     this.climbGroundY = this.group.position.y;
     return movement;
+  }
+  teleportCandidate(raycaster, uiHit = null) {
+    if (this.started && !this.finished && this.marker.visible &&
+        this.marker.userData.lookout.visible && this.visualHeight >= TOWER_HEIGHT - 0.5) {
+      this.marker.updateWorldMatrix(true, true);
+      const deckHit = raycaster.intersectObjects(this.marker.userData.deckMeshes, false)[0];
+      if (deckHit && deckHit.distance >= 1 && deckHit.distance <= TELEPORT_MAX_DISTANCE) {
+        if (uiHit && uiHit.distance < deckHit.distance) return null;
+        if (this.clipboard.visible) {
+          const board = this.clipboard.children[0];
+          board.updateWorldMatrix(true, false);
+          const boardHit = raycaster.intersectObject(board, false)[0];
+          if (boardHit && boardHit.distance < deckHit.distance) return null;
+        }
+        const landing = this.marker.localToWorld(new THREE.Vector3(0, CLIMB_HEIGHT + 0.42, LOOKOUT_Z));
+        return {
+          x: this.observer.x, z: this.observer.z + LOOKOUT_Z,
+          point: landing, distance: deckHit.distance, valid: true, platform: true,
+        };
+      }
+    }
+    return super.teleportCandidate(raycaster, uiHit);
+  }
+  teleportTo(candidate, camera) {
+    if (!candidate?.platform) return super.teleportTo(candidate, camera);
+    if (!this.marker.userData.lookout.visible ||
+        this.visualHeight < TOWER_HEIGHT - 0.5 || this.isClimbing || this.isAtTop)
+      return false;
+    if (!super.teleportTo(candidate, camera)) return false;
+    this.climbGroundY = this.group.position.y;
+    this.lookoutSlide.set(0, 0);
+    this.group.position.y = this.climbGroundY - CLIMB_HEIGHT;
+    this.lockLookout();
+    this.onEvent("reveal");
+    this.onChange();
+    return true;
   }
   updateClipboard(leftGrip, camera, preview = false, fallback = false) {
     if (this.isClimbing) {

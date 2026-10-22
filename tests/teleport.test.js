@@ -112,3 +112,36 @@ test("the pixel and viewshed demos inherit teleport, with canyon walls rejected"
   assert.equal(viewshed.teleportTo(cliff, camera), false);
   viewshed.dispose();
 });
+
+test("the viewshed platform has an open hatch and teleporting onto the deck locks the lookout", () => {
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const camera = cameraAtOrigin();
+  demo.place(camera);
+  demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
+  demo.marker.updateWorldMatrix(true, true);
+  const deckMeshes = demo.marker.userData.deckMeshes;
+  const above = (x, z) => new THREE.Raycaster(
+    demo.marker.localToWorld(new THREE.Vector3(x, 20, z)),
+    new THREE.Vector3(0, -1, 0),
+  );
+  assert.equal(above(0, 0).intersectObjects(deckMeshes, false).length, 0,
+    "the square opening goes all the way through the platform");
+  const deckRay = above(0, -0.65);
+  assert.ok(deckRay.intersectObjects(deckMeshes, false).length > 0);
+  const candidate = demo.teleportCandidate(deckRay);
+  assert.equal(candidate?.platform, true);
+  assert.equal(candidate?.valid, true);
+  assert.equal(demo.teleportCandidate(deckRay, { distance: 1 }), null,
+    "clipboard controls take priority over the landing target");
+  assert.equal(demo.teleportTo(candidate, camera), true);
+  assert.equal(demo.isAtTop, true);
+  assert.equal(demo.isClimbing, false);
+  assert.ok(Math.abs(demo.climbHeight - 10.4) < 1e-9);
+  assert.ok(Math.abs(demo.visitor.x - demo.observer.x) < 1e-8);
+  assert.ok(Math.abs(demo.visitor.y - (demo.observer.z - 0.65)) < 1e-8);
+  demo.updateClipboard(null, camera, true);
+  assert.equal(demo.clipboard.visible, true);
+  demo.dispose();
+});

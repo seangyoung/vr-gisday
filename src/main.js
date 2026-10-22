@@ -1063,7 +1063,7 @@ function drawViewshedUI() {
       : v.isClimbing
       ? "Pull rungs down to climb · Release both grips to drop"
       : v.observer.height === 12
-      ? "Grip rungs to climb · Grip the rim to pull onto the platform"
+      ? "Grip rungs to climb · Grip the rim or teleport onto the platform"
       : "Choose Tower · 12 m to reveal the rungs and lookout platform",
     0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
   }
