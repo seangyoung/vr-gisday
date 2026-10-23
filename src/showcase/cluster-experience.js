@@ -1,7 +1,7 @@
 import { TimedExhibit, canvasPanel } from "./exhibit.js";
 import {
   CLUSTER_MODES, SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor,
+  aggregationFor, blockAt, wardFor, zoneBoundarySegments,
 } from "./cluster-model.js";
 
 const plot = { x: 45, y: 35, size: 520 };
@@ -29,6 +29,19 @@ function blockPath(ctx, block) {
   }
 }
 
+function strokeWardBoundary(ctx) {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "#183847";
+  ctx.lineWidth = 6;
+  ctx.stroke();
+  ctx.strokeStyle = "#ffd094";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawMap(canvas, mode) {
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#102b38";
@@ -49,6 +62,14 @@ function drawMap(canvas, mode) {
     ctx.strokeStyle = "#dae7d5";
     ctx.lineWidth = 0.9;
     ctx.stroke();
+  }
+  if (mode !== "points") {
+    ctx.beginPath();
+    for (const segment of zoneBoundarySegments(mode)) {
+      ctx.moveTo(px(segment.x0), py(segment.y0));
+      ctx.lineTo(px(segment.x1), py(segment.y1));
+    }
+    strokeWardBoundary(ctx);
   }
   if (mode === "points") {
     for (const point of SNOW_BUILDINGS) {
@@ -117,15 +138,21 @@ function drawMap(canvas, mode) {
     const entries = [["0–24", 0], ["25–49", 25], ["50–99", 50],
       ["100–149", 100], ["150+", 150]];
     entries.forEach(([name, count], index) => {
-      const y = 331 + index * 40;
+      const y = 331 + index * 33;
       ctx.fillStyle = countColor(count);
       ctx.fillRect(602, y, 30, 27);
       ctx.fillStyle = "#e9f5f0";
       ctx.fillText(name, 644, y + 22);
     });
   }
-  ctx.font = "18px system-ui";
+  ctx.font = "17px system-ui";
   if (mode !== "points") {
+    ctx.beginPath();
+    ctx.moveTo(602, 510);
+    ctx.lineTo(634, 510);
+    strokeWardBoundary(ctx);
+    ctx.fillStyle = "#e9f5f0";
+    ctx.fillText("Ward boundary", 644, 510, 260);
     ctx.fillStyle = "#e9f5f0";
     ctx.fillText("Ringed letter = highest ward count", 602, 534, 305);
   }

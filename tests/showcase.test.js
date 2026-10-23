@@ -7,8 +7,8 @@ import { displayedBandBrightness, displayIndexPixel, displayIndexValue,
 import { makePlatformComparison, highlightPlatform } from "../src/showcase/remote-platforms.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
-  SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
-  aggregationFor, blockAt, wardFor,
+  SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
+  aggregationFor, blockAt, wardFor, zoneBoundarySegments,
 } from "../src/showcase/cluster-model.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, continentDistortionSummary,
@@ -103,6 +103,22 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(blockAt(SNOW_BLOCKS[0].x, SNOW_BLOCKS[0].y, 0)?.id,
     SNOW_BLOCKS[0].id);
   assert.equal(blockAt(0, 0), null);
+});
+
+test("ward boundary lines follow only streets separating different zones", () => {
+  assert.deepEqual(zoneBoundarySegments("points"), []);
+  const plans = ["wardA", "wardB", "wardC", "wardD"];
+  const footprints = plans.map((mode) => {
+    const segments = zoneBoundarySegments(mode);
+    assert.ok(segments.length > 80, `${mode} should show its boundaries`);
+    assert.ok(segments.every(({ x0, y0, x1, y1, wards }) =>
+      wards[0] !== wards[1] &&
+      [x0, x1].every((x) => x >= SNOW_WINDOW.minX && x <= SNOW_WINDOW.maxX) &&
+      [y0, y1].every((y) => y >= SNOW_WINDOW.minY && y <= SNOW_WINDOW.maxY)));
+    return segments.map(({ x0, y0, x1, y1 }) =>
+      `${x0},${y0},${x1},${y1}`).join("|");
+  });
+  assert.equal(new Set(footprints).size, plans.length);
 });
 
 test("ward plans visibly change the mapped concentration while keeping deaths fixed", () => {
