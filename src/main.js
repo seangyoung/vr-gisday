@@ -871,7 +871,7 @@ function drawScanUI() {
   if (s.station) {
     if (s.stage === 0) {
       lessonCard("The LiDAR Field Survey",
-        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nA tripod lidar scanner measures the first surface each laser pulse reaches.\nYou have four scans. Move the tripod to reveal surfaces hidden from earlier views.`);
+        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nEach placement scans densely. Use four angles to reveal hidden sides.`);
       button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
       label("Grip the tripod to carry it · Trigger to scan · Left stick walk · Right stick teleport/turn",
         0, GUIDED_INFO_Y, 2.3, 0.14, 24, "#b6d1d9", "#0b2430");
@@ -879,7 +879,7 @@ function drawScanUI() {
     }
     if (s.stage === 2) {
       lessonCard(`${s.score}% of the target captured`,
-        `${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} target samples.\nEach pulse stops at the first surface it reaches.\nSurveyors merge views from different stations to reveal hidden sides.`);
+        `${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} target samples.\nEach pulse stops at the first surface it reaches. Repeating a station adds no new faces.\nSurveyors merge scans from different angles to reveal hidden sides.`);
       takeawayActions(GUIDED_ACTION_Y, () => startStationScan(s.sceneInfo));
       foregroundTakeaway();
       return;

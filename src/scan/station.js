@@ -5,32 +5,102 @@ import { StationCoverage } from "./station-coverage.js";
 
 const LIMIT = 20;
 const TOTAL_SCANS = 4;
+const SCAN_BATCH = 60;
+const CLOUD_REFRESH_STEP = 180;
 const V = () => new THREE.Vector3();
+const POINT_COLORS = {
+  earth: 0x9caf87, stone: 0xc4bda8, timber: 0xbb9875,
+  plaster: 0xd9c8aa, roof: 0xc58b77, metal: 0xa9c9cc,
+  bark: 0xa18a70, leaves: 0x9cdaa6,
+};
+const POINT_CSS = Object.fromEntries(Object.entries(POINT_COLORS)
+  .map(([finish, color]) => [finish, `#${color.toString(16).padStart(6, "0")}`]));
 
 function makeTripod() {
   const group = new THREE.Group();
-  const metal = new THREE.MeshStandardMaterial({ color: 0x53666b, metalness: 0.75, roughness: 0.32 });
-  const housing = new THREE.MeshStandardMaterial({ color: 0x1d343e, metalness: 0.45, roughness: 0.35 });
-  const lens = new THREE.MeshStandardMaterial({ color: 0x8af0d3, emissive: 0x1c6350 });
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.95, 12), metal);
-  pole.position.y = 0.84;
-  group.add(pole);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.25), housing);
-  head.position.y = 1.48;
-  group.add(head);
-  const eye = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 20), lens);
-  eye.rotation.x = Math.PI / 2;
-  eye.position.set(0, 1.48, -0.14);
-  group.add(eye);
+  const metal = new THREE.MeshStandardMaterial({ color: 0xa4b1af, metalness: 0.72, roughness: 0.38 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x26343a, metalness: 0.38, roughness: 0.5 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x202b2d, roughness: 0.9 });
+  const housing = new THREE.MeshStandardMaterial({ color: 0xc6a05a, metalness: 0.28, roughness: 0.42 });
+  const glass = new THREE.MeshStandardMaterial({
+    color: 0x254b55, metalness: 0.18, roughness: 0.16,
+    emissive: 0x0c292e, emissiveIntensity: 0.7,
+  });
+  const light = new THREE.MeshStandardMaterial({
+    color: 0x84e5c9, emissive: 0x38a88b, emissiveIntensity: 0.7,
+  });
+  const cylinder = (parent, radiusTop, radiusBottom, height, y, material, sides = 12) => {
+    const part = new THREE.Mesh(
+      new THREE.CylinderGeometry(radiusTop, radiusBottom, height, sides), material);
+    part.position.y = y;
+    parent.add(part);
+    return part;
+  };
+  const rod = (parent, from, to, radius, material) => {
+    const axis = to.clone().sub(from);
+    const part = new THREE.Mesh(
+      new THREE.CylinderGeometry(radius, radius, axis.length(), 8), material);
+    part.position.copy(from).add(to).multiplyScalar(0.5);
+    part.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+    parent.add(part);
+    return part;
+  };
+  cylinder(group, 0.048, 0.055, 0.74, 0.87, metal);
+  cylinder(group, 0.14, 0.14, 0.09, 1.21, dark);
+  cylinder(group, 0.17, 0.15, 0.055, 1.29, metal);
   for (let i = 0; i < 3; i++) {
     const a = i * Math.PI * 2 / 3;
-    const foot = new THREE.Vector3(Math.cos(a) * 0.55, 0.03, Math.sin(a) * 0.55);
-    const top = new THREE.Vector3(0, 1.1, 0);
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 1.18, 9), metal);
-    leg.position.copy(foot).add(top).multiplyScalar(0.5);
-    leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), top.sub(foot).normalize());
-    group.add(leg);
+    const radial = (distance, y) =>
+      new THREE.Vector3(Math.cos(a) * distance, y, Math.sin(a) * distance);
+    const hinge = radial(0.12, 1.17);
+    const clamp = radial(0.39, 0.57);
+    const foot = radial(0.68, 0.045);
+    rod(group, hinge, clamp, 0.03, metal);
+    rod(group, clamp, foot, 0.022, metal);
+    rod(group, radial(0.02, 0.69), radial(0.43, 0.5), 0.012, dark);
+    const lock = cylinder(group, 0.043, 0.043, 0.075, 0, dark);
+    lock.position.copy(clamp);
+    const pad = cylinder(group, 0.07, 0.08, 0.045, 0, rubber);
+    pad.position.copy(foot);
   }
+  cylinder(group, 0.13, 0.13, 0.055, 1.37, dark);
+  cylinder(group, 0.17, 0.17, 0.035, 1.43, metal);
+  for (let i = 0; i < 3; i++) {
+    const a = i * Math.PI * 2 / 3;
+    const screw = cylinder(group, 0.023, 0.023, 0.08, 1.38, dark);
+    screw.position.x = Math.cos(a) * 0.11;
+    screw.position.z = Math.sin(a) * 0.11;
+  }
+  const head = new THREE.Group();
+  head.position.y = 1.54;
+  head.rotation.y = Math.PI;
+  group.add(head);
+  cylinder(head, 0.16, 0.16, 0.095, -0.09, dark);
+  cylinder(head, 0.185, 0.185, 0.025, -0.025, metal, 20);
+  cylinder(head, 0.18, 0.17, 0.27, 0.10, housing, 16);
+  cylinder(head, 0.165, 0.165, 0.035, 0.25, dark, 16);
+  const window = new THREE.Mesh(new THREE.BoxGeometry(0.255, 0.16, 0.026), glass);
+  window.position.set(0, 0.11, -0.205);
+  head.add(window);
+  const lens = cylinder(head, 0.062, 0.062, 0.025, 0, glass, 20);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(0, 0.11, -0.234);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.067, 0.012, 8, 20), metal);
+  ring.position.set(0, 0.11, -0.253);
+  head.add(ring);
+  const display = new THREE.Mesh(new THREE.BoxGeometry(0.115, 0.075, 0.014), glass);
+  display.position.set(0.138, 0.07, 0.08);
+  display.rotation.y = Math.PI / 3;
+  head.add(display);
+  const status = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 8), light);
+  status.position.set(-0.12, 0.02, -0.14);
+  head.add(status);
+  rod(head, new THREE.Vector3(-0.105, 0.26, 0),
+    new THREE.Vector3(-0.105, 0.38, 0), 0.014, dark);
+  rod(head, new THREE.Vector3(0.105, 0.26, 0),
+    new THREE.Vector3(0.105, 0.38, 0), 0.014, dark);
+  rod(head, new THREE.Vector3(-0.105, 0.38, 0),
+    new THREE.Vector3(0.105, 0.38, 0), 0.018, rubber);
   group.userData.head = head;
   return group;
 }
@@ -67,10 +137,12 @@ export class StationScanExperience {
     this.materials = scanMaterials();
     this.targets = [];
     const mesh = (geometry, position, kind, finish) => {
-      const object = new THREE.Mesh(geometry, this.materials[finish ?? (kind === "ground" ? "earth" : "stone")]);
+      const surfaceFinish = finish ?? (kind === "ground" ? "earth" : "stone");
+      const object = new THREE.Mesh(geometry, this.materials[surfaceFinish]);
       object.position.set(...position).multiplyScalar(8);
       object.scale.setScalar(8);
       object.userData.kind = kind;
+      object.userData.finish = surfaceFinish;
       this.targets.push(object);
       this.group.add(object);
       return object;
@@ -82,12 +154,15 @@ export class StationScanExperience {
     this.ground.position.y = -0.05;
     this.group.add(this.ground);
     this.tripod = makeTripod();
-    this.tripod.position.set(0, 0, 11);
+    this.tripod.position.set(0, 0, 8.5);
     this.group.add(this.tripod);
     const survey = this.targets.slice(1).filter((m) => m.userData.kind === "structure" ||
       sceneInfo.id === "canopy" && m.userData.kind === "vegetation" ||
       sceneInfo.id === "terraces" && m.userData.kind === "ground");
-    this.coverage = new StationCoverage(survey, this.targets, 900, this.group);
+    // One station densely samples its visible faces. The tree-heavy scene uses
+    // a smaller budget to keep headset setup responsive.
+    const sampleBudget = sceneInfo.id === "canopy" ? 3200 : 5200;
+    this.coverage = new StationCoverage(survey, this.targets, sampleBudget, this.group);
     const bounds = new THREE.Box3().setFromPoints(this.coverage.samples.map((sample) => sample.point));
     const span = bounds.getSize(V());
     const horizontal = Math.max(1, span.x, span.z);
@@ -97,7 +172,7 @@ export class StationScanExperience {
         290 / Math.max(1, span.y * 0.9 + horizontal * 0.36)),
     };
     this.cloud = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
-      size: 0.075, vertexColors: true, depthWrite: false,
+      size: 0.085, vertexColors: true, depthWrite: false,
     }));
     this.cloud.renderOrder = 2;
     this.group.add(this.cloud);
@@ -204,6 +279,7 @@ export class StationScanExperience {
     this.scansLeft--;
     this.scanQueue = this.tripod.position.clone().add(new THREE.Vector3(0, 1.5, 0));
     this.scanCursor = 0;
+    this.scanStartCount = this.coverage.count;
     this.onEvent("reveal");
     this.refreshClipboard();
     return true;
@@ -213,13 +289,17 @@ export class StationScanExperience {
     this.tripod.userData.head.rotation.y += dt * (this.scanQueue ? 9 : 0.6);
     if (!this.scanQueue) return;
     this.coverage.prepare();
-    const end = Math.min(this.coverage.samples.length, this.scanCursor + 60);
+    const end = Math.min(this.coverage.samples.length, this.scanCursor + SCAN_BATCH);
     for (let i = this.scanCursor; i < end; i++) this.coverage.capture(i, this.scanQueue);
     this.scanCursor = end;
-    this.refreshCloud();
+    if (end % CLOUD_REFRESH_STEP === 0 || end === this.coverage.samples.length)
+      this.refreshCloud();
     if (end === this.coverage.samples.length) {
       this.scanQueue = null;
-      this.records.push({ count: this.coverage.count });
+      this.records.push({
+        count: this.coverage.count,
+        added: this.coverage.count - this.scanStartCount,
+      });
       this.refreshClipboard();
       this.onChange();
     }
@@ -231,7 +311,7 @@ export class StationScanExperience {
       if (!this.coverage.captured[i]) continue;
       const sample = this.coverage.samples[i];
       positions.push(sample.point.x, sample.point.y, sample.point.z);
-      color.setHex(sample.mesh.userData.kind === "vegetation" ? 0x9be5ac : 0xffd39b);
+      color.setHex(POINT_COLORS[sample.mesh.userData.finish]);
       colors.push(color.r, color.g, color.b);
     }
     const geometry = new THREE.BufferGeometry();
@@ -264,7 +344,7 @@ export class StationScanExperience {
       const x = 320 + (turnedX - turnedZ * 0.55) * scale;
       const y = 285 - (point.y - center.y) * scale * 0.9 +
         (turnedX + turnedZ) * scale * 0.18;
-      ctx.fillStyle = mesh.userData.kind === "vegetation" ? "#a2df9e" : "#ffd39b";
+      ctx.fillStyle = POINT_CSS[mesh.userData.finish];
       ctx.fillRect(x, y, 3.5, 3.5);
     }
     ctx.fillStyle = "#a6f5d9";
@@ -274,8 +354,13 @@ export class StationScanExperience {
     ctx.font = "27px sans-serif";
     ctx.fillText(`${this.scansLeft} of ${TOTAL_SCANS} scans left`, 320, 550);
     ctx.font = "22px sans-serif";
-    ctx.fillText(this.scanQueue ? "Scanning…" : this.scansLeft
-      ? "Grip tripod · trigger to scan" : "All scans used · select Takeaway", 320, 588);
+    const lastAdded = this.records.at(-1)?.added;
+    const hint = this.scanQueue ? "Scanning visible faces…" : !this.scansLeft
+      ? "All scans used · select Takeaway" : lastAdded === 0
+        ? "Same view · move to another side" : lastAdded
+          ? `${lastAdded.toLocaleString()} new points · try another angle`
+          : "Grip tripod · trigger to scan";
+    ctx.fillText(hint, 320, 588);
     this.texture.needsUpdate = true;
   }
   turnPreview(direction) {

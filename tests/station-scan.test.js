@@ -5,7 +5,7 @@ import { buildScanScene, SCAN_SCENES } from "../src/scan/scenes.js";
 import { StationCoverage } from "../src/scan/station-coverage.js";
 import { StationScanExperience } from "../src/scan/station.js";
 
-function survey(id) {
+function survey(id, budget = 520) {
   const group = new THREE.Group();
   const meshes = [];
   buildScanScene(id, (geometry, position, kind) => {
@@ -20,8 +20,22 @@ function survey(id) {
   const targets = meshes.slice(1).filter((mesh) => mesh.userData.kind === "structure" ||
     id === "canopy" && mesh.userData.kind === "vegetation" ||
     id === "terraces" && mesh.userData.kind === "ground");
-  return { group, coverage: new StationCoverage(targets, meshes, 520, group) };
+  return { group, coverage: new StationCoverage(targets, meshes, budget, group) };
 }
+
+test("one dense station scan fills visible faces; a new angle reveals hidden faces", () => {
+  const { coverage } = survey("ruins", 5200);
+  coverage.prepare();
+  const front = new THREE.Vector3(0, 1.5, 13);
+  const back = new THREE.Vector3(0, 1.5, -13);
+  for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, front);
+  const first = coverage.count;
+  assert.ok(first > 1400, "one station should produce a substantial point cloud");
+  for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, front);
+  assert.equal(coverage.count, first, "repeating a station cannot fill hidden faces");
+  for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, back);
+  assert.ok(coverage.count > first + 500, "a new angle reveals many hidden faces");
+});
 
 test("tripod viewpoints add visible target surfaces across all synthetic scenes", () => {
   for (const { id } of SCAN_SCENES) {
