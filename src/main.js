@@ -2368,7 +2368,7 @@ function drawScene() {
     }
     if (step === GNSS_MULTIPATH) {
       label(gnssEnvironment === "canyon"
-        ? `Reflected route ${gnssDisplay.pathRatio.toFixed(1)}× longer here; arrival is late.`
+        ? `Reflected route ${gnssDisplay.pathRatio.toFixed(1)}× longer → distance too large → location can shift.`
         : gnssEnvironment === "open"
           ? "Open sky: a clear direct path reaches the receiver"
           : "Choose both sky conditions to compare the signal paths.",

@@ -79,7 +79,7 @@ export const stages = [
   },
   {
     title: "What if the sky is blocked?",
-    body: "Compare an open sky with a building-lined street.\nA reflected signal takes longer to arrive: multipath.\nWalls also block signals, especially indoors.",
+    body: "Multipath: a signal bounces along a longer route.\nThe extra travel time makes distance seem too large.\nThat error can shift the calculated location.",
     action: null,
   },
 ];
