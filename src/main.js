@@ -61,6 +61,7 @@ import { hasQuestShortcuts } from "./input-layout.js";
 import { ControllerGuide } from "./controller-guide.js";
 import { addControllerIllustrations } from "./controller-splash.js";
 import { initRecommendedVideos } from "./videos.js";
+import { drawMenuIcon } from "./menu-icons.js";
 const nextScanScene = createSceneRotation();
 let quizLeaderboard = null;
 try { quizLeaderboard = new QuizLeaderboard(localStorage); } catch {}
@@ -299,7 +300,7 @@ function foregroundTakeaway() {
     mesh.material.depthWrite = false;
   }
 }
-function menuCard({ title, lines, category, preview, glyph, color, action }, index, total) {
+function menuCard({ title, lines, category, preview, icon, color, action }, index, total) {
   const canvas = document.createElement("canvas");
   canvas.width = 720;
   canvas.height = 360;
@@ -315,9 +316,8 @@ function menuCard({ title, lines, category, preview, glyph, color, action }, ind
   ctx.fillRect(22, 62, 135, 231);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  drawMenuIcon(ctx, icon, color);
   ctx.fillStyle = color;
-  ctx.font = "600 91px system-ui, sans-serif";
-  ctx.fillText(glyph, 90, 177, 115);
   ctx.font = "600 31px system-ui, sans-serif";
   ctx.fillText(String(index + 1).padStart(2, "0"), 90, 321);
   ctx.textAlign = "left";
@@ -2255,45 +2255,45 @@ function drawScene() {
     [
       { title: "Find Yourself", lines: ["Find Yourself"],
         category: "Positioning", preview: "Narrow your location with satellite distances.",
-        glyph: "◎", color: "#71e3c9", action: start },
+        icon: "ranges", color: "#71e3c9", action: start },
       { title: "Make It Rain", lines: ["Make It Rain"],
         category: "Watersheds", preview: "Shape terrain and watch water carve new paths.",
-        glyph: "≈", color: "#80cfe6", action: startRain },
+        icon: "watershed", color: "#80cfe6", action: startRain },
       { title: "Scan the Hidden World", lines: ["Scan the", "Hidden World"],
         category: "LiDAR/Point Clouds", preview: "Sweep a scene to reveal a 3D point cloud.",
-        glyph: "✦", color: "#b2ddf1", action: startScan },
+        icon: "point-cloud", color: "#b2ddf1", action: startScan },
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
         category: "GIS layers", preview: "Build a landscape by switching GIS layers on.",
-        glyph: "▤", color: "#a8d995", action: startLayers },
+        icon: "layers", color: "#a8d995", action: startLayers },
       { title: "Can You See It?", lines: ["Can You See It?"],
         category: "Viewsheds", preview: "Test what a tower can see across the terrain.",
-        glyph: "◉", color: "#f7ce87", action: startViewshed },
+        icon: "viewshed", color: "#f7ce87", action: startViewshed },
       { title: "See the Invisible", lines: ["See the", "Invisible"],
         category: "Spectral data", preview: "Reveal vegetation with near-infrared imagery.",
-        glyph: "◒", color: "#f4aece",
+        icon: "spectral-leaf", color: "#f4aece",
         action: () => startShowcase("spectral") },
       { title: "How Big Is a Pixel?", lines: ["How Big Is", "a Pixel?"],
         category: "Spatial Resolution", preview: "Compare what coarse and fine pixels reveal.",
-        glyph: "▦", color: "#c1b6f5", action: startPixels },
+        icon: "pixels", color: "#c1b6f5", action: startPixels },
       { title: "Where Did the Cluster Go?", lines: ["Where Did the", "Cluster Go?"],
         category: "Aggregation", preview: "Switch zoning plans and watch patterns shift.",
-        glyph: "⁙", color: "#f2b694",
+        icon: "cluster", color: "#f2b694",
         action: () => startShowcase("cluster") },
       { title: "Make the World Flat", lines: ["Make the", "World Flat"],
         category: "Projections", preview: "Flatten a globe and explore map distortion.",
-        glyph: "◐", color: "#9adad1",
+        icon: "flatten", color: "#9adad1",
         action: () => startShowcase("projection") },
       { title: "What Changed?", lines: ["What Changed?"],
         category: "Change detection", preview: "Compare real satellite images across time.",
-        glyph: "⇄", color: "#f5dc91",
+        icon: "change", color: "#f5dc91",
         action: () => startShowcase("change") },
       { title: "Between the Rain Gauges", lines: ["Between the", "Rain Gauges"],
         category: "Interpolation", preview: "Estimate rainfall between measured locations.",
-        glyph: "⌁", color: "#81d6c8",
+        icon: "contours", color: "#81d6c8",
         action: () => startShowcase("interpolation") },
       { title: "GeoSlice Challenge", lines: ["GeoSlice", "Challenge"],
         category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
-        glyph: "✧", color: "#83e2de", action: startQuiz },
+        icon: "slice", color: "#83e2de", action: startQuiz },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
