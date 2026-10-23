@@ -1221,7 +1221,7 @@ function drawShowcaseUI() {
         "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nAim at land. Hold GRIP and drag it north or south on the map.",
         "Flatten the globe"],
       change: ["What Changed?",
-        "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nDrag between dates and choose what changed most.",
+        "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nUse the slider or spotlight to compare dates, then choose what changed most.",
         "Compare images"],
       interpolation: ["Between the Rain Gauges",
         "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare surfaces, then estimate rain at a new spot.",
@@ -1362,8 +1362,14 @@ function drawShowcaseUI() {
       0, 0.98, 2.45, 0.17, 43, "#e6f4f5", "#0b2430");
     label(`${caseInfo.sensor} · USGS imagery`,
       0, 0.79, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
-    label("Drag the white line to compare dates",
-      -0.47, -0.84, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
+    label(exhibit.comparisonMode === "spotlight"
+      ? "Aim at the image to reveal the later date"
+      : "Drag the white line to compare dates",
+    -0.47, -0.81, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
+    button("Slider", -0.86, -1.03, () => exhibit.setComparisonMode("slider"),
+      0.68, exhibit.comparisonMode === "slider");
+    button("Spotlight", -0.08, -1.03, () => exhibit.setComparisonMode("spotlight"),
+      0.68, exhibit.comparisonMode === "spotlight");
     label(caseInfo.question, 0.91, 0.67, 1.06, 0.16, 33,
       "#e6f4f5", "#0b2430");
     if (exhibit.error) {
@@ -3091,6 +3097,9 @@ renderer.setAnimationLoop((time, frame) => {
         continue;
       }
       const hit = intersect(c);
+      if (showcase?.kind === "change" && !soundMenuOpen && !hit &&
+          (showcase.draggingBy === null || showcase.draggingBy === id))
+        showcase.aimSpotlight(raycaster);
       const model = soundMenuOpen ? null : modelHit(c) || rainHit(c) ||
         scanHit(c) || (showcase?.kind === "interpolation" ? null :
           showcase?.kind === "projection"
@@ -3323,8 +3332,10 @@ if (devPreview) {
   renderer.domElement.addEventListener("pointermove", (e) => {
     const previewInterpolation = showcase?.kind === "interpolation" &&
       showcase.started && !showcase.finished;
+    const previewSpotlight = showcase?.kind === "change" &&
+      showcase.comparisonMode === "spotlight" && showcase.started && !showcase.finished;
     if (e.pointerId !== previewSpinPointer && rain?.stage !== 1 &&
-        !previewInterpolation) return;
+        !previewInterpolation && !previewSpotlight) return;
     raycaster.setFromCamera(
       new THREE.Vector2(
         (e.clientX / innerWidth) * 2 - 1,
@@ -3332,6 +3343,7 @@ if (devPreview) {
       ),
       camera,
     );
+    if (previewSpotlight && !soundMenuOpen) showcase.aimSpotlight(raycaster);
     if (e.pointerId === previewSpinPointer) {
       showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));

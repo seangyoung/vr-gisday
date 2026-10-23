@@ -38,7 +38,9 @@ export class ChangeExperience extends TimedExhibit {
     super(root, onChange);
     this.kind = "change";
     this.sceneIndex = 0;
+    this.comparisonMode = "slider";
     this.split = 0.5;
+    this.lens = { u: 0.5, v: 0.5 };
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -79,6 +81,7 @@ export class ChangeExperience extends TimedExhibit {
     const ticket = this.loadTicket = (this.loadTicket || 0) + 1;
     this.draggingBy = null;
     this.split = 0.5;
+    this.lens = { u: 0.5, v: 0.5 };
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -117,30 +120,48 @@ export class ChangeExperience extends TimedExhibit {
     const crop = this.sceneInfo.crop;
     if (crop) ctx.drawImage(this.pair[0], ...crop.before, 0, 0, width, height);
     else ctx.drawImage(this.pair[0], 0, 0, width, height);
+    const spotlight = this.comparisonMode === "spotlight";
+    const lensX = (this.lens?.u ?? 0.5) * width;
+    const lensY = (this.lens?.v ?? 0.5) * height;
+    const lensRadius = Math.min(width, height) * 0.24;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(this.split * width, 0, width * (1 - this.split), height);
+    if (spotlight) ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
+    else ctx.rect(this.split * width, 0, width * (1 - this.split), height);
     ctx.clip();
     if (crop) ctx.drawImage(this.pair[1], ...crop.after, 0, 0, width, height);
     else ctx.drawImage(this.pair[1], 0, 0, width, height);
     ctx.restore();
-    const splitX = this.split * width;
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(splitX, 0);
-    ctx.lineTo(splitX, height);
-    ctx.stroke();
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(splitX, height * 0.52, 19, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#102c37";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(splitX - 10, height * 0.52);
-    ctx.lineTo(splitX + 10, height * 0.52);
-    ctx.stroke();
+    if (spotlight) {
+      ctx.strokeStyle = "#102c37";
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "#d7fff4";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      const splitX = this.split * width;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(splitX, 0);
+      ctx.lineTo(splitX, height);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(splitX, height * 0.52, 19, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#102c37";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(splitX - 10, height * 0.52);
+      ctx.lineTo(splitX + 10, height * 0.52);
+      ctx.stroke();
+    }
     dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
     dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right");
     if (this.revealed && this.sceneInfo.focus) {
@@ -163,10 +184,37 @@ export class ChangeExperience extends TimedExhibit {
     return raycaster.intersectObject(this.image, false)[0];
   }
 
+  setComparisonMode(mode) {
+    if (!this.started || this.finished || !["slider", "spotlight"].includes(mode)) return;
+    this.comparisonMode = mode;
+    this.draggingBy = null;
+    this.refresh();
+    this.onChange();
+  }
+
+  setLensFromUV(uv) {
+    const u = Math.max(0, Math.min(1, uv.x));
+    const v = Math.max(0, Math.min(1, 1 - uv.y));
+    if (Math.abs(u - this.lens.u) < 0.006 && Math.abs(v - this.lens.v) < 0.006)
+      return false;
+    this.lens = { u, v };
+    this.refresh();
+    return true;
+  }
+
+  aimSpotlight(raycaster) {
+    if (this.comparisonMode !== "spotlight") return false;
+    const hit = this.imageHit(raycaster);
+    if (!hit?.uv) return false;
+    this.setLensFromUV(hit.uv);
+    return true;
+  }
+
   beginInteraction(raycaster, id) {
     const hit = this.imageHit(raycaster);
     if (!hit?.uv) return false;
     this.draggingBy = id;
+    if (this.comparisonMode === "spotlight") this.setLensFromUV(hit.uv);
     this.startU = hit.uv.x;
     this.moved = false;
     return true;
@@ -176,6 +224,10 @@ export class ChangeExperience extends TimedExhibit {
     if (this.draggingBy !== id) return false;
     const hit = this.imageHit(raycaster);
     if (!hit?.uv) return false;
+    if (this.comparisonMode === "spotlight") {
+      this.setLensFromUV(hit.uv);
+      return true;
+    }
     const u = Math.max(0.02, Math.min(0.98, hit.uv.x));
     if (Math.abs(u - this.startU) > 0.025) this.moved = true;
     if (this.moved && Math.abs(u - this.split) > 0.001) {

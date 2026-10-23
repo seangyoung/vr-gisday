@@ -47,6 +47,55 @@ test("a selected answer leaves the before-after slider draggable", () => {
   assert.equal(exhibit.endInteraction("right"), true);
 });
 
+test("spotlight follows the image ray and remains usable after an answer", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  exhibit.sceneIndex = 0;
+  exhibit.started = true;
+  exhibit.finished = false;
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.comparisonMode = "slider";
+  exhibit.lens = { u: 0.5, v: 0.5 };
+  exhibit.image = { updateWorldMatrix() {} };
+  exhibit.refresh = () => {};
+  exhibit.onChange = () => {};
+  exhibit.setComparisonMode("spotlight");
+  const raycaster = { intersectObject: () => [{ uv: { x: 0.28, y: 0.72 } }] };
+  assert.equal(exhibit.aimSpotlight(raycaster), true);
+  assert.ok(Math.abs(exhibit.lens.u - 0.28) < 0.001);
+  assert.ok(Math.abs(exhibit.lens.v - 0.28) < 0.001);
+  exhibit.chooseAnswer(CHANGE_SCENES[0].answer);
+  assert.equal(exhibit.aimSpotlight(raycaster), true);
+  assert.equal(exhibit.beginInteraction(raycaster, "right"), true);
+  raycaster.intersectObject = () => [{ uv: { x: 0.73, y: 0.16 } }];
+  assert.equal(exhibit.dragInteraction(raycaster, "right"), true);
+  assert.ok(Math.abs(exhibit.lens.v - 0.84) < 0.001);
+  assert.equal(exhibit.endInteraction("right"), true);
+});
+
+test("spotlight clips the later image to a circular window using aligned crops", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  const draws = [];
+  const arcs = [];
+  const ctx = new Proxy({
+    drawImage: (...args) => draws.push(args),
+    arc: (...args) => arcs.push(args),
+    measureText: () => ({ width: 100 }),
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+  exhibit.sceneIndex = CHANGE_SCENES.findIndex((scene) => scene.id === "helens");
+  exhibit.canvas = { width: 580, height: 500, getContext: () => ctx };
+  exhibit.image = { material: { map: { needsUpdate: false } } };
+  exhibit.pair = [{}, {}];
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.comparisonMode = "spotlight";
+  exhibit.lens = { u: 0.3, v: 0.4 };
+  exhibit.refresh();
+  assert.deepEqual(draws[0].slice(1), [20, 0, 580, 500, 0, 0, 580, 500]);
+  assert.deepEqual(draws[1].slice(1), [0, 0, 580, 500, 0, 0, 580, 500]);
+  assert.deepEqual(arcs[0].slice(0, 3), [174, 200, 120]);
+});
+
 test("answer highlight is drawn for local changes but not flood or fire", () => {
   const exhibit = Object.create(ChangeExperience.prototype);
   let outlines = 0;
