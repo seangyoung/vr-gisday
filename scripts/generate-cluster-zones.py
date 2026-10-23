@@ -1,0 +1,66 @@
+"""Build road-centered, non-overlapping ward polygons for the Snow map.
+
+Run with Python 3 and Shapely 2.1+. The generated JSON is committed so the
+headset never computes Voronoi geometry at runtime.
+"""
+
+import json
+import math
+import subprocess
+from pathlib import Path
+
+from shapely import MultiPoint, box, voronoi_polygons
+from shapely.geometry import LineString, Polygon
+from shapely.ops import unary_union
+
+
+ROOT = Path(__file__).resolve().parents[1]
+blocks = json.loads((ROOT / "src/showcase/data/snow-blocks.json").read_text())["blocks"]
+modes = json.loads(subprocess.check_output(
+    ["node", "--input-type=module", "-e",
+     "import { CLUSTER_MODES } from './src/showcase/cluster-model.js'; "
+     "console.log(JSON.stringify(CLUSTER_MODES));"], cwd=ROOT, text=True))
+extent = box(529115, 180770, 529700, 181350)
+urban_footprint = unary_union(
+    [Polygon(block[3][0]) for block in blocks]
+).buffer(8, join_style=2).intersection(extent)
+
+# Samples along the real block edges make the dividing lines run down streets
+# rather than cutting across the buildings. Voronoi cells partition the street
+# gaps, then cells assigned to the same ward are dissolved into one polygon.
+sites = []
+owners = []
+seen = set()
+for block_id, block in enumerate(blocks):
+    perimeter = LineString(block[3][0])
+    candidates = [perimeter.interpolate(distance)
+                  for distance in range(0, math.ceil(perimeter.length), 12)]
+    candidates.append(Polygon(block[3][0]).representative_point())
+    for point in candidates:
+        key = (round(point.x, 4), round(point.y, 4))
+        if key in seen:
+            continue
+        seen.add(key)
+        sites.append(key)
+        owners.append(block_id)
+
+cells = list(voronoi_polygons(MultiPoint(sites), extend_to=extent, ordered=True).geoms)
+output = {}
+for mode, definition in modes.items():
+    if "wards" not in definition:
+        continue
+    polygons = []
+    for ward_id in range(definition["count"]):
+        ward_cells = [cell for cell, block_id in zip(cells, owners)
+                      if definition["wards"][block_id] == ward_id]
+        dissolved = unary_union(ward_cells).intersection(urban_footprint).simplify(1.2)
+        parts = [dissolved] if isinstance(dissolved, Polygon) else list(dissolved.geoms)
+        polygons.append([
+            [[round(x, 1), round(y, 1)] for x, y in part.exterior.coords]
+            for part in parts if isinstance(part, Polygon) and part.area > 1
+        ])
+    output[mode] = polygons
+
+destination = ROOT / "src/showcase/data/snow-zone-polygons.json"
+destination.write_text(json.dumps(output, separators=(",", ":")) + "\n")
+print(f"Wrote zone polygons to {destination}")

@@ -1,6 +1,6 @@
 import source from "./data/snow.json" with { type: "json" };
 import blockSource from "./data/snow-blocks.json" with { type: "json" };
-import boundarySource from "./data/snow-zone-boundaries.json" with { type: "json" };
+import zoneSource from "./data/snow-zone-polygons.json" with { type: "json" };
 
 export const SNOW_BUILDINGS = source.buildings.map(([x, y, deaths]) => ({ x, y, deaths }));
 export const SNOW_PUMPS = source.pumps.map(([x, y, name]) => ({ x, y, name }));
@@ -133,19 +133,8 @@ export function blockAt(x, y, roadTolerance = 10) {
   return distance <= roadTolerance ? closest : null;
 }
 
-const boundaryCache = new Map();
-
-// Generated road-center segments are shared by all plans. Each plan draws only
-// the segments separating blocks assigned to different hypothetical wards.
-export function zoneBoundarySegments(mode) {
-  if (!CLUSTER_MODES[mode]?.count) return [];
-  if (boundaryCache.has(mode)) return boundaryCache.get(mode);
-  const segments = boundarySource.segments
-    .filter(([a, b]) => wardFor(SNOW_BLOCKS[a], mode) !== wardFor(SNOW_BLOCKS[b], mode))
-    .map(([a, b, x0, y0, x1, y1]) => ({
-      x0, y0, x1, y1,
-      wards: [wardFor(SNOW_BLOCKS[a], mode), wardFor(SNOW_BLOCKS[b], mode)],
-    }));
-  boundaryCache.set(mode, segments);
-  return segments;
+// Precomputed road-centered polygons keep the map light enough for Quest.
+// Each ward contains one or more exterior rings; the fill remains transparent.
+export function zonePolygons(mode) {
+  return zoneSource[mode] ?? [];
 }

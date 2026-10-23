@@ -11,7 +11,7 @@ import { SPECTRAL_LESSON_STEPS,
   nextSpectralLessonStep } from "../src/showcase/spectral-lesson.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor, zoneBoundarySegments,
+  aggregationFor, blockAt, wardFor, zonePolygons,
 } from "../src/showcase/cluster-model.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, continentDistortionSummary,
@@ -140,18 +140,20 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
   assert.equal(blockAt(0, 0), null);
 });
 
-test("ward boundary lines follow only streets separating different zones", () => {
-  assert.deepEqual(zoneBoundarySegments("points"), []);
+test("each ward has a closed polygon within the map extent", () => {
+  assert.deepEqual(zonePolygons("points"), []);
   const plans = ["wardA", "wardB", "wardC", "wardD"];
   const footprints = plans.map((mode) => {
-    const segments = zoneBoundarySegments(mode);
-    assert.ok(segments.length > 80, `${mode} should show its boundaries`);
-    assert.ok(segments.every(({ x0, y0, x1, y1, wards }) =>
-      wards[0] !== wards[1] &&
-      [x0, x1].every((x) => x >= SNOW_WINDOW.minX && x <= SNOW_WINDOW.maxX) &&
-      [y0, y1].every((y) => y >= SNOW_WINDOW.minY && y <= SNOW_WINDOW.maxY)));
-    return segments.map(({ x0, y0, x1, y1 }) =>
-      `${x0},${y0},${x1},${y1}`).join("|");
+    const polygons = zonePolygons(mode);
+    assert.equal(polygons.length, aggregationFor(mode).length);
+    assert.ok(polygons.every((rings) => rings.length > 0));
+    for (const rings of polygons) for (const ring of rings) {
+      assert.deepEqual(ring[0], ring.at(-1));
+      assert.ok(ring.every(([x, y]) =>
+        x >= SNOW_WINDOW.minX && x <= SNOW_WINDOW.maxX &&
+        y >= SNOW_WINDOW.minY && y <= SNOW_WINDOW.maxY));
+    }
+    return JSON.stringify(polygons);
   });
   assert.equal(new Set(footprints).size, plans.length);
 });

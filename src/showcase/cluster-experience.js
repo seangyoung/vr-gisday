@@ -1,7 +1,7 @@
 import { TimedExhibit, canvasPanel } from "./exhibit.js";
 import {
   CLUSTER_MODES, SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor, zoneBoundarySegments,
+  aggregationFor, blockAt, wardFor, zonePolygons,
 } from "./cluster-model.js";
 
 const plot = { x: 45, y: 35, size: 520 };
@@ -29,17 +29,37 @@ function blockPath(ctx, block) {
   }
 }
 
-function strokeWardBoundary(ctx) {
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = "#183847";
-  ctx.lineWidth = 6;
-  ctx.stroke();
-  ctx.strokeStyle = "#ffd094";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
+function traceZone(ctx, rings) {
+  ctx.beginPath();
+  for (const ring of rings) {
+    ring.forEach(([x, y], index) => {
+      if (index === 0) ctx.moveTo(px(x), py(y));
+      else ctx.lineTo(px(x), py(y));
+    });
+    ctx.closePath();
+  }
+}
+
+function drawZoneLabels(ctx, mode) {
+  if (mode === "points") return;
+  const zones = aggregationFor(mode);
+  const darkest = zones.reduce((best, zone) =>
+    zone.deaths > best.deaths ? zone : best);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 19px system-ui";
+  for (const zone of zones) {
+    const x = px(zone.labelX), y = py(zone.labelY);
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.fillStyle = "#102b38";
+    ctx.fill();
+    ctx.strokeStyle = zone === darkest ? "#a6f5d9" : "#ffffff";
+    ctx.lineWidth = zone === darkest ? 3 : 1.5;
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(zone.name, x, y + 1);
+  }
 }
 
 function drawMap(canvas, mode) {
@@ -64,12 +84,15 @@ function drawMap(canvas, mode) {
     ctx.stroke();
   }
   if (mode !== "points") {
-    ctx.beginPath();
-    for (const segment of zoneBoundarySegments(mode)) {
-      ctx.moveTo(px(segment.x0), py(segment.y0));
-      ctx.lineTo(px(segment.x1), py(segment.y1));
+    ctx.fillStyle = "rgba(255, 255, 255, 0)";
+    ctx.strokeStyle = "#183847";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    for (const rings of zonePolygons(mode)) {
+      traceZone(ctx, rings);
+      ctx.fill();
+      ctx.stroke();
     }
-    strokeWardBoundary(ctx);
   }
   if (mode === "points") {
     for (const point of SNOW_BUILDINGS) {
@@ -81,24 +104,6 @@ function drawMap(canvas, mode) {
       ctx.strokeStyle = "#422e32";
       ctx.lineWidth = 0.7;
       ctx.stroke();
-    }
-  } else {
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = "bold 19px system-ui";
-    const darkest = zones.reduce((best, zone) =>
-      zone.deaths > best.deaths ? zone : best);
-    for (const zone of zones) {
-      const x = px(zone.labelX), y = py(zone.labelY);
-      ctx.beginPath();
-      ctx.arc(x, y, 14, 0, Math.PI * 2);
-      ctx.fillStyle = "#102b38";
-      ctx.fill();
-      ctx.strokeStyle = zone === darkest ? "#a6f5d9" : "#ffffff";
-      ctx.lineWidth = zone === darkest ? 3 : 1.5;
-      ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(zone.name, x, y + 1);
     }
   }
   ctx.restore();
@@ -147,10 +152,11 @@ function drawMap(canvas, mode) {
   }
   ctx.font = "17px system-ui";
   if (mode !== "points") {
-    ctx.beginPath();
-    ctx.moveTo(602, 510);
-    ctx.lineTo(634, 510);
-    strokeWardBoundary(ctx);
+    ctx.fillStyle = "#a2b4aa";
+    ctx.fillRect(602, 502, 32, 16);
+    ctx.strokeStyle = "#183847";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(602, 502, 32, 16);
     ctx.fillStyle = "#e9f5f0";
     ctx.fillText("Ward boundary", 644, 510, 260);
     ctx.fillStyle = "#e9f5f0";
@@ -164,22 +170,21 @@ function drawMap(canvas, mode) {
   ctx.strokeRect(plot.x, plot.y, plot.size, plot.size);
 }
 
-function drawSelection(canvas, selection) {
+function drawSelection(canvas, selection, mode) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!selection) return;
   ctx.save();
   ctx.beginPath();
   ctx.rect(plot.x, plot.y, plot.size, plot.size);
   ctx.clip();
-  if (selection.type === "building") {
+  if (selection?.type === "building") {
     ctx.beginPath();
     ctx.arc(px(selection.point.x), py(selection.point.y),
       7 + Math.sqrt(selection.point.deaths) * 1.45, 0, Math.PI * 2);
     ctx.strokeStyle = "#ffffff";
     ctx.lineWidth = 3;
     ctx.stroke();
-  } else {
+  } else if (selection?.type === "zone") {
     for (const block of selection.zone.blocks) {
       blockPath(ctx, block);
       ctx.strokeStyle = "#ffffff";
@@ -187,6 +192,9 @@ function drawSelection(canvas, selection) {
       ctx.stroke();
     }
   }
+  // This overlay sits in front of the selected-block outlines, so the ward
+  // letters remain readable even when a selected block runs under a label.
+  drawZoneLabels(ctx, mode);
   ctx.restore();
 }
 
@@ -211,6 +219,8 @@ export class ClusterExperience extends TimedExhibit {
     this.selectionMap.material.transparent = true;
     this.selectionMap.material.depthWrite = false;
     this.group.add(this.selectionMap);
+    drawSelection(this.selectionCanvas, null, this.mode);
+    this.selectionMap.material.map.needsUpdate = true;
   }
   finish() {
     if (!this.started || this.finished) return;
@@ -228,7 +238,7 @@ export class ClusterExperience extends TimedExhibit {
       : `Highest ward: ${highest.deaths} deaths. Select a block to outline its ward.`;
     drawMap(this.mapCanvas, mode);
     this.map.material.map.needsUpdate = true;
-    drawSelection(this.selectionCanvas, null);
+    drawSelection(this.selectionCanvas, null, mode);
     this.selectionMap.material.map.needsUpdate = true;
     this.onChange();
   }
@@ -264,7 +274,7 @@ export class ClusterExperience extends TimedExhibit {
     }
     // Selecting changes only the transparent highlight and readout; the
     // expensive base map texture stays in place without a fade or reload.
-    drawSelection(this.selectionCanvas, this.selection);
+    drawSelection(this.selectionCanvas, this.selection, this.mode);
     this.selectionMap.material.map.needsUpdate = true;
     this.onChange("selection");
     return true;
