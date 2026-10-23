@@ -3,6 +3,8 @@ import { TimedExhibit, canvasPanel, replacePanelTexture } from "./exhibit.js";
 import { BAND_NAMES, displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "./spectral-model.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "./spectral-scenes.js";
+import { SPECTRAL_LESSON_STEPS, nextSpectralLessonStep,
+  drawSpectralLesson } from "./spectral-lesson.js";
 import { makePlatformComparison, highlightPlatform,
   alignSensingFootprints } from "./remote-platforms.js";
 import { GlobeSpin } from "./projection-model.js";
@@ -85,47 +87,6 @@ function indexCanvas(falsePixels, width, height) {
   return canvas;
 }
 
-function spectrumCanvas() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1024;
-  canvas.height = 410;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = "#102c37";
-  ctx.fillRect(0, 0, 1024, 410);
-  ctx.textAlign = "center";
-  ctx.fillStyle = "#dceff0";
-  ctx.font = "bold 32px system-ui";
-  ctx.fillText("Electromagnetic radiation: energy carried by waves", 512, 56);
-  ctx.font = "21px system-ui";
-  ctx.fillStyle = "#b6d1d9";
-  ctx.fillText("Example wavelength ranges from Landsat 8", 512, 92);
-  const bands = [
-    { label: "Blue", range: "0.45–0.51 µm", color: "#4d83d0" },
-    { label: "Green", range: "0.53–0.59 µm", color: "#51b97a" },
-    { label: "Red", range: "0.64–0.67 µm", color: "#dd6663" },
-    { label: "Near infrared", range: "0.85–0.88 µm", color: "#b55f85" },
-  ];
-  bands.forEach((band, index) => {
-    const x = 62 + index * 240;
-    ctx.fillStyle = band.color;
-    ctx.fillRect(x, 123, 218, 100);
-    ctx.strokeStyle = "#e4f4ef";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, 123, 218, 100);
-    ctx.fillStyle = "#e6f4f5";
-    ctx.font = "bold 26px system-ui";
-    ctx.fillText(band.label, x + 109, 275);
-    ctx.font = "22px system-ui";
-    ctx.fillStyle = "#b6d1d9";
-    ctx.fillText(band.range, x + 109, 309);
-  });
-  ctx.fillStyle = "#b6d1d9";
-  ctx.font = "23px system-ui";
-  ctx.fillText("Visible to human eyes", 400, 364);
-  ctx.fillText("Recorded by a sensor", 891, 364);
-  return canvas;
-}
-
 function sceneCanvas(base, sample, width, height) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -203,7 +164,14 @@ export class SpectralExperience extends TimedExhibit {
       1.58, 0.89, -0.39, 0.32);
     this.graph = canvasPanel(graphCanvas(this.bands, this.mode, false),
       0.89, 1.18, 0.86, 0.23);
-    this.spectrum = canvasPanel(spectrumCanvas(), 2.35, 0.94, 0, 0.12);
+    this.lessonStep = 0;
+    this.lessonTime = 0;
+    this.lessonFrameTime = 0;
+    this.lessonCanvas = document.createElement("canvas");
+    this.lessonCanvas.width = 1100;
+    this.lessonCanvas.height = 530;
+    drawSpectralLesson(this.lessonCanvas.getContext("2d"), 0, 0);
+    this.spectrum = canvasPanel(this.lessonCanvas, 2.35, 1.13, 0, 0.2);
     this.image.visible = false;
     this.graph.visible = false;
     this.spectrum.visible = false;
@@ -303,6 +271,16 @@ export class SpectralExperience extends TimedExhibit {
   }
   update(dt) {
     super.update(dt);
+    if (this.started && !this.finished && this.phase === "spectrum") {
+      this.lessonTime += dt;
+      this.lessonFrameTime += dt;
+      if (this.lessonFrameTime >= 1 / 24) {
+        drawSpectralLesson(this.lessonCanvas.getContext("2d"),
+          this.lessonStep, this.lessonTime);
+        this.spectrum.material.map.needsUpdate = true;
+        this.lessonFrameTime = 0;
+      }
+    }
     if (this.started && !this.finished && this.phase === "platforms")
       for (const item of this.platformItems) {
         item.spin.step(dt);
@@ -365,12 +343,30 @@ export class SpectralExperience extends TimedExhibit {
     if (!this.started || this.finished || this.phase !== "platforms") return;
     if (this.platformSpinBy !== null) this.endPlatformSpin(this.platformSpinBy);
     this.phase = "spectrum";
+    this.lessonStep = 0;
+    this.lessonTime = 0;
+    this.lessonFrameTime = 0;
     this.platformGroup.visible = false;
     this.spectrum.visible = true;
     this.onChange();
   }
-  showBands() {
+  advanceLesson() {
     if (!this.started || this.finished || this.phase !== "spectrum") return;
+    const next = nextSpectralLessonStep(this.lessonStep);
+    if (next === null) {
+      this.showBands();
+      return;
+    }
+    this.lessonStep = next;
+    this.lessonTime = 0;
+    this.lessonFrameTime = 0;
+    drawSpectralLesson(this.lessonCanvas.getContext("2d"), next, 0);
+    this.spectrum.material.map.needsUpdate = true;
+    this.onChange();
+  }
+  showBands() {
+    if (!this.started || this.finished || this.phase !== "spectrum" ||
+        this.lessonStep !== SPECTRAL_LESSON_STEPS.length - 1) return;
     this.phase = "bands";
     this.spectrum.visible = false;
     this.image.visible = true;

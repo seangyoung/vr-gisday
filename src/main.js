@@ -46,6 +46,7 @@ import { VIEWSHED_SCENES } from "./viewshed/scenes.js";
 import { PixelExperience } from "./pixels/experience.js";
 import { PIXEL_EXTENT } from "./pixels/model.js";
 import { SpectralExperience } from "./showcase/spectral-experience.js";
+import { SPECTRAL_LESSON_STEPS } from "./showcase/spectral-lesson.js";
 import { ClusterExperience } from "./showcase/cluster-experience.js";
 import { ChangeExperience } from "./change/experience.js";
 import { CHANGE_SCENES } from "./change/scenes.js";
@@ -1317,13 +1318,14 @@ function drawShowcaseUI() {
     return;
   }
   if (exhibit.kind === "spectral" && exhibit.phase === "spectrum" && !exhibit.finished) {
-    label("See the Invisible · light in bands", 0, 0.96, 2.45, 0.18,
+    const lesson = SPECTRAL_LESSON_STEPS[exhibit.lessonStep];
+    label("See the Invisible · light to NDVI", 0, 1.06, 2.45, 0.18,
       43, "#e6f4f5", "#0b2430");
-    label("A multispectral sensor records several wavelength ranges separately.",
-      0, 0.76, 2.4, 0.13, 27, "#b6d1d9", "#0b2430");
-    label("Blue, green, and red are visible light. Near infrared (NIR) is invisible to us.\nTogether, a place's band responses form a spectral signature.",
-      0, -0.53, 2.43, 0.21, 27, "#e6f4f5", "#0b2430");
-    button("View Landsat scenes", 0, -0.83, () => exhibit.showBands(), 1.48);
+    label(`${exhibit.lessonStep + 1}/4 · ${lesson.title}`,
+      0, 0.86, 2.4, 0.12, 30, "#b6d1d9", "#0b2430");
+    label(lesson.copy, 0, -0.52, 2.43, 0.22, 27,
+      "#e6f4f5", "#0b2430");
+    button(lesson.next, 0, -0.84, () => exhibit.advanceLesson(), 1.65);
     return;
   }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {

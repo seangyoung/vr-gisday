@@ -7,6 +7,8 @@ import { displayedBandBrightness, displayIndexPixel, displayIndexValue,
 import { makePlatformComparison, highlightPlatform,
   alignSensingFootprints } from "../src/showcase/remote-platforms.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
+import { SPECTRAL_LESSON_STEPS,
+  nextSpectralLessonStep } from "../src/showcase/spectral-lesson.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
   aggregationFor, blockAt, wardFor, zoneBoundarySegments,
@@ -91,6 +93,18 @@ test("real spectral scenes rotate without an immediate repeat", () => {
   assert.notEqual(secondCycle[0].id, firstCycle.at(-1).id);
   assert.deepEqual(new Set(secondCycle.map((scene) => scene.id)),
     new Set(SPECTRAL_SCENES.map((scene) => scene.id)));
+});
+
+test("the spectral introduction teaches NIR reflection before NDVI and imagery", () => {
+  assert.deepEqual(SPECTRAL_LESSON_STEPS.map(({ id }) => id),
+    ["prism", "healthy", "stressed", "ndvi"]);
+  assert.match(SPECTRAL_LESSON_STEPS[0].copy, /invisible NIR/i);
+  assert.match(SPECTRAL_LESSON_STEPS[1].copy, /reflects strongly in near infrared/i);
+  assert.match(SPECTRAL_LESSON_STEPS[2].copy, /reflects less NIR/i);
+  let step = 0;
+  for (let i = 0; i < 3; i++) step = nextSpectralLessonStep(step);
+  assert.equal(step, 3);
+  assert.equal(nextSpectralLessonStep(step), null);
 });
 
 test("Snow blocks are conserved by each hypothetical ward plan", () => {
