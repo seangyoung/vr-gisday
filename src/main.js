@@ -871,7 +871,7 @@ function drawScanUI() {
   if (s.station) {
     if (s.stage === 0) {
       lessonCard("The LiDAR Field Survey",
-        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nEach placement scans densely. Use four angles to reveal hidden sides.`);
+        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nFour stations at least 3 m apart reveal hidden sides.`);
       button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
       label("Grip the tripod to carry it · Trigger to scan · Left stick walk · Right stick teleport/turn",
         0, GUIDED_INFO_Y, 2.3, 0.14, 24, "#b6d1d9", "#0b2430");
@@ -884,9 +884,12 @@ function drawScanUI() {
       foregroundTakeaway();
       return;
     }
-    button("Turn preview ◀", -0.57, -1.21, () => s.turnPreview(-1), 1.02);
-    button("Turn preview ▶", 0.57, -1.21, () => s.turnPreview(1), 1.02);
-    button(s.scanQueue ? "Scanning…" : s.scansLeft ? "Scan here" : "Scans used",
+    if (s.records.length) {
+      button("Rotate ◀", -0.57, -1.21, () => s.turnPreview(-1), 1.02);
+      button("Rotate ▶", 0.57, -1.21, () => s.turnPreview(1), 1.02);
+    }
+    button(s.scanQueue ? "Scanning…" : !s.scansLeft ? "Scans used" :
+      s.tooCloseToPreviousStation ? "Move tripod" : "Scan here",
       -0.57, -1.47, () => s.startSweep(), 1.02);
     button("Takeaway", 0.57, -1.47, () => s.finish(), 1.02);
     return;
@@ -2572,6 +2575,7 @@ for (let i = 0; i < 2; i++) {
         hit.object.userData.action?.(hit);
         return;
       }
+      if (scan.beginPreviewDrag(raycaster, i)) return;
       if (!soundMenuOpen && scan.startSweep()) sound.click();
       return;
     }
@@ -2621,6 +2625,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("selectend", () => {
     showcase?.endInteraction?.(i);
+    scan?.endPreviewDrag?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -3067,6 +3072,13 @@ renderer.setAnimationLoop((time, frame) => {
               scan.sweep(raycaster.ray.origin, raycaster.ray.direction, dt);
           }
         }
+      else if (scan.previewDragId != null) {
+        const active = controllers[scan.previewDragId];
+        if (active?.c.visible) {
+          intersect(active.c);
+          scan.updatePreviewDrag(raycaster, scan.previewDragId);
+        } else scan.endPreviewDrag(scan.previewDragId);
+      }
       scan.update(dt);
     }
     const poses = new Map();

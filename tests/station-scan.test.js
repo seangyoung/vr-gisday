@@ -124,3 +124,58 @@ test("clipboard preview turns without changing captured survey coverage", () => 
   assert.equal(station.coverage.count, 138);
   assert.equal(redraws, 2);
 });
+
+test("a repeat tripod station cannot consume a scan, while a moved station can", () => {
+  const station = Object.create(StationScanExperience.prototype);
+  station.started = true;
+  station.finished = false;
+  station.scansLeft = 3;
+  station.scanQueue = null;
+  station.grab = { hands: new Map() };
+  station.tripod = new THREE.Group();
+  station.records = [{ position: new THREE.Vector3(0, 0, 0), added: 1400 }];
+  station.coverage = { count: 1400, prepare: () => {} };
+  station.refreshClipboard = () => {};
+  station.onChange = () => {};
+  station.onEvent = () => {};
+  assert.equal(station.startSweep(), false);
+  assert.equal(station.scansLeft, 3);
+  station.tripod.position.x = 2.99;
+  assert.equal(station.startSweep(), false);
+  assert.equal(station.scansLeft, 3);
+  station.tripod.position.x = 3.01;
+  assert.equal(station.startSweep(), true);
+  assert.equal(station.scansLeft, 2);
+  assert.equal(station.activeStation.x, 3.01);
+});
+
+test("the point cloud can be trigger-dragged after the first scan", () => {
+  const station = Object.create(StationScanExperience.prototype);
+  station.started = true;
+  station.finished = false;
+  station.records = [{ position: new THREE.Vector3() }];
+  station.scanQueue = null;
+  station.previewAngle = 0;
+  station.clipboard = new THREE.Group();
+  station.previewDisplay = new THREE.Mesh(new THREE.PlaneGeometry(2.26, 2.26),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  station.previewDisplay.position.set(0, 0.07, 0.04);
+  station.clipboard.add(station.previewDisplay);
+  station.board = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.86, 0.07),
+    new THREE.MeshBasicMaterial());
+  station.board.position.set(0, -0.14, -0.05);
+  station.clipboard.add(station.board);
+  let redraws = 0;
+  station.refreshClipboard = () => { redraws++; };
+  const ray = (x) => new THREE.Raycaster(new THREE.Vector3(x, 0, 2),
+    new THREE.Vector3(0, 0, -1));
+  assert.equal(station.beginPreviewDrag(ray(0), 1), true);
+  assert.equal(station.previewDragId, 1);
+  station.updatePreviewDrag(ray(0.3), 1);
+  assert.ok(station.previewAngle > 0.7);
+  assert.equal(redraws, 1);
+  station.endPreviewDrag(1);
+  assert.equal(station.previewDragId, null);
+  station.updatePreviewDrag(ray(0.5), 1);
+  assert.equal(redraws, 1);
+});

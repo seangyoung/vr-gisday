@@ -5,6 +5,7 @@ import { StationCoverage } from "./station-coverage.js";
 
 const LIMIT = 20;
 const TOTAL_SCANS = 4;
+const MIN_STATION_SPACING = 3;
 const SCAN_BATCH = 60;
 const CLOUD_REFRESH_STEP = 180;
 const V = () => new THREE.Vector3();
@@ -119,6 +120,7 @@ export class StationScanExperience {
     this.selected = new Set(["vegetation"]);
     this.records = [];
     this.previewAngle = 0;
+    this.previewDragId = null;
     this.lastRange = 8;
     this.scansLeft = TOTAL_SCANS;
     this.group = new THREE.Group();
@@ -194,6 +196,7 @@ export class StationScanExperience {
       new THREE.MeshBasicMaterial({ color: 0x143441 }));
     board.position.set(0, -0.14, -0.05);
     this.clipboard.add(board);
+    this.board = board;
     const clip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.06),
       new THREE.MeshBasicMaterial({ color: 0xb5c7c8 }));
     clip.position.y = 1.29;
@@ -208,6 +211,7 @@ export class StationScanExperience {
       new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide }));
     display.position.set(0, 0.07, 0.04);
     this.clipboard.add(display);
+    this.previewDisplay = display;
     this.scanQueue = null;
     this.scanCursor = 0;
     this.visitor = new THREE.Vector2();
@@ -216,6 +220,11 @@ export class StationScanExperience {
     this.refreshCloud();
   }
   get score() { return this.coverage.percent; }
+  get tooCloseToPreviousStation() {
+    return this.records.some(({ position }) =>
+      position && Math.hypot(this.tripod.position.x - position.x,
+        this.tripod.position.z - position.z) < MIN_STATION_SPACING);
+  }
   get targetName() {
     return ({ ruins: "ruin walls", bridge: "bridge and supports", village: "buildings",
       terraces: "terrace faces", canopy: "trees and canopy", courtyard: "courtyard", tower: "tower" })[this.sceneInfo.id];
@@ -262,6 +271,7 @@ export class StationScanExperience {
       this.tripod.position.y = 0;
       this.holdingHand = null;
       this.refreshClipboard();
+      this.onChange();
     }
   }
   updateTripod(poses) {
@@ -275,8 +285,14 @@ export class StationScanExperience {
   }
   startSweep() {
     if (!this.started || this.finished || this.scansLeft <= 0 || this.scanQueue || this.grab.hands.size) return false;
+    if (this.tooCloseToPreviousStation) {
+      this.refreshClipboard();
+      this.onChange();
+      return false;
+    }
     this.coverage.prepare();
     this.scansLeft--;
+    this.activeStation = this.tripod.position.clone();
     this.scanQueue = this.tripod.position.clone().add(new THREE.Vector3(0, 1.5, 0));
     this.scanCursor = 0;
     this.scanStartCount = this.coverage.count;
@@ -297,9 +313,11 @@ export class StationScanExperience {
     if (end === this.coverage.samples.length) {
       this.scanQueue = null;
       this.records.push({
+        position: this.activeStation,
         count: this.coverage.count,
         added: this.coverage.count - this.scanStartCount,
       });
+      this.activeStation = null;
       this.refreshClipboard();
       this.onChange();
     }
@@ -347,6 +365,13 @@ export class StationScanExperience {
       ctx.fillStyle = POINT_CSS[mesh.userData.finish];
       ctx.fillRect(x, y, 3.5, 3.5);
     }
+    if (this.records.length) {
+      ctx.fillStyle = "rgba(9, 35, 43, 0.88)";
+      ctx.fillRect(118, 414, 404, 31);
+      ctx.fillStyle = "#c8f3e4";
+      ctx.font = "21px sans-serif";
+      ctx.fillText("Trigger-drag this cloud to rotate", 320, 436);
+    }
     ctx.fillStyle = "#a6f5d9";
     ctx.font = "bold 38px sans-serif";
     ctx.fillText(`${this.score}% target captured`, 320, 507);
@@ -356,10 +381,11 @@ export class StationScanExperience {
     ctx.font = "22px sans-serif";
     const lastAdded = this.records.at(-1)?.added;
     const hint = this.scanQueue ? "Scanning visible faces…" : !this.scansLeft
-      ? "All scans used · select Takeaway" : lastAdded === 0
-        ? "Same view · move to another side" : lastAdded
+      ? "All scans used · select Takeaway" : this.tooCloseToPreviousStation
+        ? "Move tripod at least 3 m to a new station" : lastAdded
           ? `${lastAdded.toLocaleString()} new points · try another angle`
           : "Grip tripod · trigger to scan";
+    if (this.tooCloseToPreviousStation && this.scansLeft) ctx.fillStyle = "#ffdc83";
     ctx.fillText(hint, 320, 588);
     this.texture.needsUpdate = true;
   }
@@ -368,6 +394,37 @@ export class StationScanExperience {
     this.previewAngle = (this.previewAngle + Math.sign(direction) * Math.PI / 4 +
       Math.PI * 2) % (Math.PI * 2);
     this.refreshClipboard();
+  }
+  beginPreviewDrag(raycaster, id) {
+    if (!this.started || this.finished || !this.clipboard.visible) return false;
+    this.clipboard.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObject(this.previewDisplay, false)[0];
+    const boardHit = hit || raycaster.intersectObject(this.board, false)[0];
+    if (!boardHit) return false;
+    if (hit?.uv && this.records.length && !this.scanQueue) {
+      const x = hit.uv.x * 640, y = (1 - hit.uv.y) * 640;
+      if (x >= 35 && x <= 605 && y >= 122 && y <= 452) {
+        this.previewDragId = id;
+        this.previewDragU = hit.uv.x;
+      }
+    }
+    // Triggering on the field log should never spend a scan.
+    return true;
+  }
+  updatePreviewDrag(raycaster, id) {
+    if (this.previewDragId !== id || !this.clipboard.visible) return;
+    this.previewDisplay.updateWorldMatrix(true, false);
+    const hit = raycaster.intersectObject(this.previewDisplay, false)[0];
+    if (!hit?.uv) return;
+    const delta = hit.uv.x - this.previewDragU;
+    this.previewDragU = hit.uv.x;
+    if (Math.abs(delta) < 0.002) return;
+    this.previewAngle = (this.previewAngle + delta * Math.PI * 2 +
+      Math.PI * 4) % (Math.PI * 2);
+    this.refreshClipboard();
+  }
+  endPreviewDrag(id) {
+    if (this.previewDragId === id) this.previewDragId = null;
   }
   updateClipboard(leftGrip, camera, preview = false, fallback = false) {
     if (!this.started || this.finished || this.holdingHand === "left" ||
