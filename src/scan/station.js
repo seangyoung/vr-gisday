@@ -17,6 +17,12 @@ const POINT_COLORS = {
 const POINT_CSS = Object.fromEntries(Object.entries(POINT_COLORS)
   .map(([finish, color]) => [finish, `#${color.toString(16).padStart(6, "0")}`]));
 
+export function stationSurveyTargets(sceneId, meshes) {
+  return meshes.slice(1).filter((mesh) => mesh.userData.kind === "structure" ||
+    sceneId === "canopy" && mesh.userData.kind === "vegetation" ||
+    sceneId === "terraces" && ["ground", "vegetation"].includes(mesh.userData.kind));
+}
+
 function makeTripod() {
   const group = new THREE.Group();
   const metal = new THREE.MeshStandardMaterial({ color: 0xa4b1af, metalness: 0.72, roughness: 0.38 });
@@ -158,9 +164,7 @@ export class StationScanExperience {
     this.tripod = makeTripod();
     this.tripod.position.set(0, 0, 8.5);
     this.group.add(this.tripod);
-    const survey = this.targets.slice(1).filter((m) => m.userData.kind === "structure" ||
-      sceneInfo.id === "canopy" && m.userData.kind === "vegetation" ||
-      sceneInfo.id === "terraces" && m.userData.kind === "ground");
+    const survey = stationSurveyTargets(sceneInfo.id, this.targets);
     // One station densely samples its visible faces. The tree-heavy scene uses
     // a smaller budget to keep headset setup responsive.
     const sampleBudget = sceneInfo.id === "canopy" ? 3200 : 5200;
@@ -183,7 +187,7 @@ export class StationScanExperience {
       cancel: () => {
         this.grab.hands.clear();
         this.holdingHand = null;
-        this.tripod.position.y = 0;
+        this.tripod.position.y = this.surfaceHeightAt(this.tripod.position.x, this.tripod.position.z);
       },
       release: (id) => this.releaseTripod(id),
       update: (poses) => this.updateTripod(poses),
@@ -215,6 +219,9 @@ export class StationScanExperience {
     this.scanQueue = null;
     this.scanCursor = 0;
     this.visitor = new THREE.Vector2();
+    this.walkHeight = 0;
+    this.walkSupportHeight = 0;
+    this.fallSpeed = 0;
     this.walkForward = V();
     this.eye = V();
     this.refreshCloud();
@@ -227,7 +234,7 @@ export class StationScanExperience {
   }
   get targetName() {
     return ({ ruins: "ruin walls", bridge: "bridge and supports", village: "buildings",
-      terraces: "terrace faces", canopy: "trees and canopy", courtyard: "courtyard", tower: "tower" })[this.sceneInfo.id];
+      terraces: "terraces and trees", canopy: "trees and canopy", courtyard: "courtyard", tower: "tower" })[this.sceneInfo.id];
   }
   place(camera) {
     const eye = camera.getWorldPosition(V());
@@ -238,6 +245,9 @@ export class StationScanExperience {
       eye.z + forward.z * 14);
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z);
     this.visitor.set(0, 16);
+    this.walkHeight = 0;
+    this.walkSupportHeight = 0;
+    this.fallSpeed = 0;
   }
   begin() { this.stage = 1; this.started = true; this.group.visible = true; this.onChange(); }
   finish() {
@@ -249,9 +259,24 @@ export class StationScanExperience {
     this.group.visible = false;
     this.onChange();
   }
-  canPlace(x, z) {
+  surfaceHeightAt(x, z) {
+    if (this.sceneInfo?.id !== "terraces") return 0;
+    let height = 0;
+    for (const mesh of this.targets.slice(1)) {
+      if (mesh.userData.kind !== "ground") continue;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox;
+      if (x >= mesh.position.x + box.min.x * mesh.scale.x &&
+          x <= mesh.position.x + box.max.x * mesh.scale.x &&
+          z >= mesh.position.z + box.min.z * mesh.scale.z &&
+          z <= mesh.position.z + box.max.z * mesh.scale.z)
+        height = Math.max(height, mesh.position.y + box.max.y * mesh.scale.y);
+    }
+    return height;
+  }
+  canPlace(x, z, height = this.surfaceHeightAt(x, z)) {
     if (Math.abs(x) > LIMIT || Math.abs(z) > LIMIT) return false;
-    const worldPoint = this.group.localToWorld(new THREE.Vector3(x, 0.72, z));
+    const worldPoint = this.group.localToWorld(new THREE.Vector3(x, height + 0.72, z));
     return !this.targets.slice(1).some((mesh) => {
       if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
       return mesh.geometry.boundingBox.containsPoint(mesh.worldToLocal(worldPoint.clone()));
@@ -270,7 +295,7 @@ export class StationScanExperience {
   }
   releaseTripod(id) {
     if (this.grab.hands.delete(id)) {
-      this.tripod.position.y = 0;
+      this.tripod.position.y = this.surfaceHeightAt(this.tripod.position.x, this.tripod.position.z);
       this.holdingHand = null;
       this.refreshClipboard();
       this.onChange();
@@ -282,8 +307,10 @@ export class StationScanExperience {
     const pose = poses.get(id);
     if (!pose) { this.releaseTripod(id); return; }
     const local = this.group.worldToLocal(new THREE.Vector3().setFromMatrixPosition(pose));
-    if (this.canPlace(local.x, local.z))
-      this.tripod.position.set(local.x, THREE.MathUtils.clamp(local.y - 1.1, 0, 0.65), local.z);
+    const height = this.surfaceHeightAt(local.x, local.z);
+    if (this.canPlace(local.x, local.z, height))
+      this.tripod.position.set(local.x,
+        THREE.MathUtils.clamp(local.y - 1.1, height, height + 0.65), local.z);
   }
   startSweep() {
     if (!this.started || this.finished || this.scansLeft <= 0 || this.scanQueue || this.grab.hands.size) return false;
@@ -304,6 +331,16 @@ export class StationScanExperience {
   }
   update(dt) {
     if (!this.started || this.finished) return;
+    if (this.walkHeight > this.walkSupportHeight) {
+      this.fallSpeed = (this.fallSpeed ?? 0) + 12 * dt;
+      const drop = Math.min(this.walkHeight - this.walkSupportHeight, this.fallSpeed * dt);
+      this.walkHeight -= drop;
+      this.group.position.y += drop;
+      if (this.walkHeight <= this.walkSupportHeight + 1e-4) {
+        this.walkHeight = this.walkSupportHeight;
+        this.fallSpeed = 0;
+      }
+    }
     this.tripod.userData.head.rotation.y += dt * (this.scanQueue ? 9 : 0.6);
     if (!this.scanQueue) return;
     this.coverage.prepare();
@@ -456,9 +493,17 @@ export class StationScanExperience {
     const local = this.group.worldToLocal(camera.getWorldPosition(V()));
     const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
     const nx = local.x + c * dx - s * dz, nz = local.z + s * dx + c * dz;
-    if (!this.canPlace(nx, nz)) return;
+    const height = this.surfaceHeightAt(nx, nz);
+    const previousHeight = this.walkHeight ?? 0;
+    if (height > previousHeight + 0.35 || !this.canPlace(nx, nz, height)) return;
     this.group.position.x -= dx;
     this.group.position.z -= dz;
+    this.walkSupportHeight = height;
+    if (height >= previousHeight) {
+      this.group.position.y += previousHeight - height;
+      this.walkHeight = height;
+      this.fallSpeed = 0;
+    }
     this.visitor.set(nx, nz);
   }
   turn(angle, camera) {
@@ -472,13 +517,35 @@ export class StationScanExperience {
   teleportCandidate(raycaster, uiHit = null) {
     if (!this.started || this.finished || this.scanQueue) return null;
     this.ground.updateWorldMatrix(true, false);
-    const hit = raycaster.intersectObject(this.ground, false)[0];
-    if (!hit || hit.distance < 1 || hit.distance > 25 || uiHit && uiHit.distance < hit.distance) return null;
+    const surfaces = this.sceneInfo?.id === "terraces"
+      ? [this.ground, ...this.targets.slice(1).filter((mesh) => mesh.userData.kind === "ground")]
+      : [this.ground];
+    const hit = raycaster.intersectObjects(surfaces, false)[0];
+    const terraceEdge = hit && hit.object !== this.ground && hit.face.normal.y < 0.75;
+    if (!hit || hit.distance < (terraceEdge ? 0.45 : 1) || hit.distance > 25 ||
+        uiHit && uiHit.distance < hit.distance) return null;
     const obstruction = raycaster.intersectObjects(this.targets.slice(1), false)[0];
-    if (obstruction && obstruction.distance < hit.distance - 0.1) return null;
+    // Thin terrace trim runs just in front of the next step's face.
+    const trimClearance = terraceEdge && obstruction?.object.userData.kind === "structure" ? 0.7 : 0.1;
+    if (obstruction && obstruction.distance < hit.distance - trimClearance) return null;
     const local = this.group.worldToLocal(hit.point.clone());
-    return { x: local.x, z: local.z, point: hit.point.clone().add(new THREE.Vector3(0, 0.05, 0)),
-      distance: hit.distance, valid: this.canPlace(local.x, local.z) };
+    if (terraceEdge) {
+      // A straight controller ray from below a step sees its vertical face.
+      // Let that face designate a landing just inside the top edge.
+      const mesh = hit.object;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox;
+      local.x = THREE.MathUtils.clamp(local.x,
+        mesh.position.x + box.min.x * mesh.scale.x + 0.45,
+        mesh.position.x + box.max.x * mesh.scale.x - 0.45);
+      local.z = THREE.MathUtils.clamp(local.z,
+        mesh.position.z + box.min.z * mesh.scale.z + 0.45,
+        mesh.position.z + box.max.z * mesh.scale.z - 0.45);
+    }
+    const height = this.surfaceHeightAt(local.x, local.z);
+    const point = this.group.localToWorld(new THREE.Vector3(local.x, height + 0.05, local.z));
+    return { x: local.x, z: local.z, point,
+      height, distance: hit.distance, valid: this.canPlace(local.x, local.z, height) };
   }
   teleportTo(candidate, camera) {
     if (!candidate?.valid) return false;
@@ -486,6 +553,11 @@ export class StationScanExperience {
     const landing = this.group.localToWorld(new THREE.Vector3(candidate.x, 0, candidate.z));
     this.group.position.x += eye.x - landing.x;
     this.group.position.z += eye.z - landing.z;
+    const height = candidate.height ?? this.surfaceHeightAt(candidate.x, candidate.z);
+    this.group.position.y += (this.walkHeight ?? 0) - height;
+    this.walkHeight = height;
+    this.walkSupportHeight = height;
+    this.fallSpeed = 0;
     this.visitor.set(candidate.x, candidate.z);
     return true;
   }

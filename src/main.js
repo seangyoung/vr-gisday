@@ -884,7 +884,9 @@ function drawScanUI() {
   if (s.station) {
     if (s.stage === 0) {
       lessonCard("The LiDAR Field Survey",
-        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nFour stations at least 3 m apart reveal hidden sides.`);
+        s.sceneInfo.id === "terraces"
+          ? "Survey the terraces and trees from several positions.\nLidar times returning laser pulses to sample visible surfaces.\nAim teleport at a step face to climb onto its top."
+          : `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nFour stations at least 3 m apart reveal hidden sides.`);
       button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
       label("Grip the tripod to carry it · Trigger to scan · Left stick walk · Right stick teleport/turn",
         0, GUIDED_INFO_Y, 2.3, 0.14, 24, "#b6d1d9", "#0b2430");

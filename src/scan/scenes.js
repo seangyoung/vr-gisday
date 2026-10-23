@@ -28,10 +28,10 @@ export const SCAN_SCENES = [
   },
   {
     id: "terraces", name: "Terraced lookout",
-    prompt: "Scan the stepped ground from above and from the side.\nWhere do you see edges and vertical faces?",
+    prompt: "Scan the stepped ground and nearby trees.\nWhich faces need a higher or lower viewpoint?",
     takeaway: {
       title: "Height changes need well-placed samples.",
-      body: "The steps show up as changes in point height.\nDenser points sharpen the edges between levels.\nA digital elevation model (DEM) stores ground heights in a grid.",
+      body: "The steps and trees return points at different heights.\nGround points reveal terrace tops and vertical faces.\nA digital elevation model (DEM) stores ground heights in a grid.",
     },
   },
   {

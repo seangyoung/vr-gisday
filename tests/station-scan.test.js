@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { buildScanScene, SCAN_SCENES } from "../src/scan/scenes.js";
 import { StationCoverage } from "../src/scan/station-coverage.js";
-import { StationScanExperience } from "../src/scan/station.js";
+import { StationScanExperience, stationSurveyTargets } from "../src/scan/station.js";
 
 function survey(id, budget = 520) {
   const group = new THREE.Group();
@@ -17,11 +17,22 @@ function survey(id, budget = 520) {
     meshes.push(object);
     return object;
   });
-  const targets = meshes.slice(1).filter((mesh) => mesh.userData.kind === "structure" ||
-    id === "canopy" && mesh.userData.kind === "vegetation" ||
-    id === "terraces" && mesh.userData.kind === "ground");
+  const targets = stationSurveyTargets(id, meshes);
   return { group, meshes, coverage: new StationCoverage(targets, meshes, budget, group) };
 }
+
+test("terrace tripod scans include visible trees as well as stepped ground", () => {
+  const { coverage } = survey("terraces", 5200);
+  const vegetation = coverage.samples
+    .map((sample, index) => sample.mesh.userData.kind === "vegetation" ? index : -1)
+    .filter((index) => index >= 0);
+  assert.ok(vegetation.length > 300, "tree trunks and crowns receive scan samples");
+  coverage.prepare();
+  const front = new THREE.Vector3(0, 1.5, 13);
+  for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, front);
+  assert.ok(vegetation.some((index) => coverage.captured[index]),
+    "the first station adds tree points to the cloud");
+});
 
 test("one dense station scan fills visible faces; a new angle reveals hidden faces", () => {
   const { coverage } = survey("ruins", 5200);
@@ -150,6 +161,71 @@ test("rotating the bridge does not create invisible barriers across its open cen
   assert.ok(Math.abs(station.tripod.position.x) < 1e-6);
   assert.ok(Math.abs(station.tripod.position.z) < 1e-6,
     "the carried tripod follows the controller through the open center");
+});
+
+test("terrace faces teleport onto each level and the tripod rests on the chosen surface", () => {
+  const { group, meshes } = survey("terraces", 8);
+  group.rotation.y = 0.37;
+  const station = Object.create(StationScanExperience.prototype);
+  station.sceneInfo = { id: "terraces" };
+  station.group = group;
+  station.targets = meshes;
+  station.started = true;
+  station.finished = false;
+  station.scanQueue = null;
+  station.visitor = new THREE.Vector2();
+  station.walkForward = new THREE.Vector3();
+  station.walkHeight = 0;
+  station.walkSupportHeight = 0;
+  station.fallSpeed = 0;
+  station.grab = { hands: new Map([[1, true]]) };
+  station.tripod = new THREE.Group();
+  station.tripod.userData.head = new THREE.Group();
+  group.add(station.tripod);
+  station.refreshClipboard = () => {};
+  station.onChange = () => {};
+  station.ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  station.ground.rotation.x = -Math.PI / 2;
+  station.ground.position.y = -0.05;
+  group.add(station.ground);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.copy(group.localToWorld(new THREE.Vector3(0, 1.6, 6)));
+  camera.rotation.y = group.rotation.y;
+  camera.updateMatrixWorld(true);
+
+  for (const [z, footHeight, expected] of [
+    [6, 0, 1.28], [3.5, 1.28, 2.56], [2.4, 2.56, 3.84],
+  ]) {
+    group.updateWorldMatrix(true, true);
+    const origin = group.localToWorld(new THREE.Vector3(0, footHeight + 1.2, z));
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(group.quaternion);
+    const candidate = station.teleportCandidate(new THREE.Raycaster(origin, direction));
+    assert.equal(candidate?.valid, true, `the face at ${expected} m offers a landing`);
+    assert.ok(Math.abs(candidate.height - expected) < 1e-5);
+    assert.equal(station.teleportTo(candidate, camera), true);
+    const eye = group.worldToLocal(camera.getWorldPosition(new THREE.Vector3()));
+    assert.ok(Math.abs(eye.y - expected - 1.6) < 1e-5,
+      "the visitor stands at normal eye height above the terrace");
+  }
+
+  station.walk(1, 0, 0.15, camera);
+  assert.ok(Math.abs(station.walkHeight - 3.84) < 1e-5,
+    "walking along the upper terrace retains its height");
+  const hand = group.localToWorld(new THREE.Vector3(0, 5.15, 0.75));
+  station.updateTripod(new Map([[1, new THREE.Matrix4().makeTranslation(hand.x, hand.y, hand.z)]]));
+  assert.ok(station.tripod.position.y >= 3.84 - 1e-5,
+    "the carried tripod reaches the upper terrace");
+  station.releaseTripod(1);
+  assert.ok(Math.abs(station.tripod.position.y - 3.84) < 1e-5,
+    "the tripod feet settle on the upper terrace");
+
+  station.walk(0, 1, 0.3, camera);
+  assert.ok(Math.abs(station.walkSupportHeight - 2.56) < 1e-5,
+    "walking off the upper edge finds the next level");
+  station.update(0.2);
+  assert.ok(station.walkHeight < 3.84 && station.walkHeight > 2.56,
+    "the visitor falls briefly instead of snapping down");
 });
 
 test("clipboard preview turns without changing captured survey coverage", () => {
