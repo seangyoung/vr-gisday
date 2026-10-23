@@ -7,7 +7,7 @@ import {
   riverWaterHeight,
   riverX,
 } from "../layers/experience.js";
-import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel } from "./model.js";
+import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "./model.js";
 
 const gold = 0xffd36f;
 const clamp = (value) => THREE.MathUtils.clamp(value, -PIXEL_EXTENT + 0.001, PIXEL_EXTENT - 0.001);
@@ -19,15 +19,26 @@ function surfaceY(x, z) {
   return y;
 }
 
+function visibleBounds(cell) {
+  return {
+    x0: Math.max(-PIXEL_EXTENT, cell.x0),
+    x1: Math.min(PIXEL_EXTENT, cell.x0 + cell.size),
+    z0: Math.max(-PIXEL_EXTENT, cell.z0),
+    z1: Math.min(PIXEL_EXTENT, cell.z0 + cell.size),
+  };
+}
+
 function footprint(cell) {
   const group = new THREE.Group();
-  const steps = Math.max(2, Math.ceil(cell.size / 1.5));
+  const { x0, x1, z0, z1 } = visibleBounds(cell);
+  const span = Math.max(x1 - x0, z1 - z0);
+  const steps = Math.max(2, Math.ceil(span / 1.5));
   const path = [];
   const sides = [
-    [cell.x0, cell.z0, cell.x0 + cell.size, cell.z0],
-    [cell.x0 + cell.size, cell.z0, cell.x0 + cell.size, cell.z0 + cell.size],
-    [cell.x0 + cell.size, cell.z0 + cell.size, cell.x0, cell.z0 + cell.size],
-    [cell.x0, cell.z0 + cell.size, cell.x0, cell.z0],
+    [x0, z0, x1, z0],
+    [x1, z0, x1, z1],
+    [x1, z1, x0, z1],
+    [x0, z1, x0, z0],
   ];
   for (const [x0, z0, x1, z1] of sides)
     for (let i = 0; i < steps; i++) {
@@ -37,17 +48,17 @@ function footprint(cell) {
       path.push(new THREE.Vector3(x, surfaceY(x, z) + 0.3, z));
     }
   path.push(path[0].clone());
-  const border = new THREE.Mesh(
+  // At 1 km the actual boundary lies beyond this 144 m study area.
+  if (cell.size <= PIXEL_EXTENT * 2) group.add(new THREE.Mesh(
     new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path), path.length * 2, 0.065, 5),
     new THREE.MeshBasicMaterial({ color: gold }),
-  );
-  group.add(border);
-  const fillSteps = Math.max(1, Math.ceil(cell.size / 2));
+  ));
+  const fillSteps = Math.max(1, Math.ceil(span / 2));
   const positions = [], indices = [];
   for (let row = 0; row <= fillSteps; row++)
     for (let col = 0; col <= fillSteps; col++) {
-      const x = cell.x0 + (col / fillSteps) * cell.size;
-      const z = cell.z0 + (row / fillSteps) * cell.size;
+      const x = x0 + (col / fillSteps) * (x1 - x0);
+      const z = z0 + (row / fillSteps) * (z1 - z0);
       positions.push(x, surfaceY(x, z) + 0.16, z);
       if (row < fillSteps && col < fillSteps) {
         const a = row * (fillSteps + 1) + col;
@@ -61,16 +72,15 @@ function footprint(cell) {
     geometry,
     new THREE.MeshBasicMaterial({ color: gold, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }),
   ));
-  for (const [x, z] of [
-    [cell.x0, cell.z0], [cell.x0 + cell.size, cell.z0],
-    [cell.x0, cell.z0 + cell.size], [cell.x0 + cell.size, cell.z0 + cell.size],
-  ]) {
-    const post = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.055, 0.055, 0.85, 8),
-      new THREE.MeshBasicMaterial({ color: gold }),
-    );
-    post.position.set(x, surfaceY(x, z) + 0.6, z);
-    group.add(post);
+  if (cell.size <= PIXEL_EXTENT * 2) {
+    for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
+      const post = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.055, 0.055, 0.85, 8),
+        new THREE.MeshBasicMaterial({ color: gold }),
+      );
+      post.position.set(x, surfaceY(x, z) + 0.6, z);
+      group.add(post);
+    }
   }
   return group;
 }
@@ -84,7 +94,7 @@ export class PixelExperience extends LayerExperience {
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.model = new PixelModel();
-    this.size = 24;
+    this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
     this.footprintAge = 1;
@@ -103,8 +113,9 @@ export class PixelExperience extends LayerExperience {
       });
     }
     this.footprint = footprint(this.cell);
-    const centerX = this.cell.x0 + this.size / 2;
-    const centerZ = this.cell.z0 + this.size / 2;
+    const bounds = visibleBounds(this.cell);
+    const centerX = (bounds.x0 + bounds.x1) / 2;
+    const centerZ = (bounds.z0 + bounds.z1) / 2;
     const pivot = new THREE.Group();
     pivot.position.set(centerX, 0, centerZ);
     this.footprint.position.set(-centerX, 0, -centerZ);
@@ -135,13 +146,14 @@ export class PixelExperience extends LayerExperience {
     this.footprint.scale.set(next, 1, next);
     if (this.footprintAge >= 1) this.footprint.scale.set(1, 1, 1);
   }
-  get pureWaterAt48() {
-    return this.model.raster(48).pixels.some(({ counts }) => counts[2] === 48 ** 2);
+  get pureWaterAt30() {
+    return this.model.raster(30).pixels.some(({ counts, sampledArea }) =>
+      sampledArea === 30 ** 2 && counts[2] === sampledArea);
   }
   predictPureWater(answer) {
     if (!this.started || this.finished || this.answer !== null) return;
     this.answer = answer;
-    this.onEvent(answer === this.pureWaterAt48 ? "correct" : "blocked");
+    this.onEvent(answer === this.pureWaterAt30 ? "correct" : "blocked");
     this.onChange();
   }
   setProbe(x, z) {
@@ -177,7 +189,7 @@ export class PixelExperience extends LayerExperience {
   reset() {
     this.elapsed = 0;
     this.finished = false;
-    this.size = 24;
+    this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
     this.refreshFootprint();
@@ -186,20 +198,22 @@ export class PixelExperience extends LayerExperience {
   renderMap(ctx, size = this.size) {
     const raster = this.model.raster(size);
     const width = ctx.canvas.width;
-    const cellPixels = width / raster.cells;
+    const canvasPerMeter = width / (PIXEL_EXTENT * 2);
     ctx.fillStyle = "#163b3b";
     ctx.fillRect(0, 0, width, width);
     raster.pixels.forEach(({ rgb }, index) => {
       const col = index % raster.cells;
       const row = Math.floor(index / raster.cells);
       ctx.fillStyle = `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]})`;
-      ctx.fillRect(col * cellPixels, row * cellPixels, cellPixels + 0.5, cellPixels + 0.5);
+      ctx.fillRect(col * size * canvasPerMeter, row * size * canvasPerMeter,
+        Math.min(size, this.model.width - col * size) * canvasPerMeter + 0.5,
+        Math.min(size, this.model.width - row * size) * canvasPerMeter + 0.5);
     });
-    if (cellPixels >= 8) {
+    if (size * canvasPerMeter >= 8 && size <= PIXEL_EXTENT * 2) {
       ctx.strokeStyle = "#13292666";
       ctx.lineWidth = 1;
       for (let i = 0; i <= raster.cells; i++) {
-        const at = i * cellPixels;
+        const at = Math.min(width, i * size * canvasPerMeter);
         ctx.beginPath();
         ctx.moveTo(at, 0); ctx.lineTo(at, width);
         ctx.moveTo(0, at); ctx.lineTo(width, at);
@@ -209,14 +223,18 @@ export class PixelExperience extends LayerExperience {
     const cell = this.model.cellAt(this.probe.x, this.probe.z, size);
     ctx.strokeStyle = "#163039";
     ctx.lineWidth = 7;
-    ctx.strokeRect(cell.col * cellPixels, cell.row * cellPixels, cellPixels, cellPixels);
+    const cellX = Math.max(0, cell.x0 + PIXEL_EXTENT) * canvasPerMeter;
+    const cellY = Math.max(0, cell.z0 + PIXEL_EXTENT) * canvasPerMeter;
+    const sampledWidth = Math.min(size, this.model.width - cell.col * size) * canvasPerMeter;
+    const sampledHeight = Math.min(size, this.model.width - cell.row * size) * canvasPerMeter;
+    ctx.strokeRect(cellX, cellY, sampledWidth, sampledHeight);
     ctx.strokeStyle = "#ffdf75";
     ctx.lineWidth = 4;
-    ctx.strokeRect(cell.col * cellPixels, cell.row * cellPixels, cellPixels, cellPixels);
+    ctx.strokeRect(cellX, cellY, sampledWidth, sampledHeight);
     ctx.fillStyle = "#17313add";
     ctx.fillRect(0, 0, width, 42);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 23px system-ui, sans-serif";
-    ctx.fillText(`MODEL COLORS · ${size} m`, 12, 29);
+    ctx.fillText(`MODEL COLORS · ${pixelSizeLabel(size)}${size > this.model.width ? " (partial)" : ""}`, 12, 29);
   }
 }

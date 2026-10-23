@@ -6,7 +6,9 @@ import {
 } from "../layers/experience.js";
 
 export const PIXEL_EXTENT = 72;
-export const PIXEL_SIZES = [2, 8, 24, 48];
+export const PIXEL_SIZES = [1, 10, 30, 1000];
+export const pixelSizeLabel = (size) => size >= 1000
+  ? `${size / 1000} km` : `${size} m`;
 export const COVER_NAMES = ["Other ground", "Forest", "Water", "Road"];
 const WIDTH = PIXEL_EXTENT * 2;
 const COLORS = [
@@ -58,21 +60,27 @@ export class PixelModel {
   raster(size) {
     if (!PIXEL_SIZES.includes(size)) throw new RangeError("Unsupported pixel size");
     if (this.rasters.has(size)) return this.rasters.get(size);
-    const cells = WIDTH / size;
+    const cells = Math.ceil(WIDTH / size);
     const pixels = new Array(cells * cells);
     for (let row = 0; row < cells; row++)
       for (let col = 0; col < cells; col++) {
         const counts = [0, 0, 0, 0];
         const sums = [0, 0, 0];
-        for (let dz = 0; dz < size; dz++)
-          for (let dx = 0; dx < size; dx++) {
-            const source = (row * size + dz) * WIDTH + col * size + dx;
+        const x0 = col * size;
+        const z0 = row * size;
+        const sampledWidth = Math.min(size, WIDTH - x0);
+        const sampledHeight = Math.min(size, WIDTH - z0);
+        const sampledArea = sampledWidth * sampledHeight;
+        for (let dz = 0; dz < sampledHeight; dz++)
+          for (let dx = 0; dx < sampledWidth; dx++) {
+            const source = (z0 + dz) * WIDTH + x0 + dx;
             counts[this.cover[source]]++;
             for (let band = 0; band < 3; band++) sums[band] += this.rgb[source * 3 + band];
           }
         pixels[row * cells + col] = {
           counts,
-          rgb: sums.map((sum) => Math.round(sum / (size * size))),
+          sampledArea,
+          rgb: sums.map((sum) => Math.round(sum / sampledArea)),
         };
       }
     const result = { size, cells, pixels };
@@ -86,8 +94,8 @@ export class PixelModel {
     return {
       ...raster.pixels[row * raster.cells + col],
       col, row, size,
-      x0: -PIXEL_EXTENT + col * size,
-      z0: -PIXEL_EXTENT + row * size,
+      x0: size > WIDTH ? -size / 2 : -PIXEL_EXTENT + col * size,
+      z0: size > WIDTH ? -size / 2 : -PIXEL_EXTENT + row * size,
     };
   }
 }

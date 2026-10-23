@@ -44,7 +44,7 @@ import { LandscapeTeleport, teleportStickAction } from "./layers/teleport.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { VIEWSHED_SCENES } from "./viewshed/scenes.js";
 import { PixelExperience } from "./pixels/experience.js";
-import { PIXEL_EXTENT } from "./pixels/model.js";
+import { PIXEL_EXTENT, PIXEL_SIZES, pixelSizeLabel } from "./pixels/model.js";
 import { SpectralExperience } from "./showcase/spectral-experience.js";
 import { SPECTRAL_LESSON_STEPS } from "./showcase/spectral-lesson.js";
 import { ClusterExperience } from "./showcase/cluster-experience.js";
@@ -1205,7 +1205,7 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Ground sample distance (GSD) is one image pixel's width on the ground.\nA larger pixel can mix a narrow river or road with nearby land.\nCompare the landscape with two maps of the same place at different pixel sizes.",
+      "Ground sample distance (GSD) is one image pixel's width on the ground.\nA larger pixel can mix a narrow river or road with nearby land.\nCompare 1 m, 10 m, 30 m, and 1 km views of the same place.",
       0.13,
     );
     button("Compare pixels", 0, -0.43, () => p.begin(), 1.5);
@@ -1221,7 +1221,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis model averages colors; real sensors record light in bands.",
+      "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis 144 m scene fills only about 2% of a 1 km pixel.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -1232,10 +1232,11 @@ function drawPixelsUI() {
     "Left stick: walk · Right stick: turn sideways\nRight stick forward: aim ray · release to teleport",
     0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430",
   );
-  for (const [size, x] of [[2, -0.84], [8, -0.28], [24, 0.28], [48, 0.84]])
-    button(`${size} m`, x, 0.5, () => p.setSize(size), 0.48)
+  for (const [index, size] of PIXEL_SIZES.entries())
+    button(pixelSizeLabel(size), (index - 1.5) * 0.56, 0.5,
+      () => p.setSize(size), 0.48)
       .material.color.set(p.size === size ? 0xffffff : 0x91a6a4);
-  for (const [size, x] of [[2, -0.56], [p.size, 0.56]]) {
+  for (const [size, x] of [[1, -0.56], [p.size, 0.56]]) {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
     p.renderMap(canvas.getContext("2d"), size);
@@ -1253,18 +1254,23 @@ function drawPixelsUI() {
     p.registerVisitorMarker(map, PIXEL_EXTENT);
   }
   const cell = p.cell;
-  const percent = (index) => Math.round((cell.counts[index] / (p.size ** 2)) * 100);
+  const percent = (index) => Math.round((cell.counts[index] / cell.sampledArea) * 100);
+  const sizeInfo = p.size === 1000
+    ? "Selected 1 km GSD · 1,000,000 m² · the modeled 144 m scene fills about 2%.\nThe map color averages this patch only; the full pixel reaches far beyond it."
+    : cell.sampledArea < p.size ** 2
+    ? `Selected ${pixelSizeLabel(p.size)} GSD · edge pixel cropped by the map.\n${cell.sampledArea} m² shown of ${p.size ** 2} m² · Move the dot inward for a full pixel.`
+    : `Selected ${pixelSizeLabel(p.size)} GSD · ${(p.size ** 2).toLocaleString()} m² · White dot: you\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`;
   label(
-    `Selected ${p.size} m GSD · ${p.size ** 2} m² · White dot: you\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`,
+    sizeInfo,
     0, -0.675, 2.3, 0.14, 27, "#e6f4f5", "#0b2430",
   );
   if (p.answer === null) {
-    label("Prediction: any all-water pixel at 48 m?", -0.35, -0.82, 1.5, 0.12, 27, "#d8f3e6", "#0b2430");
+    label("Prediction: any all-water pixel at 30 m?", -0.35, -0.82, 1.5, 0.12, 27, "#d8f3e6", "#0b2430");
     button("Yes", 0.57, -0.82, () => p.predictPureWater(true), 0.42);
     button("No", 1.03, -0.82, () => p.predictPureWater(false), 0.34);
   } else
     label(
-      `${p.answer === p.pureWaterAt48 ? "Exactly" : "Compare the 48 m view"}: each river pixel also includes land. That blend is a mixed pixel.`,
+      `${p.answer === p.pureWaterAt30 ? "Exactly" : "Compare the 30 m view"}: each river pixel also includes land. That blend is a mixed pixel.`,
       0, -0.82, 2.3, 0.12, 27, "#d8f3e6", "#0b2430",
     );
   button("Takeaway", 0, -1.01, () => p.finish(), 1.4);
