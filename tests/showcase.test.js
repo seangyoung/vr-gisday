@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
-import { displayedBandBrightness, nirGrayPixel } from "../src/showcase/spectral-model.js";
+import { displayedBandBrightness, displayIndexPixel, displayIndexValue,
+  SPECTRAL_MODES } from "../src/showcase/spectral-model.js";
+import { makePlatformComparison, highlightPlatform } from "../src/showcase/remote-platforms.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL,
@@ -37,7 +39,25 @@ test("XR hover safely handles free-floating exhibits without flat panels", () =>
 test("rendered Landsat composites map display colors to sampled band brightness", () => {
   assert.deepEqual(displayedBandBrightness([38, 72, 96, 255], [184, 53, 72, 255]),
     [96, 72, 38, 184]);
-  assert.deepEqual(nirGrayPixel([184, 53, 72, 255]), [184, 184, 184, 255]);
+  assert.deepEqual(SPECTRAL_MODES, ["natural", "false", "index"]);
+  assert.ok(displayIndexValue([184, 53, 72, 255]) > 0);
+  assert.ok(displayIndexValue([20, 70, 72, 255]) < 0);
+  assert.equal(displayIndexValue([0, 0, 0, 255]), 0);
+  assert.ok(displayIndexPixel([184, 53, 72, 255])[1] >
+    displayIndexPixel([20, 70, 72, 255])[1]);
+  assert.equal(displayIndexPixel([184, 53, 72, 255])[3], 255);
+});
+
+test("the remote-sensing intro offers distinct selectable platform footprints", () => {
+  const comparison = makePlatformComparison();
+  assert.deepEqual(comparison.items.map((item) => item.id),
+    ["satellite", "aircraft", "drone"]);
+  assert.equal(comparison.pickTargets.length, 3);
+  highlightPlatform(comparison.items, "drone");
+  assert.ok(comparison.items[2].cone.material.opacity >
+    comparison.items[0].cone.material.opacity);
+  assert.ok(comparison.items[0].footprint.geometry.parameters.radius >
+    comparison.items[2].footprint.geometry.parameters.radius);
 });
 
 test("real spectral scenes rotate without an immediate repeat", () => {

@@ -2,6 +2,10 @@
 // controller hover hit testing limited to surfaces an exhibit actually owns.
 export function exhibitPanelHit(raycaster, exhibit) {
   if (!exhibit?.started || exhibit.finished) return null;
+  if (exhibit.kind === "spectral" && exhibit.phase === "platforms") {
+    exhibit.platformGroup.updateWorldMatrix(true, true);
+    return raycaster.intersectObjects(exhibit.platformHits, false)[0] ?? null;
+  }
   const targets = exhibit.kind === "projection"
     ? [exhibit.globe, exhibit.map]
     : [exhibit.image ?? exhibit.map];

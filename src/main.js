@@ -1212,8 +1212,8 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Satellites measure visible colors and near infrared (NIR).\nHealthy leaves reflect much NIR light, which our eyes cannot see.\nCompare real places in natural color, false color, and NIR gray.",
-        "Reveal the bands"],
+        "Remote sensing collects information from a distance.\nSatellites, aircraft, and drones carry imaging sensors.\nSome record sunlight; lidar and radar send pulses.",
+        "Meet the sensors"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
@@ -1239,11 +1239,25 @@ function drawShowcaseUI() {
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
     return;
   }
+  if (exhibit.kind === "spectral" && exhibit.phase === "platforms" && !exhibit.finished) {
+    label("See the Invisible · remote sensing platforms", 0, 0.96, 2.45, 0.18,
+      43, "#e6f4f5", "#0b2430");
+    label("Different viewing heights trade broad coverage for local detail.",
+      0, 0.77, 2.36, 0.12, 28, "#b6d1d9", "#0b2430");
+    const choice = exhibit.platformItems.find((item) => item.id === exhibit.platform);
+    label(`${choice.name}\n${choice.note}`, 0, -0.55, 2.42, 0.18,
+      27, "#e6f4f5", "#0b2430");
+    for (const [index, item] of exhibit.platformItems.entries())
+      button(item.label, (index - 1) * 0.78, -0.78,
+        () => exhibit.selectPlatform(item.id), 0.7, exhibit.platform === item.id);
+    button("Explore Landsat bands", 0, -1.02, () => exhibit.showBands(), 1.48);
+    return;
+  }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
     lessonCard(`${exhibit.sceneInfo.name} · takeaways`,
-      `A spectral signature describes a surface's response across bands.\nFalse color assigns NIR to red; leafy areas often appear red.\n${exhibit.sceneInfo.observation}`, -0.02);
-    label("Scientists map vegetation and water with calibrated bands.\nHere the sample bars show rendered-image brightness.",
-      0, -0.45, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
+      `Remote sensors record light in separate wavelength bands. A spectral signature describes how a surface responds across them.\nFalse color assigns near infrared (NIR) to red; leafy areas often appear red.\n${exhibit.sceneInfo.observation}`, -0.02);
+    label("NDVI = (NIR − red) / (NIR + red), using calibrated reflectance.\nOur index preview uses display colors to illustrate this idea.",
+      0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
     if (!exhibit.finished) {
       button("Keep exploring", -0.58, -0.72, () => exhibit.keepExploring(), 1.0);
       button("Next scene", 0.58, -0.72, () => exhibit.nextScene(), 1.0);
@@ -1376,20 +1390,20 @@ function drawShowcaseUI() {
     const modeText = {
       natural: "Natural color: visible red, green, and blue bands",
       false: "False color: NIR → red, red → green, green → blue",
-      nir: "Approximate near-infrared view in gray",
+      index: "NDVI = (NIR − red) / (NIR + red).\nPreview colors use JPEG brightness, stretched within each scene.",
     };
     label(`${exhibit.sceneInfo.name} · ${exhibit.sceneInfo.sensor}`,
       0, 0.96, 2.35, 0.18, 40, "#e6f4f5", "#0b2430");
     label(exhibit.sceneInfo.prompt, 0, -0.42, 2.4, 0.12, 28,
       "#d8f3e6", "#0b2430");
-    label(modeText[exhibit.mode], 0, -0.58, 2.4, 0.12, 27,
+    label(modeText[exhibit.mode], 0, -0.57, 2.4, 0.17, 26,
       "#e6f4f5", "#0b2430");
     button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"),
       0.72, exhibit.mode === "natural");
     button("False color", 0, -0.75, () => exhibit.setMode("false"),
       0.72, exhibit.mode === "false");
-    button("Near infrared", 0.78, -0.75, () => exhibit.setMode("nir"),
-      0.72, exhibit.mode === "nir");
+    button("NDVI idea", 0.78, -0.75, () => exhibit.setMode("index"),
+      0.72, exhibit.mode === "index");
     button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {

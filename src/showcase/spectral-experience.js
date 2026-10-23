@@ -1,7 +1,8 @@
 import { TimedExhibit, canvasPanel, replacePanelTexture } from "./exhibit.js";
-import { BAND_NAMES, displayedBandBrightness, nirGrayPixel,
+import { BAND_NAMES, displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "./spectral-model.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "./spectral-scenes.js";
+import { makePlatformComparison, highlightPlatform } from "./remote-platforms.js";
 import bayNaturalUrl from "./data/landsat-sf-natural.jpg";
 import bayFalseUrl from "./data/landsat-sf-false.jpg";
 import evergladesNaturalUrl from "./data/landsat-florida-natural.jpg";
@@ -49,14 +50,33 @@ function loadPixels(url, width, height) {
   });
 }
 
-function nirCanvas(falsePixels, width, height) {
+function indexCanvas(falsePixels, width, height) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   const pixels = ctx.createImageData(width, height);
+  const histogram = new Uint32Array(512);
+  let positives = 0;
+  for (let i = 0; i < falsePixels.length; i += 4) {
+    const value = displayIndexValue(falsePixels.subarray(i, i + 4));
+    if (value >= 0) {
+      histogram[Math.min(511, Math.floor(value * 512))]++;
+      positives++;
+    }
+  }
+  const quantile = (fraction) => {
+    let seen = 0;
+    for (let index = 0; index < histogram.length; index++) {
+      seen += histogram[index];
+      if (seen >= positives * fraction) return index / 512;
+    }
+    return 1;
+  };
+  const low = positives ? quantile(0.12) : 0;
+  const high = positives ? quantile(0.88) : 0.4;
   for (let i = 0; i < pixels.data.length; i += 4) {
-    pixels.data.set(nirGrayPixel(falsePixels.subarray(i, i + 4)), i);
+    pixels.data.set(displayIndexPixel(falsePixels.subarray(i, i + 4), low, high), i);
   }
   ctx.putImageData(pixels, 0, 0);
   return canvas;
@@ -112,11 +132,12 @@ function graphCanvas(bands, mode, ready) {
   ctx.textAlign = "center";
   ctx.font = "19px system-ui";
   ctx.fillText(mode === "false" ? "Display: NIR → R, red → G, green → B"
-    : mode === "nir" ? "NIR shown as grayscale" : "Display: visible red, green, blue",
+    : mode === "index" ? "Index preview: NIR vs. red" : "Display: visible red, green, blue",
   210, 495, 405);
   ctx.fillStyle = "#b6d1d9";
   ctx.font = "17px system-ui";
-  ctx.fillText("Reflectance needs calibration", 210, 532, 405);
+  ctx.fillText(mode === "index" ? "Real NDVI needs calibrated reflectance" :
+    "Display brightness, not calibrated reflectance", 210, 532, 405);
   return canvas;
 }
 
@@ -124,6 +145,8 @@ export class SpectralExperience extends TimedExhibit {
   constructor(root, onChange) {
     super(root, onChange);
     this.kind = "spectral";
+    this.phase = "platforms";
+    this.platform = "satellite";
     this.mode = "natural";
     this.nextSceneInRotation = createSpectralSceneRotation();
     this.sceneInfo = this.nextSceneInRotation();
@@ -137,7 +160,14 @@ export class SpectralExperience extends TimedExhibit {
       1.58, 0.89, -0.39, 0.32);
     this.graph = canvasPanel(graphCanvas(this.bands, this.mode, false),
       0.89, 1.18, 0.86, 0.23);
-    this.group.add(this.image, this.graph);
+    this.image.visible = false;
+    this.graph.visible = false;
+    const comparison = makePlatformComparison();
+    this.platformGroup = comparison.group;
+    this.platformItems = comparison.items;
+    this.platformHits = comparison.pickTargets;
+    highlightPlatform(this.platformItems, this.platform);
+    this.group.add(this.image, this.graph, this.platformGroup);
     this.loadScene();
     for (const scene of SPECTRAL_SCENES.slice(1))
       this.getSceneData(scene).catch(() => {});
@@ -154,7 +184,7 @@ export class SpectralExperience extends TimedExhibit {
     ]).then(([natural, falseColor]) => {
       const data = {
         sources: { natural: natural.canvas, false: falseColor.canvas,
-          nir: nirCanvas(falseColor.pixels, width, height) },
+          index: indexCanvas(falseColor.pixels, width, height) },
         pixels: { natural: natural.pixels, false: falseColor.pixels },
       };
       this.sceneCache.set(scene.id, data);
@@ -202,7 +232,7 @@ export class SpectralExperience extends TimedExhibit {
       });
   }
   nextScene() {
-    if (!this.started || this.finished) return;
+    if (!this.started || this.finished || this.phase !== "bands") return;
     this.sceneInfo = this.nextSceneInRotation();
     this.sample = { ...this.sceneInfo.sample };
     this.takeawayOpen = false;
@@ -212,7 +242,7 @@ export class SpectralExperience extends TimedExhibit {
     if (!this.ready) this.onChange();
   }
   showTakeaways() {
-    if (!this.started || this.finished) return;
+    if (!this.started || this.finished || this.phase !== "bands") return;
     this.takeawayOpen = true;
     this.group.visible = false;
     this.onChange();
@@ -225,15 +255,45 @@ export class SpectralExperience extends TimedExhibit {
   }
   update(dt) {
     super.update(dt);
+    if (this.started && !this.finished && this.phase === "platforms")
+      for (const item of this.platformItems) {
+        item.model.rotation.y += dt * (item.id === "drone" ? 0.52 : 0.2);
+        item.cone.material.opacity = item.id === this.platform
+          ? 0.17 + 0.045 * Math.sin(this.elapsed * 3) : 0.055;
+      }
     if (this.finished) this.group.visible = false;
   }
+  selectPlatform(platform) {
+    if (!this.started || this.finished || this.phase !== "platforms" ||
+        !this.platformItems.some((item) => item.id === platform)) return;
+    this.platform = platform;
+    highlightPlatform(this.platformItems, platform);
+    this.onChange();
+  }
+  showBands() {
+    if (!this.started || this.finished || this.phase !== "platforms") return;
+    this.phase = "bands";
+    this.platformGroup.visible = false;
+    this.image.visible = true;
+    this.graph.visible = true;
+    this.onChange();
+  }
   setMode(mode) {
-    if (!this.started || this.finished || this.takeawayOpen || !SPECTRAL_MODES.includes(mode)) return;
+    if (!this.started || this.finished || this.phase !== "bands" ||
+        this.takeawayOpen || !SPECTRAL_MODES.includes(mode)) return;
     this.mode = mode;
     if (this.ready) this.refresh();
   }
   selectFromRay(raycaster) {
-    if (!this.started || this.finished || this.takeawayOpen || !this.ready) return false;
+    if (!this.started || this.finished || this.takeawayOpen) return false;
+    if (this.phase === "platforms") {
+      this.platformGroup.updateWorldMatrix(true, true);
+      const hit = raycaster.intersectObjects(this.platformHits, false)[0];
+      if (!hit) return false;
+      this.selectPlatform(hit.object.userData.platform);
+      return true;
+    }
+    if (!this.ready) return false;
     this.image.updateWorldMatrix(true, false);
     const hit = raycaster.intersectObject(this.image, false)[0];
     if (!hit?.uv) return false;
