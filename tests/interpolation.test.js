@@ -70,6 +70,28 @@ test("probe targeting reaches the base beneath a raised surface", () => {
   assert.equal(demo.targets[0].visible, false);
 });
 
+test("pointing at a gauge head reveals its reading until the ray moves away", () => {
+  const demo = new InterpolationExperience(new THREE.Group(), () => {}, new THREE.Scene());
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.y = 1.6;
+  demo.place(camera);
+  demo.begin();
+  demo.model.updateWorldMatrix(true, true);
+  const head = demo.stationHeads[0].getWorldPosition(new THREE.Vector3());
+  const ray = new THREE.Raycaster(
+    head.clone().add(new THREE.Vector3(0, 0, 0.5)),
+    new THREE.Vector3(0, 0, -1),
+  );
+  const hit = demo.gaugeHit(ray);
+  assert.equal(hit?.object.userData.gaugeIndex, 0);
+  demo.showGaugeHover(0, hit);
+  assert.equal(demo.stationValueTags[0].visible, true);
+  assert.equal(demo.stationValueTags[1].visible, false);
+  demo.showGaugeHover(0, null);
+  assert.equal(demo.stationValueTags[0].visible, false);
+  demo.dispose();
+});
+
 test("the rainfall model turns with a held grip without moving its estimate", () => {
   const demo = new InterpolationExperience(new THREE.Group(), () => {}, new THREE.Scene());
   const camera = new THREE.PerspectiveCamera();

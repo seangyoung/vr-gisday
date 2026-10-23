@@ -3250,8 +3250,11 @@ renderer.setAnimationLoop((time, frame) => {
           showcase?.kind === "projection"
             ? showcase.continentGripHit(raycaster)
             : showcase?.grabHit?.(raycaster));
+      const interpolationGauge = hit || soundMenuOpen ||
+        showcase?.kind !== "interpolation" ? null : showcase.gaugeHit(raycaster);
       const interpolationTarget = hit || soundMenuOpen ||
-        showcase?.kind !== "interpolation" ? null : showcase.targetHit(raycaster);
+        showcase?.kind !== "interpolation" ? null :
+          interpolationGauge ?? showcase.targetHit(raycaster);
       const ground = hit || soundMenuOpen || viewshed?.isClimbing
         ? null : (viewshed ?? pixels)?.hitTerrain(raycaster);
       const exhibitPanel = hit || soundMenuOpen ? null :
@@ -3275,8 +3278,10 @@ renderer.setAnimationLoop((time, frame) => {
       beam.visible = pointerAvailable && !activeTarget && !viewshed?.isClimbing;
       targetBeam.visible = activeTarget;
       if (activeTarget) targetBeam.scale.z = interpolationTarget.distance;
-      if (showcase?.kind === "interpolation")
-        showcase.showTarget(id, activeTarget ? interpolationTarget : null);
+      if (showcase?.kind === "interpolation") {
+        showcase.showGaugeHover(id, pointerAvailable ? interpolationGauge : null);
+        showcase.showTarget(id, activeTarget && !interpolationGauge ? interpolationTarget : null);
+      }
       beam.scale.z = hit ? hit.distance : interpolationTarget ? interpolationTarget.distance :
         model ? model.distance :
         ground ? ground.distance : exhibitPanel ? exhibitPanel.distance : 4;
@@ -3499,7 +3504,10 @@ if (devPreview) {
     }
     if (previewInterpolation) {
       const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
-      showcase.showTarget(2, ui || soundMenuOpen ? null : showcase.targetHit(raycaster));
+      const gauge = ui || soundMenuOpen ? null : showcase.gaugeHit(raycaster);
+      showcase.showGaugeHover(2, gauge);
+      showcase.showTarget(2, ui || soundMenuOpen || gauge ? null :
+        showcase.targetHit(raycaster));
       return;
     }
     rain.group.updateWorldMatrix(true, true);
@@ -3508,6 +3516,9 @@ if (devPreview) {
     // A held press keeps watering its last valid source beyond the terrain edge.
   });
   renderer.domElement.addEventListener("pointerleave", () => {
-    if (showcase?.kind === "interpolation") showcase.showTarget(2, null);
+    if (showcase?.kind === "interpolation") {
+      showcase.showGaugeHover(2, null);
+      showcase.showTarget(2, null);
+    }
   });
 }

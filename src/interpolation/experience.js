@@ -214,7 +214,10 @@ export class InterpolationExperience extends TimedExhibit {
     this.stationGroup = new THREE.Group();
     this.model.add(this.stationGroup);
     this.stationHeads = [];
+    this.stationPickTargets = [];
     this.stationValueTags = [];
+    this.hoveredGauges = new Map();
+    this.selectedGauges = new Set();
     this.smoothResiduals = new THREE.Group();
     this.model.add(this.smoothResiduals);
     for (const station of STATIONS) {
@@ -232,6 +235,15 @@ export class InterpolationExperience extends TimedExhibit {
       head.position.set(station.x, h, station.z);
       this.stationGroup.add(head);
       this.stationHeads.push(head);
+      const pickTarget = new THREE.Mesh(
+        new THREE.SphereGeometry(0.075, 12, 8),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0,
+          depthWrite: false }),
+      );
+      pickTarget.position.copy(head.position);
+      pickTarget.userData.gaugeIndex = this.stationPickTargets.length;
+      this.stationGroup.add(pickTarget);
+      this.stationPickTargets.push(pickTarget);
       const valueTag = makeText(`${station.value} mm`);
       valueTag.scale.set(0.24, 0.075, 1);
       valueTag.position.set(station.x, h + 0.105, station.z);
@@ -281,7 +293,34 @@ export class InterpolationExperience extends TimedExhibit {
     this.model.visible = false;
     this.grab.cancel();
     this.targets.forEach((target) => { target.visible = false; });
+    this.hoveredGauges.clear();
+    this.refreshGaugeLabels();
     super.finish();
+  }
+
+  refreshGaugeLabels() {
+    const hovered = new Set(this.hoveredGauges.values());
+    this.stationHeads.forEach((head, index) => head.material.color.set(
+      hovered.has(index) ? 0x91f1df :
+      this.selectedGauges.has(index) ? 0xffd070 : 0xffffff));
+    this.stationValueTags.forEach((tag, index) => {
+      tag.visible = hovered.has(index) ||
+        this.showWeights && this.selectedGauges.has(index);
+    });
+  }
+
+  gaugeHit(raycaster) {
+    if (!this.started || this.finished || !this.model.visible) return null;
+    this.stationGroup.updateWorldMatrix(true, true);
+    return raycaster.intersectObjects(this.stationPickTargets, false)[0] ?? null;
+  }
+
+  showGaugeHover(controllerId, hit) {
+    const index = hit?.object.userData.gaugeIndex;
+    if (this.hoveredGauges.get(controllerId) === index) return;
+    if (index === undefined) this.hoveredGauges.delete(controllerId);
+    else this.hoveredGauges.set(controllerId, index);
+    this.refreshGaugeLabels();
   }
 
   setMode(mode) {
@@ -318,12 +357,9 @@ export class InterpolationExperience extends TimedExhibit {
       ? nearestEstimate(this.probe.x, this.probe.z)
       : result.value;
     const showNeighbors = this.mode === "idw";
-    const selected = new Set(showNeighbors ? result.neighbors.map(({ index }) => index) : []);
-    this.stationHeads.forEach((head, index) => head.material.color.set(
-      selected.has(index) ? 0xffd070 : 0xffffff));
-    this.stationValueTags.forEach((tag, index) => {
-      tag.visible = !!this.showWeights && selected.has(index);
-    });
+    this.selectedGauges = new Set(showNeighbors ?
+      result.neighbors.map(({ index }) => index) : []);
+    this.refreshGaugeLabels();
     for (const child of [...this.probeGroup.children]) {
       child.traverse((node) => {
         node.geometry?.dispose();
