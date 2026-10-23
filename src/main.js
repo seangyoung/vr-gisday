@@ -879,14 +879,16 @@ function drawScanUI() {
     }
     if (s.stage === 2) {
       lessonCard(`${s.score}% of the target captured`,
-        `Your ${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} surveyable target samples.\nWalls, roofs, vegetation, and the target itself block laser pulses.\nSurveyors combine scans from several locations to fill those gaps. Where would you place your next station?`);
+        `${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} target samples.\nEach pulse stops at the first surface it reaches.\nSurveyors merge views from different stations to reveal hidden sides.`);
       takeawayActions(GUIDED_ACTION_Y, () => startStationScan(s.sceneInfo));
       foregroundTakeaway();
       return;
     }
+    button("Turn preview ◀", -0.57, -1.21, () => s.turnPreview(-1), 1.02);
+    button("Turn preview ▶", 0.57, -1.21, () => s.turnPreview(1), 1.02);
     button(s.scanQueue ? "Scanning…" : s.scansLeft ? "Scan here" : "Scans used",
-      -0.57, -1.04, () => s.startSweep(), 1.02);
-    button("Results", 0.57, -1.04, () => s.finish(), 1.02);
+      -0.57, -1.47, () => s.startSweep(), 1.02);
+    button("Takeaway", 0.57, -1.47, () => s.finish(), 1.02);
     return;
   }
   if (s.room) {
@@ -2526,7 +2528,8 @@ for (let i = 0; i < 2; i++) {
     if (quiz && !soundMenuOpen) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing) return;
-    if (grab?.hands.size || rain?.grab.hands.size || scan?.grab.hands.size ||
+    if (grab?.hands.size || rain?.grab.hands.size ||
+        (scan?.grab.hands.size && !scan.station) ||
         showcase?.grab?.hands.size || showcase?.continentGripBy != null)
       return;
     const hit = intersect(c);
@@ -2553,6 +2556,10 @@ for (let i = 0; i < 2; i++) {
       }
     }
     if (scan?.station && scan.stage === 1) {
+      if (hit) {
+        hit.object.userData.action?.(hit);
+        return;
+      }
       if (!soundMenuOpen && scan.startSweep()) sound.click();
       return;
     }

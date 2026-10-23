@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { buildScanScene, SCAN_SCENES } from "../src/scan/scenes.js";
 import { StationCoverage } from "../src/scan/station-coverage.js";
+import { StationScanExperience } from "../src/scan/station.js";
 
 function survey(id) {
   const group = new THREE.Group();
@@ -54,4 +55,58 @@ test("occluded surfaces become visible from the other side after moving the enti
     coverage.capture(i, new THREE.Vector3(0, 1.5, -13));
   assert.ok(coverage.count > first);
   assert.equal(coverage.percent, Math.round(100 * coverage.count / coverage.samples.length));
+});
+
+test("tripod survey starts at standing height and allows walking and teleporting while carrying", () => {
+  const station = Object.create(StationScanExperience.prototype);
+  station.started = true;
+  station.finished = false;
+  station.scanQueue = null;
+  station.group = new THREE.Group();
+  station.visitor = new THREE.Vector2();
+  station.walkForward = new THREE.Vector3();
+  station.grab = { hands: new Map([[1, true]]) };
+  station.tripod = new THREE.Group();
+  station.group.add(station.tripod);
+  station.canPlace = () => true;
+  station.targets = [];
+  station.ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  station.ground.rotation.x = -Math.PI / 2;
+  station.group.add(station.ground);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 0.2, 0);
+  camera.updateMatrixWorld(true);
+  station.place(camera);
+  assert.ok(Math.abs(station.group.worldToLocal(camera.position.clone()).y - 1.6) < 1e-6);
+  const beforeWalk = station.group.position.clone();
+  station.walk(0, -1, 1, camera);
+  assert.ok(station.group.position.distanceTo(beforeWalk) > 1);
+  const ray = new THREE.Raycaster(new THREE.Vector3(0, 4, 0),
+    new THREE.Vector3(0, -1, 0));
+  const destination = station.teleportCandidate(ray);
+  assert.ok(destination?.valid);
+  const beforeTeleport = station.group.position.clone();
+  assert.equal(station.teleportTo({ x: 4, z: 2, valid: true }, camera), true);
+  assert.ok(station.group.position.distanceTo(beforeTeleport) > 1);
+  station.updateTripod(new Map([[1, new THREE.Matrix4().makeTranslation(1, 0.3, -1)]]));
+  const carried = station.tripod.getWorldPosition(new THREE.Vector3());
+  assert.ok(Math.abs(carried.x - 1) < 1e-6);
+  assert.ok(Math.abs(carried.z + 1) < 1e-6);
+});
+
+test("clipboard preview turns without changing captured survey coverage", () => {
+  const station = Object.create(StationScanExperience.prototype);
+  station.started = true;
+  station.finished = false;
+  station.previewAngle = 0;
+  station.coverage = { count: 138 };
+  let redraws = 0;
+  station.refreshClipboard = () => { redraws++; };
+  station.turnPreview(1);
+  assert.ok(Math.abs(station.previewAngle - Math.PI / 4) < 1e-6);
+  station.turnPreview(-1);
+  assert.ok(Math.abs(station.previewAngle) < 1e-6);
+  assert.equal(station.coverage.count, 138);
+  assert.equal(redraws, 2);
 });

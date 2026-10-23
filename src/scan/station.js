@@ -48,6 +48,7 @@ export class StationScanExperience {
     this.onEvent = onEvent;
     this.selected = new Set(["vegetation"]);
     this.records = [];
+    this.previewAngle = 0;
     this.lastRange = 8;
     this.scansLeft = TOTAL_SCANS;
     this.group = new THREE.Group();
@@ -87,6 +88,14 @@ export class StationScanExperience {
       sceneInfo.id === "canopy" && m.userData.kind === "vegetation" ||
       sceneInfo.id === "terraces" && m.userData.kind === "ground");
     this.coverage = new StationCoverage(survey, this.targets, 900, this.group);
+    const bounds = new THREE.Box3().setFromPoints(this.coverage.samples.map((sample) => sample.point));
+    const span = bounds.getSize(V());
+    const horizontal = Math.max(1, span.x, span.z);
+    this.previewFrame = {
+      center: bounds.getCenter(V()),
+      scale: Math.min(90, 490 / (horizontal * 1.55),
+        290 / Math.max(1, span.y * 0.9 + horizontal * 0.36)),
+    };
     this.cloud = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({
       size: 0.075, vertexColors: true, depthWrite: false,
     }));
@@ -106,9 +115,9 @@ export class StationScanExperience {
     this.clipboard.visible = false;
     this.clipboard.scale.setScalar(0.27);
     scene.add(this.clipboard);
-    const board = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.55, 0.07),
+    const board = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.86, 0.07),
       new THREE.MeshBasicMaterial({ color: 0x143441 }));
-    board.position.z = -0.05;
+    board.position.set(0, -0.14, -0.05);
     this.clipboard.add(board);
     const clip = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.06),
       new THREE.MeshBasicMaterial({ color: 0xb5c7c8 }));
@@ -141,7 +150,8 @@ export class StationScanExperience {
     const forward = camera.getWorldDirection(V());
     forward.y = 0;
     forward.normalize();
-    this.group.position.set(eye.x + forward.x * 14, 0, eye.z + forward.z * 14);
+    this.group.position.set(eye.x + forward.x * 14, eye.y - 1.6,
+      eye.z + forward.z * 14);
     this.group.rotation.y = Math.atan2(-forward.x, -forward.z);
     this.visitor.set(0, 16);
   }
@@ -243,11 +253,17 @@ export class StationScanExperience {
     ctx.fillText(`${this.sceneInfo.name} · ${this.targetName}`, 320, 96);
     ctx.fillStyle = "#1b4653";
     ctx.fillRect(35, 122, 570, 330);
+    const c = Math.cos(this.previewAngle), s = Math.sin(this.previewAngle);
+    const { center, scale } = this.previewFrame;
     for (let i = 0; i < this.coverage.samples.length; i++) {
       if (!this.coverage.captured[i]) continue;
       const { point, mesh } = this.coverage.samples[i];
-      const x = 320 + (point.x - point.z * 0.55) * 16;
-      const y = 300 - point.y * 14 + (point.x + point.z) * 3;
+      const localX = point.x - center.x, localZ = point.z - center.z;
+      const turnedX = localX * c - localZ * s;
+      const turnedZ = localX * s + localZ * c;
+      const x = 320 + (turnedX - turnedZ * 0.55) * scale;
+      const y = 285 - (point.y - center.y) * scale * 0.9 +
+        (turnedX + turnedZ) * scale * 0.18;
       ctx.fillStyle = mesh.userData.kind === "vegetation" ? "#a2df9e" : "#ffd39b";
       ctx.fillRect(x, y, 3.5, 3.5);
     }
@@ -258,8 +274,15 @@ export class StationScanExperience {
     ctx.font = "27px sans-serif";
     ctx.fillText(`${this.scansLeft} of ${TOTAL_SCANS} scans left`, 320, 550);
     ctx.font = "22px sans-serif";
-    ctx.fillText(this.scanQueue ? "Scanning…" : "Grip tripod · trigger to scan", 320, 588);
+    ctx.fillText(this.scanQueue ? "Scanning…" : this.scansLeft
+      ? "Grip tripod · trigger to scan" : "All scans used · select Takeaway", 320, 588);
     this.texture.needsUpdate = true;
+  }
+  turnPreview(direction) {
+    if (!this.started || this.finished || !direction) return;
+    this.previewAngle = (this.previewAngle + Math.sign(direction) * Math.PI / 4 +
+      Math.PI * 2) % (Math.PI * 2);
+    this.refreshClipboard();
   }
   updateClipboard(leftGrip, camera, preview = false, fallback = false) {
     if (!this.started || this.finished || this.holdingHand === "left" ||
@@ -277,7 +300,7 @@ export class StationScanExperience {
     this.clipboard.updateWorldMatrix(true, true);
   }
   walk(x, y, dt, camera) {
-    if (!this.started || this.finished || this.grab.hands.size || this.scanQueue) return;
+    if (!this.started || this.finished || this.scanQueue) return;
     const magnitude = Math.hypot(x, y);
     if (magnitude < 0.18 || dt <= 0) return;
     camera.getWorldDirection(this.walkForward);
@@ -303,7 +326,7 @@ export class StationScanExperience {
     this.group.rotation.y += angle;
   }
   teleportCandidate(raycaster, uiHit = null) {
-    if (!this.started || this.finished || this.grab.hands.size) return null;
+    if (!this.started || this.finished || this.scanQueue) return null;
     this.ground.updateWorldMatrix(true, false);
     const hit = raycaster.intersectObject(this.ground, false)[0];
     if (!hit || hit.distance < 1 || hit.distance > 25 || uiHit && uiHit.distance < hit.distance) return null;
