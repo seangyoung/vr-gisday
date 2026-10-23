@@ -4,7 +4,8 @@ import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
 import { displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "../src/showcase/spectral-model.js";
-import { makePlatformComparison, highlightPlatform } from "../src/showcase/remote-platforms.js";
+import { makePlatformComparison, highlightPlatform,
+  alignSensingFootprints } from "../src/showcase/remote-platforms.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
@@ -58,6 +59,26 @@ test("the remote-sensing intro offers distinct selectable platform footprints", 
     comparison.items[0].cone.material.opacity);
   assert.ok(comparison.items[0].footprint.geometry.parameters.radius >
     comparison.items[2].footprint.geometry.parameters.radius);
+});
+
+test("all sensing footprints originate at their cameras while models spin", () => {
+  const { group, items } = makePlatformComparison();
+  const aircraft = items.find((item) => item.id === "aircraft");
+  const drone = items.find((item) => item.id === "drone");
+  assert.ok(aircraft.model.children.length > 25);
+  assert.equal(drone.model.userData.rotors.length, 4);
+  for (const item of items) {
+    item.model.rotation.set(-0.18, 0.51, 0);
+    item.model.scale.setScalar(1.11);
+  }
+  alignSensingFootprints(group, items);
+  for (const item of items) {
+    const camera = item.model.localToWorld(
+      item.model.userData.cameraAperture.clone());
+    const tip = item.cone.localToWorld(new THREE.Vector3(0, 0.5, 0));
+    assert.ok(camera.distanceTo(tip) < 1e-6,
+      `${item.id} sensing cone should begin at its camera`);
+  }
 });
 
 test("real spectral scenes rotate without an immediate repeat", () => {

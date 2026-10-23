@@ -1,8 +1,11 @@
+import * as THREE from "three";
 import { TimedExhibit, canvasPanel, replacePanelTexture } from "./exhibit.js";
 import { BAND_NAMES, displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "./spectral-model.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "./spectral-scenes.js";
-import { makePlatformComparison, highlightPlatform } from "./remote-platforms.js";
+import { makePlatformComparison, highlightPlatform,
+  alignSensingFootprints } from "./remote-platforms.js";
+import { GlobeSpin } from "./projection-model.js";
 import bayNaturalUrl from "./data/landsat-sf-natural.jpg";
 import bayFalseUrl from "./data/landsat-sf-false.jpg";
 import evergladesNaturalUrl from "./data/landsat-florida-natural.jpg";
@@ -235,6 +238,9 @@ export class SpectralExperience extends TimedExhibit {
     this.platformGroup = comparison.group;
     this.platformItems = comparison.items;
     this.platformHits = comparison.pickTargets;
+    this.platformSpinBy = null;
+    this.platformSpinItem = null;
+    for (const item of this.platformItems) item.spin = new GlobeSpin();
     highlightPlatform(this.platformItems, this.platform);
     this.group.add(this.image, this.graph, this.platformGroup, this.spectrum);
     this.loadScene();
@@ -326,12 +332,17 @@ export class SpectralExperience extends TimedExhibit {
     super.update(dt);
     if (this.started && !this.finished && this.phase === "platforms")
       for (const item of this.platformItems) {
-        item.model.rotation.y += dt * (item.id === "drone" ? 0.52 : 0.2);
+        item.spin.step(dt);
+        item.model.rotation.set(item.spin.pitch, item.spin.yaw, 0, "XYZ");
         item.cone.material.opacity = item.id === this.platform
           ? 0.17 + 0.045 * Math.sin(this.elapsed * 3) : 0.055;
         for (const rotor of item.model.userData.rotors || [])
           rotor.rotation.y += dt * 10;
       }
+    if (this.started && !this.finished && this.phase === "platforms")
+      alignSensingFootprints(this.platformGroup, this.platformItems);
+    if (this.finished && this.platformSpinBy !== null)
+      this.endPlatformSpin(this.platformSpinBy);
     if (this.finished) this.group.visible = false;
   }
   selectPlatform(platform) {
@@ -339,10 +350,47 @@ export class SpectralExperience extends TimedExhibit {
         !this.platformItems.some((item) => item.id === platform)) return;
     this.platform = platform;
     highlightPlatform(this.platformItems, platform);
+    alignSensingFootprints(this.platformGroup, this.platformItems);
     this.onChange();
+  }
+  platformRayAngles(raycaster) {
+    this.group.updateWorldMatrix(true, false);
+    const inverse = this.group.matrixWorld.clone().invert();
+    const direction = raycaster.ray.direction.clone().transformDirection(inverse);
+    return [Math.atan2(direction.x, -direction.z),
+      Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1))];
+  }
+  beginPlatformSpin(raycaster, source) {
+    if (!this.started || this.finished || this.phase !== "platforms" ||
+        this.platformSpinBy !== null) return false;
+    this.platformGroup.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObjects(this.platformHits, false)[0];
+    if (!hit) return false;
+    const item = this.platformItems.find(({ id }) => id === hit.object.userData.platform);
+    this.platformSpinBy = source;
+    this.platformSpinItem = item;
+    item.spin.begin(...this.platformRayAngles(raycaster));
+    this.selectPlatform(item.id);
+    return true;
+  }
+  dragPlatformSpin(raycaster, source, dt) {
+    if (this.platformSpinBy !== source || !this.platformSpinItem) return false;
+    this.platformSpinItem.spin.drag(...this.platformRayAngles(raycaster), dt);
+    this.platformSpinItem.model.rotation.set(
+      this.platformSpinItem.spin.pitch, this.platformSpinItem.spin.yaw, 0, "XYZ");
+    alignSensingFootprints(this.platformGroup, this.platformItems);
+    return true;
+  }
+  endPlatformSpin(source) {
+    if (this.platformSpinBy !== source) return false;
+    this.platformSpinItem.spin.end();
+    this.platformSpinBy = null;
+    this.platformSpinItem = null;
+    return true;
   }
   showSpectrum() {
     if (!this.started || this.finished || this.phase !== "platforms") return;
+    if (this.platformSpinBy !== null) this.endPlatformSpin(this.platformSpinBy);
     this.phase = "spectrum";
     this.platformGroup.visible = false;
     this.spectrum.visible = true;

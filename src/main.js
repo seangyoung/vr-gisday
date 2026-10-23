@@ -1264,14 +1264,14 @@ function drawShowcaseUI() {
     return;
   }
   if (exhibit.kind === "spectral" && exhibit.phase === "platforms" && !exhibit.finished) {
-    label("See the Invisible · remote sensing platforms", 0, 0.96, 2.45, 0.18,
+    label("See the Invisible · remote sensing platforms", 0, 1.06, 2.45, 0.18,
       43, "#e6f4f5", "#0b2430");
-    label("Choose a platform to compare its coverage and detail.",
-      0, 0.77, 2.36, 0.12, 28, "#b6d1d9", "#0b2430");
+    label("Spatial resolution = detail; temporal resolution = revisit time.\nTrigger-drag a model to spin it.",
+      0, 0.86, 2.36, 0.14, 28, "#b6d1d9", "#0b2430");
     const choice = exhibit.platformItems.find((item) => item.id === exhibit.platform);
-    label(choice.name, 0, -0.45, 2.42, 0.11,
+    label(choice.name, 0, -0.44, 2.42, 0.09,
       30, "#e6f4f5", "#0b2430");
-    label(choice.note, 0, -0.59, 2.42, 0.18,
+    label(choice.note, 0, -0.61, 2.42, 0.21,
       25, "#d8f3e6", "#0b2430");
     for (const [index, item] of exhibit.platformItems.entries())
       button(item.label, (index - 1) * 0.78, -0.84,
@@ -2723,6 +2723,11 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (showcase) {
+      if (showcase.kind === "spectral" &&
+          showcase.beginPlatformSpin(raycaster, i)) {
+        sound.click();
+        return;
+      }
       if (["projection", "change"].includes(showcase.kind) &&
           showcase.beginInteraction(raycaster, i)) {
         sound.click();
@@ -2739,6 +2744,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("selectend", () => {
     showcase?.endInteraction?.(i);
+    showcase?.endPlatformSpin?.(i);
     scan?.endPreviewDrag?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
@@ -2841,6 +2847,7 @@ for (let i = 0; i < 2; i++) {
     rain?.grab.release(i);
     showcase?.grab?.release(i);
     showcase?.endContinentGrip?.(i);
+    showcase?.endPlatformSpin?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -3049,6 +3056,15 @@ renderer.setAnimationLoop((time, frame) => {
       else {
         intersect(active.c);
         showcase.dragInteraction(raycaster, active.id, dt);
+      }
+    }
+    if (showcase?.kind === "spectral" && showcase.platformSpinBy !== null) {
+      const active = controllers.find(({ id }) => id === showcase.platformSpinBy);
+      if (!visibleSession || !active?.c.visible || soundMenuOpen)
+        showcase.endPlatformSpin(showcase.platformSpinBy);
+      else {
+        intersect(active.c);
+        showcase.dragPlatformSpin(raycaster, active.id, dt);
       }
     }
     if (showcase?.kind === "projection" &&
@@ -3265,7 +3281,8 @@ renderer.setAnimationLoop((time, frame) => {
         !scan?.grab.hands.has(id) &&
         !showcase?.grab?.hands.has(id) &&
         showcase?.continentGripBy !== id &&
-        showcase?.draggingBy !== id;
+        showcase?.draggingBy !== id &&
+        showcase?.platformSpinBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
       if (teleport.active && teleport.demo === landscapeDemo &&
           c.userData.xrInput?.handedness === "right") {
@@ -3446,7 +3463,9 @@ if (
     else if (showcase) {
       const picked = showcase.kind === "projection" &&
         showcase.beginContinentGrip(raycaster, "preview");
-      if (picked || (["projection", "change"].includes(showcase.kind) &&
+      if (picked || (showcase.kind === "spectral" &&
+          showcase.beginPlatformSpin(raycaster, "preview")) ||
+          (["projection", "change"].includes(showcase.kind) &&
           showcase.beginInteraction(raycaster, "preview"))) {
         previewSpinPointer = e.pointerId;
         previewSpinTime = e.timeStamp;
@@ -3470,6 +3489,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
+      showcase?.endPlatformSpin?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -3477,6 +3497,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
+      showcase?.endPlatformSpin?.("preview");
       previewSpinPointer = null;
     }
   });
@@ -3499,6 +3520,8 @@ if (devPreview) {
       showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       showcase?.dragContinentGrip?.(raycaster, "preview");
+      showcase?.dragPlatformSpin?.(raycaster, "preview",
+        Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       previewSpinTime = e.timeStamp;
       return;
     }
