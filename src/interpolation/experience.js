@@ -41,6 +41,25 @@ function makeText(text) {
   return sprite;
 }
 
+function makeProbeQuestion() {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  ctx.font = "bold 104px system-ui";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#17313e";
+  ctx.fillText("?", 64, 65);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture, transparent: true, depthTest: false, depthWrite: false,
+  }));
+  sprite.scale.set(0.083, 0.083, 1);
+  sprite.renderOrder = 6;
+  return sprite;
+}
+
 function gridLine(points, color, opacity = 1) {
   const line = new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(points),
@@ -318,11 +337,14 @@ export class InterpolationExperience extends TimedExhibit {
       new THREE.MeshBasicMaterial({ color: 0xffd070 }));
     marker.position.set(this.probe.x, y, this.probe.z);
     this.probeGroup.add(marker);
+    const question = makeProbeQuestion();
+    question.position.copy(marker.position);
+    this.probeGroup.add(question);
     this.probeGroup.add(gridLine([
       new THREE.Vector3(this.probe.x, 0, this.probe.z),
       new THREE.Vector3(this.probe.x, y, this.probe.z),
     ], 0xffd070));
-    const tag = makeText(`? ${this.displayValue.toFixed(1)} mm`);
+    const tag = makeText(`${this.displayValue.toFixed(1)} mm`);
     tag.scale.set(0.36, 0.09, 1);
     tag.position.set(this.probe.x, y + 0.13, this.probe.z);
     this.probeGroup.add(tag);
