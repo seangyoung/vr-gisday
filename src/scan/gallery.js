@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-// A small point-cloud illustration for each route; neither is a live scan.
+// Small point-cloud illustrations for the three routes; none is a live scan.
 export function scanThumbnail(kind) {
   const canvas = document.createElement("canvas");
   canvas.width = 640;
@@ -71,6 +71,21 @@ export function scanThumbnail(kind) {
           cy - 55 * scale + Math.sin(angle) * radius * 68 * scale,
           "#94df9e", 1.1 + random() * 0.8);
       }
+    if (kind === "station") {
+      // Tripod silhouette distinguishes the walkable survey from tabletop scanning.
+      ctx.strokeStyle = "#e6f4f0";
+      ctx.lineWidth = 8;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(112, 158); ctx.lineTo(112, 260);
+      ctx.moveTo(112, 221); ctx.lineTo(64, 324);
+      ctx.moveTo(112, 221); ctx.lineTo(160, 324);
+      ctx.stroke();
+      ctx.fillStyle = "#203e46";
+      ctx.fillRect(84, 139, 56, 33);
+      ctx.fillStyle = "#a6f5d9";
+      ctx.beginPath(); ctx.arc(111, 155, 10, 0, Math.PI * 2); ctx.fill();
+    }
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;

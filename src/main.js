@@ -25,6 +25,7 @@ const sound = new LabSound();
 import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
 import { ScanExperience } from "./scan/experience.js";
+import { StationScanExperience } from "./scan/station.js";
 import { scanThumbnail } from "./scan/gallery.js";
 import { RainExperience } from "./rain/experience.js";
 import { rainThumbnail } from "./rain/gallery.js";
@@ -169,7 +170,7 @@ function clear() {
     grab = null;
   }
   buttons = [];
-  for (const group of [content, layers?.ui, viewshed?.ui, pixels?.ui].filter(Boolean))
+  for (const group of [content, layers?.ui, viewshed?.ui, pixels?.ui, scan?.station ? scan.ui : null].filter(Boolean))
     while (group.children.length) {
       const obj = group.children[0];
       obj.traverse((n) => {
@@ -391,7 +392,7 @@ function closeSoundMenu() {
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
   const visualRoots = [
-    root, floatingModel, rain?.group, scan?.group, showcase?.model,
+    root, floatingModel, rain?.group, scan?.group, scan?.clipboard, showcase?.model,
     quiz?.group, quiz?.letterField, quiz?.effects,
     ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
@@ -593,6 +594,7 @@ function start() {
   }
   if (scan) {
     if (scan.room) startRoomScan();
+    else if (scan.station) startStationScan(scan.sceneInfo);
     else startScan();
     return;
   }
@@ -674,6 +676,18 @@ function startScan(sceneInfo, explore = false) {
     scan.group.visible = false;
     draw();
   }
+}
+function startStationScan(sceneInfo) {
+  if (!SCAN_SCENES.includes(sceneInfo)) sceneInfo = nextScanScene();
+  stopRainInput();
+  rain?.dispose(); rain = null;
+  layers?.dispose(); layers = null;
+  viewshed?.dispose(); viewshed = null;
+  pixels?.dispose(); pixels = null;
+  scan?.dispose();
+  scan = new StationScanExperience(scene, draw, sceneInfo, (event) => sound.cue(event));
+  scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
+  draw();
 }
 function startLayers() {
   stopRainInput();
@@ -854,6 +868,27 @@ function drawRoomUI() {
 }
 function drawScanUI() {
   const s = scan;
+  if (s.station) {
+    if (s.stage === 0) {
+      lessonCard("The LiDAR Field Survey",
+        `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nA tripod lidar scanner measures the first surface each laser pulse reaches.\nYou have four scans. Move the tripod to reveal surfaces hidden from earlier views.`);
+      button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
+      label("Grip the tripod to carry it · Trigger to scan · Left stick walk · Right stick teleport/turn",
+        0, GUIDED_INFO_Y, 2.3, 0.14, 24, "#b6d1d9", "#0b2430");
+      return;
+    }
+    if (s.stage === 2) {
+      lessonCard(`${s.score}% of the target captured`,
+        `Your ${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} surveyable target samples.\nWalls, roofs, vegetation, and the target itself block laser pulses.\nSurveyors combine scans from several locations to fill those gaps. Where would you place your next station?`);
+      takeawayActions(GUIDED_ACTION_Y, () => startStationScan(s.sceneInfo));
+      foregroundTakeaway();
+      return;
+    }
+    button(s.scanQueue ? "Scanning…" : s.scansLeft ? "Scan here" : "Scans used",
+      -0.57, -1.04, () => s.startSweep(), 1.02);
+    button("Results", 0.57, -1.04, () => s.finish(), 1.02);
+    return;
+  }
   if (s.room) {
     drawRoomUI();
     return;
@@ -912,8 +947,9 @@ function drawScanUI() {
   );
 }
 function drawScanChoiceCard(kind, x, title, subtitle, action) {
+  const width = 0.83;
   const card = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.1, 1.22),
+    new THREE.PlaneGeometry(width, 1.15),
     new THREE.MeshBasicMaterial({ color: kind === "room" ? 0x294046 : 0x193e47,
       side: THREE.DoubleSide }),
   );
@@ -928,19 +964,21 @@ function drawScanChoiceCard(kind, x, title, subtitle, action) {
   uiParent.add(card);
   const thumbnail = scanThumbnail(kind);
   thumbnail.position.set(x, 0.1, 0.16);
+  thumbnail.scale.setScalar(0.78);
   uiParent.add(thumbnail);
-  label(title, x, -0.38, 1.04, 0.12, 37, "#ffffff").position.z = 0.37;
-  label(subtitle, x, -0.51, 1.04, 0.11, 25, "#c7e6e5").position.z = 0.37;
+  label(title, x, -0.38, 0.79, 0.12, 30, "#ffffff").position.z = 0.37;
+  label(subtitle, x, -0.51, 0.79, 0.11, 21, "#c7e6e5").position.z = 0.37;
 }
 function drawScanChooserUI() {
   label("Scan the Hidden World", 0, 1.02, 2.3, 0.2, 54, "#e6f4f5", "#0b2430");
-  label("Lidar (light detection and ranging) times reflected laser pulses.\nEach pulse measures distance; many returns form a 3D point cloud.\nChoose a lidar model or sample your room in mixed reality.",
+  label("Lidar (light detection and ranging) times reflected laser pulses.\nEach pulse measures distance; many returns form a 3D point cloud.\nChoose a tabletop, walkable, or mixed reality survey.",
     0, 0.705, 2.3, 0.31, 38, "#e6f4f5", "#0b2430");
-  drawScanChoiceCard("synthetic", -0.61, "Synthetic scan", "First surface hit", () => {
+  drawScanChoiceCard("synthetic", -0.89, "Tabletop scan", "Aim at a model", () => {
     scan.group.visible = true;
     scan.explore();
   });
-  drawScanChoiceCard("room", 0.61, "Room scan · MR", "Sample real surfaces", switchToRoomScan);
+  drawScanChoiceCard("station", 0, "Tripod survey", "Walk and place", () => startStationScan(scan.sceneInfo));
+  drawScanChoiceCard("room", 0.89, "Room scan · MR", "Sample your room", switchToRoomScan);
   if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
 }
@@ -1921,7 +1959,20 @@ function draw() {
     } else {
       panel.style.display = "block";
     }
-    if (scan?.stage === 1 && !scan.room) {
+    if (scan?.station && scan.stage === 1) {
+      for (const [name, x, z] of [
+        ["Place front", 0, 10], ["Place right", 11, 0],
+        ["Place back", 0, -13], ["Place left", -11, 0],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => {
+          scan.tripod.position.set(x, 0, z);
+          scan.startSweep();
+        };
+        panel.append(b);
+      }
+    } else if (scan?.stage === 1 && !scan.room) {
       for (const [name, z] of [
         ["Scan front", 3],
         ["Scan back", -3],
@@ -2068,6 +2119,8 @@ function controllerGuideContext(hand) {
     return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
       "Move/size", onMenu, exitLabel];
   }
+  if (scan?.station && scan.stage === 1)
+    return ["Scan", "Carry tripod", onMenu, exitLabel, teleportHint];
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
@@ -2128,13 +2181,14 @@ function drawScene() {
     pixels ? `pixels:${pixels.started}:${pixels.finished}` :
     viewshed ? `viewshed:${viewshed.view}:${viewshed.started}:${viewshed.finished}` :
     layers ? `layers:${layers.view}:${layers.started}:${layers.finished}` :
-    scan ? `scan:${scan.room ? "room" : "model"}:${scan.stage}` :
+    scan ? `scan:${scan.room ? "room" : scan.station ? "station" : "model"}:${scan.stage}` :
     rain ? `rain:${rain.kind}:${rain.stage}` : `position:${step}`;
   if (key !== lastUIKey) uiFadeAge = 0;
   lastUIKey = key;
   uiParent = (pixels?.started ? pixels.ui : null) ??
     (viewshed?.started ? viewshed.ui : null) ??
-    (layers?.started ? layers.ui : null) ?? content;
+    (layers?.started ? layers.ui : null) ??
+    (scan?.station && scan.started && !scan.finished ? scan.ui : null) ?? content;
   if (showcase) {
     drawShowcaseUI();
     return;
@@ -2478,6 +2532,10 @@ for (let i = 0; i < 2; i++) {
         return;
       }
     }
+    if (scan?.station && scan.stage === 1) {
+      if (!soundMenuOpen && scan.startSweep()) sound.click();
+      return;
+    }
     if (scan?.stage === 1 && !scan.room) {
       const model = scan.grabHit(raycaster);
       if (modelBeforeUi(model, hit)) {
@@ -2538,6 +2596,11 @@ for (let i = 0; i < 2; i++) {
         sound.click();
         return;
       }
+    }
+    if (scan?.station && scan.stage === 1 && grip.visible) {
+      intersect(c);
+      if (scan.gripTripod(i, grip, raycaster, c.userData.xrInput?.handedness)) sound.click();
+      return;
     }
     if (scan && (scan.room || scan.stage === 1) && grip.visible) {
       if (scan.room && !scan.frozen) return;
@@ -2627,7 +2690,7 @@ for (let i = 0; i < 2; i++) {
   controllers.push({ c, grip, beam, targetBeam, guide, id: i });
 }
 function scanHit(c) {
-  if (!scan || (!scan.room && scan.stage !== 1)) return null;
+  if (!scan || scan.station || (!scan.room && scan.stage !== 1)) return null;
   intersect(c);
   return scan.hit(raycaster);
 }
@@ -2652,7 +2715,8 @@ function intersect(c) {
   if (soundMenuOpen) return raycaster.intersectObjects(soundButtons, false)[0];
   if ((layers?.started && !layers.clipboard.visible) ||
       (viewshed?.started && !viewshed.clipboard.visible) ||
-      (pixels?.started && !pixels.clipboard.visible)) return null;
+      (pixels?.started && !pixels.clipboard.visible) ||
+      (scan?.station && scan.started && !scan.finished && !scan.clipboard.visible)) return null;
   return raycaster.intersectObjects(buttons, false)[0];
 }
 async function enter(mode, roomScan = mode === "immersive-ar") {
@@ -2818,7 +2882,7 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    const landscapeDemo = pixels ?? viewshed ?? layers;
+    const landscapeDemo = pixels ?? viewshed ?? layers ?? (scan?.station ? scan : null);
     if (["projection", "change"].includes(showcase?.kind) &&
         showcase.draggingBy !== null) {
       const active = controllers.find(({ id }) => id === showcase.draggingBy);
@@ -2854,7 +2918,7 @@ renderer.setAnimationLoop((time, frame) => {
     quiz?.update(dt, visibleSession && !soundMenuOpen);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
-      if (visible && !soundMenuOpen) landscapeDemo.update(dt);
+      if (visible && !soundMenuOpen && !landscapeDemo.station) landscapeDemo.update(dt);
       const right = visible && !soundMenuOpen
         ? controllers.find(({ c }) => c.userData.xrInput?.handedness === "right")
         : null;
@@ -2954,7 +3018,7 @@ renderer.setAnimationLoop((time, frame) => {
           renderer.xr.getCamera(),
           intersect,
         );
-      else
+      else if (!scan.station)
         for (const { c } of controllers) {
           if (!c.visible) c.userData.scanning = false;
           if (c.visible && c.userData.scanning) {
@@ -2980,7 +3044,7 @@ renderer.setAnimationLoop((time, frame) => {
       showcase?.grab?.update(poses);
       let tabletopGrab = null;
       if (!soundMenuOpen) {
-        if (scan && !scan.room && scan.stage === 1) tabletopGrab = scan.grab;
+        if (scan && !scan.room && !scan.station && scan.stage === 1) tabletopGrab = scan.grab;
         else if (rain && rain.group.visible &&
             (rain.stage > 0 && rain.stage < 4 || rain.stage === 4 && rain.replayTime >= 0))
           tabletopGrab = rain.grab;
@@ -3064,10 +3128,10 @@ renderer.setAnimationLoop((time, frame) => {
       if (hit) hit.object.material.color.set(hit.object.userData.hoverColor ?? 0xffda8b);
     }
   }
-  if (devPreview && (pixels || viewshed || layers) && !renderer.xr.isPresenting &&
+  if (devPreview && (pixels || viewshed || layers || scan?.station) && !renderer.xr.isPresenting &&
       !soundMenuOpen) {
-    const landscapeDemo = pixels ?? viewshed ?? layers;
-    landscapeDemo.update(dt);
+    const landscapeDemo = pixels ?? viewshed ?? layers ?? scan;
+    if (!landscapeDemo.station) landscapeDemo.update(dt);
     landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
@@ -3098,7 +3162,7 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
-  const landscapeAudioDemo = pixels ?? viewshed ?? layers;
+  const landscapeAudioDemo = pixels ?? viewshed ?? layers ?? (scan?.station ? scan : null);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
   const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
@@ -3152,12 +3216,12 @@ if (
     startRain();
   else if (new URLSearchParams(location.search).get("demo") === "quiz")
     startQuiz();
-  else if (new URLSearchParams(location.search).get("demo") === "scan")
-    startScan(
-      SCAN_SCENES.find(
-        (s) => s.id === new URLSearchParams(location.search).get("scene"),
-      ),
-    );
+  else if (new URLSearchParams(location.search).get("demo") === "scan") {
+    const stationPreview = new URLSearchParams(location.search).get("mode") === "station";
+    if (stationPreview) camera.position.y = 1.6;
+    (stationPreview ? startStationScan : startScan)(
+      SCAN_SCENES.find((s) => s.id === new URLSearchParams(location.search).get("scene")));
+  }
   else draw();
   place();
   if (previewGuide)
