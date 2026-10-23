@@ -41,6 +41,37 @@ function makeText(text) {
   return sprite;
 }
 
+function makeIdwTag(neighbors, value) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 640;
+  canvas.height = 210;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b2430";
+  ctx.fillRect(0, 0, 640, 210);
+  ctx.strokeStyle = "#ffdd91";
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, 636, 206);
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#ffdd91";
+  ctx.font = "bold 37px system-ui";
+  ctx.fillText("IDW · weights = 1/d²", 320, 43);
+  ctx.fillStyle = "#f4f8ef";
+  ctx.font = "36px system-ui";
+  const terms = neighbors.map(({ station, weight }) =>
+    `${station.value}×${Math.round(weight * 100)}%`).join(" + ");
+  ctx.fillText(terms, 320, 106, 600);
+  ctx.font = "bold 48px system-ui";
+  ctx.fillText(`≈ ${value.toFixed(1)} mm`, 320, 167);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: texture, depthTest: false, transparent: true,
+  }));
+  sprite.scale.set(0.94, 0.31, 1);
+  return sprite;
+}
+
 function makeProbeQuestion() {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 128;
@@ -380,10 +411,16 @@ export class InterpolationExperience extends TimedExhibit {
       new THREE.Vector3(this.probe.x, 0, this.probe.z),
       new THREE.Vector3(this.probe.x, y, this.probe.z),
     ], 0xffd070));
-    const tag = makeText(`${this.displayValue.toFixed(1)} mm`);
-    tag.scale.set(0.36, 0.09, 1);
-    tag.position.set(this.probe.x, y + 0.13, this.probe.z);
+    const tag = this.showWeights
+      ? makeIdwTag(result.neighbors, result.value)
+      : makeText(`${this.displayValue.toFixed(1)} mm`);
+    if (!this.showWeights) tag.scale.set(0.36, 0.09, 1);
+    tag.position.set(this.probe.x, y + (this.showWeights ? 0.42 : 0.13), this.probe.z);
     this.probeGroup.add(tag);
+    if (this.showWeights) this.probeGroup.add(gridLine([
+      new THREE.Vector3(this.probe.x, y + 0.05, this.probe.z),
+      new THREE.Vector3(this.probe.x, y + 0.26, this.probe.z),
+    ], 0xffdd91));
     if (showNeighbors) result.neighbors.forEach(({ station }) => {
       const h = heightForValue(station.value);
       this.probeGroup.add(gridLine([

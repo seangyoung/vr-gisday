@@ -1371,10 +1371,8 @@ function drawShowcaseUI() {
     label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
       "#e6f4f5", "#0b2430");
     if (exhibit.showWeights) {
-      const terms = exhibit.estimate.neighbors.map(({ station, weight }) =>
-        `${station.value}×${Math.round(weight * 100)}%`).join(" + ");
-      label(`IDW weights = 1/d² for ${exhibit.estimate.neighbors.length} nearest gauge${exhibit.estimate.neighbors.length === 1 ? "" : "s"}\n${terms} ≈ ${exhibit.estimate.value.toFixed(1)} mm`,
-        0, -0.66, 2.48, 0.18, 26, "#ffdd91", "#0b2430");
+      label("The three nearest gauges contribute; move ? to change their weights.",
+        0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
     } else label(`Point at the model to move ? · ${exhibit.mode === "smooth" ? "smooth" :
       exhibit.mode === "zones" ? "nearest" : "IDW"} estimate ${exhibit.displayValue.toFixed(1)} mm`,
       0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
