@@ -141,19 +141,37 @@ export function drawMenuIcon(ctx, icon, color) {
       break;
     }
     case "cluster": {
-      // Broad Street-style hand pump: lever, barrel, spout, and base.
-      fillPath([[-14, -18], [11, -18], [11, 34], [-14, 34]], 0.25);
-      path([[-14, 34], [-14, -18], [11, -18], [11, 34]]);
-      path([[-19, 34], [16, 34], [22, 42], [-25, 42]], true);
-      path([[-17, -18], [14, -18]]);
-      path([[-8, -23], [-35, -40], [-42, -40]]);
-      circle(-8, -23, 3.5, true);
-      path([[11, 3], [31, 3], [31, 17]]);
-      path([[25, 17], [37, 17]]);
+      // Bold street hand-pump silhouette stays readable on a small VR card.
       ctx.save();
-      ctx.globalAlpha = 0.75;
-      path([[31, 23], [28, 30], [31, 33], [34, 30], [31, 23]]);
+      ctx.globalAlpha = 0.72;
+      ctx.beginPath();
+      ctx.moveTo(-20, 34);
+      ctx.lineTo(-17, -16);
+      ctx.quadraticCurveTo(-17, -29, -5, -31);
+      ctx.quadraticCurveTo(7, -29, 8, -16);
+      ctx.lineTo(11, 34);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
+      path([[-20, 34], [-17, -16]]);
+      path([[8, -16], [11, 34]]);
+      path([[-27, 41], [18, 41], [12, 33], [-21, 33]], true);
+      ctx.save();
+      ctx.lineWidth = 7;
+      path([[-5, -29], [-38, -42]]);
+      ctx.restore();
+      circle(-41, -43, 5, true);
+      circle(-5, -30, 4, true);
+      ctx.save();
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(8, -6);
+      ctx.bezierCurveTo(21, -9, 34, -9, 34, 7);
+      ctx.lineTo(34, 12);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = "#a6e3f1";
+      path([[34, 19], [29, 29], [34, 34], [39, 29], [34, 19]], true);
       break;
     }
     case "flatten": {
@@ -190,15 +208,15 @@ export function drawMenuIcon(ctx, icon, color) {
       ctx.save();
       ctx.globalAlpha = 0.8;
       ctx.lineWidth = 4;
-      for (const [x, top] of [[-32, -15], [0, -38], [32, -11]])
+      for (const [x, top] of [[-32, -13], [0, -32], [32, -38]])
         path([[x, top + 6], [x, 39]]);
       ctx.restore();
       ctx.beginPath();
-      ctx.moveTo(-46, -10);
-      ctx.bezierCurveTo(-26, -17, -15, -36, 0, -38);
-      ctx.bezierCurveTo(16, -39, 23, -10, 46, -7);
+      ctx.moveTo(-46, -8);
+      ctx.bezierCurveTo(-29, -15, -13, -31, 0, -32);
+      ctx.bezierCurveTo(16, -34, 25, -39, 46, -35);
       ctx.stroke();
-      for (const [x, y] of [[-32, -15], [0, -38], [32, -11]])
+      for (const [x, y] of [[-32, -13], [0, -32], [32, -38]])
         circle(x, y, 5.5, true);
       break;
     }
