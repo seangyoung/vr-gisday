@@ -340,8 +340,6 @@ function menuCard({ title, lines, category, preview, glyph, color, action }, ind
   }
   if (currentLine) previewLines.push(currentLine);
   previewLines.forEach((line, lineIndex) => ctx.fillText(line, 181, 230 + lineIndex * 35, 510));
-  ctx.font = "600 24px system-ui, sans-serif";
-  ctx.fillText("SELECT  ›", 181, 333);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
@@ -2262,7 +2260,7 @@ function drawScene() {
         category: "Watersheds", preview: "Shape terrain and watch water carve new paths.",
         glyph: "≈", color: "#80cfe6", action: startRain },
       { title: "Scan the Hidden World", lines: ["Scan the", "Hidden World"],
-        category: "Point clouds", preview: "Sweep a scene to reveal a 3D point cloud.",
+        category: "LiDAR/Point Clouds", preview: "Sweep a scene to reveal a 3D point cloud.",
         glyph: "✦", color: "#b2ddf1", action: startScan },
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
         category: "GIS layers", preview: "Build a landscape by switching GIS layers on.",
@@ -2270,13 +2268,13 @@ function drawScene() {
       { title: "Can You See It?", lines: ["Can You See It?"],
         category: "Viewsheds", preview: "Test what a tower can see across the terrain.",
         glyph: "◉", color: "#f7ce87", action: startViewshed },
-      { title: "How Big Is a Pixel?", lines: ["How Big Is", "a Pixel?"],
-        category: "Resolution", preview: "Compare what coarse and fine pixels reveal.",
-        glyph: "▦", color: "#c1b6f5", action: startPixels },
       { title: "See the Invisible", lines: ["See the", "Invisible"],
         category: "Spectral data", preview: "Reveal vegetation with near-infrared imagery.",
         glyph: "◒", color: "#f4aece",
         action: () => startShowcase("spectral") },
+      { title: "How Big Is a Pixel?", lines: ["How Big Is", "a Pixel?"],
+        category: "Spatial Resolution", preview: "Compare what coarse and fine pixels reveal.",
+        glyph: "▦", color: "#c1b6f5", action: startPixels },
       { title: "Where Did the Cluster Go?", lines: ["Where Did the", "Cluster Go?"],
         category: "Aggregation", preview: "Switch zoning plans and watch patterns shift.",
         glyph: "⁙", color: "#f2b694",
