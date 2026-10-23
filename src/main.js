@@ -888,8 +888,10 @@ function drawScanUI() {
       button("Rotate ◀", -0.57, -1.21, () => s.turnPreview(-1), 1.02);
       button("Rotate ▶", 0.57, -1.21, () => s.turnPreview(1), 1.02);
     }
-    button(s.scanQueue ? "Scanning…" : !s.scansLeft ? "Scans used" :
-      s.tooCloseToPreviousStation ? "Move tripod" : "Scan here",
+    if (s.tooCloseToPreviousStation && s.scansLeft && !s.scanQueue)
+      label("Move tripod ≥3 m", -0.57, -1.47, 1.02, 0.16,
+        42, "#ffdc83", "#26404a");
+    else button(s.scanQueue ? "Scanning…" : s.scansLeft ? "Scan here" : "Scans used",
       -0.57, -1.47, () => s.startSweep(), 1.02);
     button("Takeaway", 0.57, -1.47, () => s.finish(), 1.02);
     return;
