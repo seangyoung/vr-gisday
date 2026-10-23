@@ -1120,10 +1120,12 @@ function drawViewshedUI() {
     buttons.push(map);
     v.registerVisitorMarker(map, LANDSCAPE_EXTENT, true);
     label("Blue beacon marks the ground target.\nCan the tower see its base?", 0.64, 0.25, 1.06, 0.19, 31, "#e6f4f5", "#0b2430");
-    button("Eye level · 2 m", 0.64, 0.04, () => v.setHeight(2), 1.04)
-      .material.color.set(v.observer.height === 2 ? 0xffffff : 0x91a6a4);
-    button("Tower · 12 m", 0.64, -0.19, () => v.setHeight(12), 1.04)
-      .material.color.set(v.observer.height === 12 ? 0xffffff : 0x91a6a4);
+    label("OBSERVER HEIGHT · SELECT ONE", 0.64, 0.08, 1.04, 0.1,
+      33, "#b6d1d9", "#163744");
+    button(`${v.observer.height === 2 ? "◉" : "○"} Eye level · 2 m`,
+      0.64, -0.06, () => v.setHeight(2), 1.04, v.observer.height === 2);
+    button(`${v.observer.height === 12 ? "◉" : "○"} Tower · 12 m`,
+      0.64, -0.23, () => v.setHeight(12), 1.04, v.observer.height === 12);
     button("Reset point", 0.64, -0.43, () => v.reset(), 1.04);
     label(v.isAtTop
       ? "LOOKOUT LOCKED · Grip the pole to return to the rungs"
