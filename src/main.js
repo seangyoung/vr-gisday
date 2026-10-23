@@ -230,6 +230,43 @@ function label(
   uiParent.add(mesh);
   return mesh;
 }
+function ndviLegend() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 170;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b2430";
+  ctx.fillRect(0, 0, 1200, 170);
+  ctx.strokeStyle = "#86bcb2";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(2, 2, 1196, 166);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f1f8f4";
+  ctx.font = "bold 43px system-ui";
+  ctx.fillText("NDVI color key · near infrared compared with red", 600, 47);
+  const ramp = ctx.createLinearGradient(65, 0, 1135, 0);
+  ramp.addColorStop(0, "#254e74");
+  ramp.addColorStop(0.32, "#ae996f");
+  ramp.addColorStop(0.65, "#78a95d");
+  ramp.addColorStop(1, "#1d6540");
+  ctx.fillStyle = ramp;
+  ctx.fillRect(65, 65, 1070, 38);
+  ctx.strokeStyle = "#dcece3";
+  ctx.strokeRect(65, 65, 1070, 38);
+  ctx.font = "bold 38px system-ui";
+  ctx.fillStyle = "#f1f8f4";
+  ctx.textAlign = "left";
+  ctx.fillText("Water / low", 65, 149);
+  ctx.textAlign = "right";
+  ctx.fillText("More green plants", 1135, 149);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.33),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }));
+  mesh.position.set(0, -0.495, 0.03);
+  uiParent.add(mesh);
+  return mesh;
+}
 function paintLabel(c, text, w, size, color, bg) {
   const ctx = c.getContext("2d");
   ctx.clearRect(0, 0, c.width, c.height);
@@ -1434,10 +1471,13 @@ function drawShowcaseUI() {
     };
     label(`${exhibit.sceneInfo.name} · ${exhibit.sceneInfo.sensor}`,
       0, 0.96, 2.35, 0.18, 40, "#e6f4f5", "#0b2430");
-    label(exhibit.sceneInfo.prompt, 0, -0.42, 2.4, 0.12, 28,
-      "#d8f3e6", "#0b2430");
-    label(modeText[exhibit.mode], 0, -0.57, 2.4, 0.17, 26,
-      "#e6f4f5", "#0b2430");
+    if (exhibit.mode === "index") ndviLegend();
+    else {
+      label(exhibit.sceneInfo.prompt, 0, -0.42, 2.4, 0.12, 28,
+        "#d8f3e6", "#0b2430");
+      label(modeText[exhibit.mode], 0, -0.57, 2.4, 0.17, 26,
+        "#e6f4f5", "#0b2430");
+    }
     button("Natural color", -0.78, -0.75, () => exhibit.setMode("natural"),
       0.72, exhibit.mode === "natural");
     button("False color", 0, -0.75, () => exhibit.setMode("false"),

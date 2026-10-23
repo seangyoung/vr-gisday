@@ -126,33 +126,7 @@ function spectrumCanvas() {
   return canvas;
 }
 
-function drawIndexLegend(ctx, width, height) {
-  const scale = Math.min(width / 960, height / 540);
-  const x = 18 * scale;
-  const y = height - 111 * scale;
-  const w = 430 * scale;
-  const h = 94 * scale;
-  ctx.fillStyle = "rgba(10, 34, 42, 0.94)";
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#f1f8f4";
-  ctx.textAlign = "left";
-  ctx.font = `bold ${24 * scale}px system-ui`;
-  ctx.fillText("NDVI color key", x + 14 * scale, y + 31 * scale);
-  const ramp = ctx.createLinearGradient(x + 14 * scale, 0, x + (w / scale - 14) * scale, 0);
-  ramp.addColorStop(0, "#254e74");
-  ramp.addColorStop(0.32, "#ae996f");
-  ramp.addColorStop(0.65, "#78a95d");
-  ramp.addColorStop(1, "#1d6540");
-  ctx.fillStyle = ramp;
-  ctx.fillRect(x + 14 * scale, y + 39 * scale, w - 28 * scale, 17 * scale);
-  ctx.font = `${18 * scale}px system-ui`;
-  ctx.fillStyle = "#e6f4f5";
-  ctx.fillText("Water / low", x + 14 * scale, y + 81 * scale);
-  ctx.textAlign = "right";
-  ctx.fillText("Stronger vegetation signal", x + w - 14 * scale, y + 81 * scale);
-}
-
-function sceneCanvas(base, sample, width, height, mode) {
+function sceneCanvas(base, sample, width, height) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -169,7 +143,6 @@ function sceneCanvas(base, sample, width, height, mode) {
   ctx.moveTo(x + 11, y);
   ctx.lineTo(x + 18, y);
   ctx.stroke();
-  if (mode === "index") drawIndexLegend(ctx, width, height);
   return canvas;
 }
 
@@ -436,7 +409,7 @@ export class SpectralExperience extends TimedExhibit {
       this.pixels.natural.subarray(i, i + 4),
       this.pixels.false.subarray(i, i + 4));
     replacePanelTexture(this.image,
-      sceneCanvas(this.sources[this.mode], this.sample, width, height, this.mode));
+      sceneCanvas(this.sources[this.mode], this.sample, width, height));
     replacePanelTexture(this.graph, graphCanvas(this.bands, this.mode, true));
     if (this.started) this.onChange();
   }
