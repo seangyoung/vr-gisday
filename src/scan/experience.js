@@ -30,6 +30,7 @@ export class ScanExperience {
       new THREE.Vector3(-1.12, -0.1, -0.91),
       new THREE.Vector3(1.12, 1.17, 0.91),
     );
+    this.grab.turnPivot.copy(this.grabBounds.getCenter(new THREE.Vector3()));
     this.targets = [];
     const mesh = (geometry, position, kind, finish) => {
       const m = new THREE.Mesh(

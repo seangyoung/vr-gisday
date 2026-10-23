@@ -43,6 +43,7 @@ export class RoomScan {
     this.group = new THREE.Group();
     scene.add(this.group);
     this.grab = new ModelGrab(this.group, 0.03, 1);
+    this.grab.turnPivot.set(0, 0, 0);
     const geo = new THREE.BufferGeometry();
     for (const name of ["position", "color"])
       geo.setAttribute(

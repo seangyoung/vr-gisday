@@ -1960,6 +1960,8 @@ function gnssObject() {
   floatingModel = gnssDisplay.group;
   scene.add(floatingModel);
   grab = new ModelGrab(floatingModel, 0.48, 1.35);
+  grab.turnPivot.copy(step === GNSS_SATELLITE
+    ? gnssDisplay.craft.position : new THREE.Vector3());
   resetModelView();
   if (preservePose) {
     floatingModel.position.copy(preservePose.position);
@@ -2092,6 +2094,7 @@ function spatial() {
   );
   group.userData.radius = bounds.getSize(new THREE.Vector3()).length() / 2;
   grab = new ModelGrab(group);
+  grab.turnPivot.set(0, 0, 0);
   resetModelView();
   if (preservePose) {
     group.position.copy(preservePose.position);
@@ -2890,10 +2893,10 @@ for (let i = 0; i < 2; i++) {
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
     guide.setHandedness("none");
-    grab?.release(i);
-    scan?.grab.release(i);
-    rain?.grab.release(i);
-    showcase?.grab?.release(i);
+    grab?.release(i, false);
+    scan?.grab.release(i, false);
+    rain?.grab.release(i, false);
+    showcase?.grab?.release(i, false);
     showcase?.endContinentGrip?.(i);
     showcase?.endPlatformSpin?.(i);
     rain?.endStroke(i);
@@ -3267,10 +3270,10 @@ renderer.setAnimationLoop((time, frame) => {
       }
     if (renderer.xr.getSession().visibilityState === "visible") {
       viewshed?.updateClimb(poses, dt);
-      grab?.update(poses);
-      rain?.grab.update(poses);
-      scan?.grab.update(poses);
-      showcase?.grab?.update(poses);
+      grab?.update(poses, dt);
+      rain?.grab.update(poses, dt);
+      scan?.grab.update(poses, dt);
+      showcase?.grab?.update(poses, dt);
       let tabletopGrab = null;
       if (!soundMenuOpen) {
         if (scan && !scan.room && !scan.station && scan.stage === 1) tabletopGrab = scan.grab;

@@ -148,3 +148,80 @@ test("a held tabletop model snap-turns around its center once per stick deflecti
   grab.release(0);
   assert.equal(grab.turnWithStick(0, 1, 0, camera), false);
 });
+
+function releaseAfterTurn(speed) {
+  const object = assembly();
+  object.position.set(0.2, 1.3, -1.4);
+  const grab = new ModelGrab(object);
+  grab.turnPivot.set(0, 0.3, 0);
+  grab.begin(0, pose(0, 0, 0));
+  for (let frame = 1; frame <= 6; frame++) {
+    const turn = new Quaternion().setFromAxisAngle(
+      new Vector3(0, 1, 0), speed * frame * 0.02);
+    grab.update(new Map([[0, pose(0, 0, 0, turn)]]), 0.02);
+  }
+  const heldAngle = object.rotation.y;
+  const center = object.localToWorld(grab.turnPivot.clone());
+  grab.release(0);
+  for (let frame = 0; frame < 40; frame++) grab.update(new Map(), 0.02);
+  close(object.localToWorld(grab.turnPivot.clone()), center);
+  return { coast: object.rotation.y - heldAngle, grab, object };
+}
+
+test("a faster hand turn coasts farther in the same direction, then stops", () => {
+  const slow = releaseAfterTurn(1.1);
+  const fast = releaseAfterTurn(3.3);
+  const reverse = releaseAfterTurn(-3.3);
+  assert.ok(slow.coast > 0.05);
+  assert.ok(fast.coast > slow.coast * 2);
+  assert.ok(reverse.coast < -0.1);
+  assert.ok(fast.coast < 0.8, "a strong flick remains a short coast");
+  const settled = fast.object.quaternion.clone();
+  fast.grab.update(new Map(), 1);
+  assert.ok(fast.object.quaternion.angleTo(settled) < 0.01);
+});
+
+test("a gentle release, lost tracking, or a snap-turn adds no momentum", () => {
+  const gentle = releaseAfterTurn(0.2);
+  assert.ok(Math.abs(gentle.coast) < 1e-8);
+
+  const object = assembly();
+  const grab = new ModelGrab(object);
+  const camera = new PerspectiveCamera();
+  grab.begin(0, pose(0));
+  grab.update(new Map([[0, pose(0, 0, 0,
+    new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.1))]]), 0.02);
+  assert.equal(grab.turnWithStick(0, 1, 0, camera), true);
+  const snapped = object.quaternion.clone();
+  grab.release(0);
+  grab.update(new Map(), 0.2);
+  assert.ok(object.quaternion.angleTo(snapped) < 1e-8);
+
+  grab.begin(0, pose(0));
+  grab.update(new Map([[0, pose(0, 0, 0,
+    new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.1))]]), 0.02);
+  const beforeLoss = object.quaternion.clone();
+  grab.update(new Map(), 0.02);
+  grab.update(new Map(), 0.2);
+  assert.ok(object.quaternion.angleTo(beforeLoss) < 1e-8);
+});
+
+test("a two-handed turn keeps its momentum when both grips release together", () => {
+  const object = assembly();
+  const grab = new ModelGrab(object);
+  grab.begin(0, pose(-0.2));
+  grab.begin(1, pose(0.2));
+  for (let frame = 1; frame <= 6; frame++) {
+    const angle = frame * 0.07;
+    const x = 0.2 * Math.cos(angle);
+    const z = 0.2 * Math.sin(angle);
+    grab.update(new Map([
+      [0, pose(-x, 0, z)], [1, pose(x, 0, -z)],
+    ]), 0.02);
+  }
+  const held = object.quaternion.clone();
+  grab.release(0);
+  grab.release(1);
+  grab.update(new Map(), 0.08);
+  assert.ok(object.quaternion.angleTo(held) > 0.1);
+});
