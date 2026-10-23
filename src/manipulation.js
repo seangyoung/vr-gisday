@@ -2,8 +2,9 @@ import { Matrix4, Vector3, Quaternion, MathUtils } from "three";
 
 const MIN_RELEASE_SPEED = 0.55; // Radians per second: small wrist adjustments settle in place.
 const MAX_RELEASE_SPEED = 5.5;
-const SPIN_DRAG = 6.5; // Exponential damping, so a faster turn coasts farther.
+const SPIN_DRAG = 6; // Exponential damping, so a faster turn coasts farther.
 const STOP_SPEED = 0.05;
+const PAIR_RELEASE_MS = 130; // Two controller events rarely arrive in one frame.
 
 // World-space manipulation of a single rigid assembly. No child is transformed alone.
 export class ModelGrab {
@@ -17,6 +18,7 @@ export class ModelGrab {
     this.angularVelocity = new Vector3();
     this.lastRotation = null;
     this.lastInstantSpeed = 0;
+    this.pendingPairRelease = null;
   }
   begin(id, matrix) {
     if (this.hands.has(id) || this.hands.size === 2) return;
@@ -24,18 +26,36 @@ export class ModelGrab {
     this.rebase();
     this.resetMotion();
   }
-  release(id, coast = true) {
+  release(id, coast = true, at = performance.now()) {
+    const releasingPair = coast && this.hands.size === 2 && this.hands.has(id);
+    if (releasingPair) this.pendingPairRelease = {
+      at,
+      velocity: this.angularVelocity.clone(),
+      speed: this.lastInstantSpeed,
+      oneHandSampled: false,
+    };
     if (!this.hands.delete(id)) return;
     this.stickReady.delete(id);
     this.rebase();
     if (this.hands.size) {
-      // Keep the measured spin if both grips are released in the same frame.
-      // Rebasing the remaining hand avoids a jump in its next pose update.
+      // Rebase the remaining hand without losing the brief two-hand flick.
       if (coast) this.lastRotation = this.object.quaternion.clone();
       else this.resetMotion();
     }
     else {
       this.lastRotation = null;
+      if (this.pendingPairRelease) {
+        const pending = this.pendingPairRelease;
+        if (coast && at >= pending.at &&
+            at - pending.at <= PAIR_RELEASE_MS) {
+          this.angularVelocity.copy(pending.velocity);
+          this.lastInstantSpeed = pending.speed;
+        } else if (!pending.oneHandSampled) {
+          this.angularVelocity.set(0, 0, 0);
+          this.lastInstantSpeed = 0;
+        }
+        this.pendingPairRelease = null;
+      }
       if (!coast || this.lastInstantSpeed < MIN_RELEASE_SPEED ||
           this.angularVelocity.length() < MIN_RELEASE_SPEED)
         this.angularVelocity.set(0, 0, 0);
@@ -48,11 +68,13 @@ export class ModelGrab {
     this.angularVelocity.set(0, 0, 0);
     this.lastRotation = null;
     this.lastInstantSpeed = 0;
+    this.pendingPairRelease = null;
   }
   resetMotion() {
     this.angularVelocity.set(0, 0, 0);
     this.lastRotation = this.object.quaternion.clone();
     this.lastInstantSpeed = 0;
+    this.pendingPairRelease = null;
   }
   rotateAboutPivot(turn) {
     this.object.updateWorldMatrix(true, false);
@@ -165,7 +187,13 @@ export class ModelGrab {
           this.object.quaternion,
           this.object.scale,
         );
+      if (this.pendingPairRelease &&
+          (!Number.isFinite(dt) || dt <= 0 || dt > 0.1)) {
+        this.lastRotation = this.object.quaternion.clone();
+        return;
+      }
       this.sampleRotation(dt);
+      if (this.pendingPairRelease) this.pendingPairRelease.oneHandSampled = true;
       return;
     }
     const a = new Vector3().setFromMatrixPosition(hands[0]);

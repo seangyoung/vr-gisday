@@ -206,7 +206,7 @@ test("a gentle release, lost tracking, or a snap-turn adds no momentum", () => {
   assert.ok(object.quaternion.angleTo(beforeLoss) < 1e-8);
 });
 
-test("a two-handed turn keeps its momentum when both grips release together", () => {
+function turnedPair() {
   const object = assembly();
   const grab = new ModelGrab(object);
   grab.begin(0, pose(-0.2));
@@ -219,9 +219,53 @@ test("a two-handed turn keeps its momentum when both grips release together", ()
       [0, pose(-x, 0, z)], [1, pose(x, 0, -z)],
     ]), 0.02);
   }
+  return { object, grab };
+}
+
+test("a two-handed turn keeps its momentum when both grips release together", () => {
+  const { object, grab } = turnedPair();
   const held = object.quaternion.clone();
-  grab.release(0);
-  grab.release(1);
+  grab.release(0, true, 1000);
+  grab.release(1, true, 1000);
   grab.update(new Map(), 0.08);
   assert.ok(object.quaternion.angleTo(held) > 0.1);
+});
+
+test("two-hand momentum survives a short gap and an idle frame between releases", () => {
+  const { object, grab } = turnedPair();
+  const held = object.quaternion.clone();
+  grab.release(0, true, 1000);
+  grab.update(new Map([[1, grab.hands.get(1)]]), 0.02);
+  grab.release(1, true, 1090);
+  grab.update(new Map(), 0.08);
+  assert.ok(object.quaternion.angleTo(held) > 0.1);
+});
+
+test("a late second release or cancelled grip does not revive an old two-hand flick", () => {
+  const late = turnedPair();
+  late.grab.release(0, true, 1000);
+  late.grab.update(new Map([[1, late.grab.hands.get(1)]]), 0.02);
+  const held = late.object.quaternion.clone();
+  late.grab.release(1, true, 1150);
+  late.grab.update(new Map(), 0.1);
+  assert.ok(late.object.quaternion.angleTo(held) < 1e-8);
+
+  const cancelled = turnedPair();
+  cancelled.grab.release(0, true, 1000);
+  cancelled.grab.release(1, false, 1050);
+  const before = cancelled.object.quaternion.clone();
+  cancelled.grab.update(new Map(), 0.1);
+  assert.ok(cancelled.object.quaternion.angleTo(before) < 1e-6);
+});
+
+test("after the release window, the remaining hand supplies its own inertia", () => {
+  const { object, grab } = turnedPair();
+  grab.release(0, true, 1000);
+  const position = new Vector3().setFromMatrixPosition(grab.hands.get(1));
+  const turn = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), 0.12);
+  grab.update(new Map([[1, pose(position.x, position.y, position.z, turn)]]), 0.02);
+  const held = object.quaternion.clone();
+  grab.release(1, true, 1200);
+  grab.update(new Map(), 0.08);
+  assert.ok(object.quaternion.angleTo(held) > 0.05);
 });
