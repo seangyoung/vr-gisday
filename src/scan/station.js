@@ -409,7 +409,7 @@ export class StationScanExperience {
       ctx.fillRect(118, 414, 404, 31);
       ctx.fillStyle = "#c8f3e4";
       ctx.font = "21px sans-serif";
-      ctx.fillText("Trigger-drag this cloud to rotate", 320, 436);
+      ctx.fillText("Right trigger-drag this cloud to rotate", 320, 436);
     }
     ctx.fillStyle = "#a6f5d9";
     ctx.font = "bold 38px sans-serif";

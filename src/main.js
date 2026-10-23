@@ -926,8 +926,8 @@ function drawScanUI() {
           ? "Survey the terraces and trees from several positions.\nLidar times returning laser pulses to sample visible surfaces.\nAim teleport at a step face to climb onto its top."
           : `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nFour stations at least 3 m apart reveal hidden sides.`);
       button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
-      label("Grip the tripod to carry it · Trigger to scan · Left stick walk · Right stick teleport/turn",
-        0, GUIDED_INFO_Y, 2.3, 0.14, 24, "#b6d1d9", "#0b2430");
+      label("Grip tripod to carry · Right trigger scans/selects clipboard\nLeft stick: walk · Right stick: teleport/turn",
+        0, GUIDED_INFO_Y, 2.3, 0.18, 26, "#b6d1d9", "#0b2430");
       return;
     }
     if (s.stage === 2) {
@@ -1051,10 +1051,8 @@ function drawLayersUI() {
       0.13,
     );
     button("Start building", 0, -0.43, () => l.begin(), 1.5);
-    label(showFallbackControls
-      ? "The map and layer list appear on the left-hand clipboard."
-      : "After starting, raise your left hand to see the map and layer list.",
-      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    label("Raise your left hand for the clipboard.\nUse the right trigger to select layers.",
+      0, -0.72, 2.3, 0.17, 29, "#b6d1d9", "#0b2430");
     return;
   }
   label(
@@ -1129,10 +1127,8 @@ function drawViewshedUI() {
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
-    label(showFallbackControls
-      ? "The map and controls appear on the left-hand clipboard."
-      : "After starting, raise your left hand to see the map and controls.",
-      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    label("Raise your left hand for the clipboard.\nUse the right trigger to select controls.",
+      0, -0.72, 2.3, 0.17, 29, "#b6d1d9", "#0b2430");
     return;
   }
   label(
@@ -1209,10 +1205,8 @@ function drawPixelsUI() {
       0.13,
     );
     button("Compare pixels", 0, -0.43, () => p.begin(), 1.5);
-    label(showFallbackControls
-      ? "The images and controls appear on the left-hand clipboard."
-      : "After starting, raise your left hand to see the images and controls.",
-      0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
+    label("Raise your left hand for the clipboard.\nUse the right trigger to compare pixels.",
+      0, -0.72, 2.3, 0.17, 29, "#b6d1d9", "#0b2430");
     return;
   }
   label(
@@ -2324,15 +2318,15 @@ function controllerGuideContext(hand) {
       "Move/size", onMenu, exitLabel];
   }
   if (scan?.station && scan.stage === 1)
-    return ["Scan", "Carry tripod", onMenu, exitLabel, teleportHint];
+    return [hand === "left" ? null : "Scan", "Carry tripod", onMenu, exitLabel, teleportHint];
   if (scan?.stage === 1)
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
-    return [viewshed.isClimbing ? null : "Place tower",
+    return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
       viewshed.isAtTop ? "Grip pole" : "Grip rung / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if ((layers?.started && !layers.finished) || (pixels?.started && !pixels.finished))
-    return ["Select", null, onMenu, exitLabel, teleportHint];
+    return [hand === "left" ? null : "Select", null, onMenu, exitLabel, teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     showcase.kind === "projection" ? "Grab land" :
@@ -2341,6 +2335,11 @@ function controllerGuideContext(hand) {
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
+}
+function leftHoldsClipboard(controller) {
+  return controller.userData.xrInput?.handedness === "left" &&
+    (layers?.started || viewshed?.started || pixels?.started ||
+      scan?.station && scan.started && !scan.finished);
 }
 function updateControllerGuides(cam, tracked, dt) {
   if (showFallbackControls) {
@@ -2706,6 +2705,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("selectstart", () => {
     if (quiz && !soundMenuOpen) return;
+    if (leftHoldsClipboard(c)) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing) return;
     if (grab?.hands.size || rain?.grab.hands.size ||
@@ -3304,6 +3304,11 @@ renderer.setAnimationLoop((time, frame) => {
     }
     for (const { c, beam, targetBeam, id } of controllers) {
       if (quiz && !soundMenuOpen) {
+        beam.visible = false;
+        targetBeam.visible = false;
+        continue;
+      }
+      if (leftHoldsClipboard(c)) {
         beam.visible = false;
         targetBeam.visible = false;
         continue;
