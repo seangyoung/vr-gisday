@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { InterpolationExperience } from "../src/interpolation/experience.js";
 import {
-  STATIONS, idwEstimate, nearestEstimate, smoothEstimate,
+  STATIONS, idwEstimate, idwWorkedFraction, nearestEstimate, smoothEstimate,
 } from "../src/interpolation/model.js";
 
 globalThis.document = {
   createElement: () => ({
     width: 256, height: 80,
-    getContext: () => ({ fillRect() {}, strokeRect() {}, fillText() {} }),
+    getContext: () => ({ fillRect() {}, strokeRect() {}, fillText() {},
+      beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+      measureText: (text) => ({ width: text.length * 24 }) }),
   }),
 };
 
@@ -21,6 +23,27 @@ test("IDW honors measured readings and normalized neighbor weights", () => {
   assert.ok(Math.abs(estimate.neighbors.reduce((sum, n) => sum + n.weight, 0) - 1) < 1e-12);
   assert.ok(Math.abs(estimate.value - estimate.neighbors.reduce((sum, n) =>
     sum + n.station.value * n.weight, 0)) < 1e-12);
+});
+
+test("the displayed IDW fraction matches a worked three-neighbor example", () => {
+  const stations = [
+    { x: 350, z: 0, value: 12 },
+    { x: 750, z: 0, value: 10 },
+    { x: 850, z: 0, value: 10 },
+  ];
+  const p1 = idwEstimate(0, 0, stations, 3, 1);
+  const p2 = idwEstimate(0, 0, stations, 3, 2);
+  assert.equal(p1.value.toFixed(1), "11.1");
+  assert.equal(p2.value.toFixed(1), "11.4");
+  assert.deepEqual(idwWorkedFraction(p2), {
+    exact: false, count: 3, power: 2,
+    numerator: "12/350² + 10/750² + 10/850²",
+    denominator: "1/350² + 1/750² + 1/850²",
+    value: p2.value,
+  });
+  const atGauge = idwWorkedFraction(idwEstimate(STATIONS[0].x,
+    STATIONS[0].z));
+  assert.deepEqual(atGauge, { exact: true, value: STATIONS[0].value });
 });
 
 test("smoothing can miss a measured reading; nearest zones preserve one reading", () => {

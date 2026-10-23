@@ -15,18 +15,20 @@ export const STATIONS = Object.freeze([
 ]);
 
 const EPSILON = 1e-10;
+export const IDW_POWER = 2;
 export function nearestStations(x, z, stations = STATIONS, count = 3) {
   return stations.map((station, index) => ({
     station, index, distance: Math.hypot(x - station.x, z - station.z),
   })).sort((a, b) => a.distance - b.distance).slice(0, count);
 }
 
-export function idwEstimate(x, z, stations = STATIONS, count = 3, power = 2) {
+export function idwEstimate(x, z, stations = STATIONS, count = 3, power = IDW_POWER) {
   const neighbors = nearestStations(x, z, stations, count);
   if (!neighbors.length) throw new RangeError("IDW requires stations");
   if (neighbors[0].distance < EPSILON) return {
     value: neighbors[0].station.value,
     neighbors: [{ ...neighbors[0], weight: 1 }],
+    power,
   };
   const raw = neighbors.map((n) => n.distance ** -power);
   const total = raw.reduce((sum, weight) => sum + weight, 0);
@@ -34,6 +36,29 @@ export function idwEstimate(x, z, stations = STATIONS, count = 3, power = 2) {
     value: neighbors.reduce((sum, n, i) =>
       sum + n.station.value * raw[i] / total, 0),
     neighbors: neighbors.map((n, i) => ({ ...n, weight: raw[i] / total })),
+    power,
+  };
+}
+
+// Text for the worked fraction shown at the probe. Four significant digits
+// keep the printed distances close to the unrounded calculation; the result
+// uses the full-precision distances in idwEstimate.
+export function idwWorkedFraction(estimate) {
+  const { neighbors, power, value } = estimate;
+  if (neighbors[0].distance < EPSILON) return {
+    exact: true, value,
+  };
+  const distance = (d) => Number(d.toPrecision(4)).toString();
+  const exponent = power === 1 ? "" : power === 2 ? "²" : `^${power}`;
+  return {
+    exact: false,
+    count: neighbors.length,
+    power,
+    numerator: neighbors.map(({ station, distance: d }) =>
+      `${station.value}/${distance(d)}${exponent}`).join(" + "),
+    denominator: neighbors.map(({ distance: d }) =>
+      `1/${distance(d)}${exponent}`).join(" + "),
+    value,
   };
 }
 
