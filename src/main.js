@@ -1852,7 +1852,7 @@ function resetModelView() {
   );
   floatingModel.scale.setScalar(inspecting ? 0.66 : gnss ? 0.74 : 0.35);
 }
-function updateGnssPopupPose() {
+function placeGnssPopup() {
   if (!gnssPopup || !floatingModel || !gnssSelection) return;
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   cam.updateWorldMatrix(true, false);
@@ -1944,7 +1944,7 @@ function showGnssPopup() {
   group.visible = !soundMenuOpen;
   scene.add(group);
   gnssPopup = { group, panel, leader, marker };
-  updateGnssPopupPose();
+  placeGnssPopup();
 }
 function gnssObject() {
   gnssDisplay = new GnssScene(step, {
@@ -1976,6 +1976,8 @@ function keepGnssPose() {
 function inspectGnssPart(ray) {
   const picked = gnssDisplay?.pickPart(ray);
   if (!picked) return false;
+  // Freeze any residual hand spin before anchoring the callout in the room.
+  grab?.cancel();
   gnssSelection = {
     text: picked.text,
     localPoint: floatingModel.worldToLocal(picked.point),
@@ -2666,6 +2668,10 @@ function place() {
   root.position.y = pos.y - 0.08;
   root.rotation.set(0, Math.atan2(-dir.x, -dir.z), 0);
   pendingPlacement = false;
+  if (gnssPopup) {
+    clearGnssPopup();
+    gnssSelection = null;
+  }
   if (floatingModel) resetModelView();
   if (rain) rain.place(cam);
   scan?.place(cam);
@@ -2875,6 +2881,10 @@ for (let i = 0; i < 2; i++) {
     // Once one hand holds the assembly, the other can join from anywhere.
     if (grab.hands.size || near || modelHit(c)) {
       sound.click();
+      if (step === GNSS_SATELLITE) {
+        clearGnssPopup();
+        gnssSelection = null;
+      }
       grab.begin(i, grip.matrixWorld);
     }
   });
@@ -3420,7 +3430,6 @@ renderer.setAnimationLoop((time, frame) => {
     : 0;
   sound.setLandscape(!!(audible && landscapeAudioDemo), riverLevel,
     landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0);
-  updateGnssPopupPose();
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {
