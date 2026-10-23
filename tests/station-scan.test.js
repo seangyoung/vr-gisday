@@ -20,7 +20,7 @@ function survey(id, budget = 520) {
   const targets = meshes.slice(1).filter((mesh) => mesh.userData.kind === "structure" ||
     id === "canopy" && mesh.userData.kind === "vegetation" ||
     id === "terraces" && mesh.userData.kind === "ground");
-  return { group, coverage: new StationCoverage(targets, meshes, budget, group) };
+  return { group, meshes, coverage: new StationCoverage(targets, meshes, budget, group) };
 }
 
 test("one dense station scan fills visible faces; a new angle reveals hidden faces", () => {
@@ -107,6 +107,49 @@ test("tripod survey starts at standing height and allows walking and teleporting
   const carried = station.tripod.getWorldPosition(new THREE.Vector3());
   assert.ok(Math.abs(carried.x - 1) < 1e-6);
   assert.ok(Math.abs(carried.z + 1) < 1e-6);
+});
+
+test("rotating the bridge does not create invisible barriers across its open center", () => {
+  const { group, meshes } = survey("bridge", 8);
+  group.rotation.y = Math.PI / 4;
+  const station = Object.create(StationScanExperience.prototype);
+  station.group = group;
+  station.targets = meshes;
+  station.started = true;
+  station.finished = false;
+  station.scanQueue = null;
+  station.visitor = new THREE.Vector2();
+  station.walkForward = new THREE.Vector3();
+  station.grab = { hands: new Map([[1, true]]) };
+  station.tripod = new THREE.Group();
+  station.tripod.position.z = 8.5;
+  group.add(station.tripod);
+  station.ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  station.ground.rotation.x = -Math.PI / 2;
+  station.ground.position.y = -0.05;
+  group.add(station.ground);
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.copy(group.localToWorld(new THREE.Vector3(0, 1.6, 6)));
+  camera.rotation.y = group.rotation.y;
+  camera.updateMatrixWorld(true);
+
+  assert.equal(station.canPlace(0, 0), true, "the gap beneath the deck is open");
+  assert.equal(station.canPlace(6, 0), false, "the raised bank still blocks ground-level walking");
+  station.walk(0, -1, 1, camera);
+  assert.ok(group.worldToLocal(camera.getWorldPosition(new THREE.Vector3())).z < 4,
+    "walking continues through the open center");
+
+  const point = group.localToWorld(new THREE.Vector3(0, 1.6, 0));
+  const ray = new THREE.Raycaster(point, new THREE.Vector3(0, -1, 0));
+  const destination = station.teleportCandidate(ray);
+  assert.equal(destination?.valid, true, "teleporting beneath the bridge remains possible");
+
+  const pose = new THREE.Matrix4().makeTranslation(point.x, point.y, point.z);
+  station.updateTripod(new Map([[1, pose]]));
+  assert.ok(Math.abs(station.tripod.position.x) < 1e-6);
+  assert.ok(Math.abs(station.tripod.position.z) < 1e-6,
+    "the carried tripod follows the controller through the open center");
 });
 
 test("clipboard preview turns without changing captured survey coverage", () => {

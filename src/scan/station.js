@@ -251,9 +251,11 @@ export class StationScanExperience {
   }
   canPlace(x, z) {
     if (Math.abs(x) > LIMIT || Math.abs(z) > LIMIT) return false;
-    const point = new THREE.Vector3(x, 0.72, z);
-    return !this.targets.slice(1).some((mesh) => new THREE.Box3().setFromObject(mesh)
-      .containsPoint(this.group.localToWorld(point.clone())));
+    const worldPoint = this.group.localToWorld(new THREE.Vector3(x, 0.72, z));
+    return !this.targets.slice(1).some((mesh) => {
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      return mesh.geometry.boundingBox.containsPoint(mesh.worldToLocal(worldPoint.clone()));
+    });
   }
   gripTripod(id, grip, raycaster, handedness) {
     if (!this.started || this.finished || this.scanQueue || this.grab.hands.size) return false;
