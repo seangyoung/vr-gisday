@@ -2377,7 +2377,7 @@ function drawScene() {
         icon: "point-cloud", color: "#b2ddf1", action: startScan },
       { title: "See the Invisible", lines: ["See the", "Invisible"],
         category: "Spectral data", preview: "Reveal vegetation with near-infrared imagery.",
-        icon: "spectral-leaf", color: "#f4aece",
+        icon: "spectral-leaf", color: "#9fdda6",
         action: () => startShowcase("spectral") },
       { title: "How Big Is a Pixel?", lines: ["How Big Is", "a Pixel?"],
         category: "Spatial Resolution", preview: "Compare what coarse and fine pixels reveal.",

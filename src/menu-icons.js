@@ -82,34 +82,49 @@ export function drawMenuIcon(ctx, icon, color) {
       break;
     }
     case "viewshed": {
-      fillPath([[-29, -25], [45, -8], [45, 20]], 0.22);
-      path([[-29, -25], [45, -8]]);
-      path([[-29, -25], [45, 20]]);
-      path([[-46, 43], [-24, 18], [-4, 35], [16, 6], [44, 30]]);
-      path([[-39, 34], [-29, -25], [-19, 29]]);
-      path([[-38, 6], [-20, 6]]);
-      circle(-29, -25, 4, true);
+      // A lookout platform and its single dashed line of sight.
+      path([[-45, 38], [-14, 34], [9, 39], [29, 22], [46, 28]]);
+      path([[-42, -28], [-6, -28]]);
+      path([[-39, -41], [-39, -29]]);
+      path([[-9, -41], [-9, -29]]);
+      path([[-38, -41], [-10, -41]]);
+      path([[-38, -26], [-42, 32]]);
+      path([[-10, -26], [-14, 32]]);
+      path([[-37, -9], [-12, -9]]);
+      path([[-39, 10], [-13, 10]]);
+      circle(-16, -34, 4, true);
+      ctx.save();
+      ctx.setLineDash([2, 8]);
+      ctx.lineWidth = 4;
+      path([[-12, -33], [37, -7]]);
+      ctx.restore();
+      circle(38, -6, 5);
       break;
     }
     case "spectral-leaf": {
       const leaf = () => {
         ctx.beginPath();
-        ctx.moveTo(-37, 38);
-        ctx.bezierCurveTo(-34, -8, 2, -43, 40, -39);
-        ctx.bezierCurveTo(45, 3, 15, 31, -37, 38);
+        ctx.moveTo(-35, 39);
+        ctx.bezierCurveTo(-34, -9, 1, -35, 38, -22);
+        ctx.bezierCurveTo(39, 13, 13, 39, -35, 39);
         ctx.closePath();
       };
       ctx.save();
+      ctx.globalAlpha = 0.25;
       leaf();
-      ctx.clip();
-      ctx.fillStyle = "#83d79c";
-      ctx.fillRect(-50, -50, 50, 100);
-      ctx.fillStyle = "#e798c1";
-      ctx.fillRect(0, -50, 50, 100);
+      ctx.fill();
       ctx.restore();
       leaf();
       ctx.stroke();
-      path([[-37, 38], [-10, 6], [15, -19], [39, -39]]);
+      path([[-35, 39], [-13, 12], [10, -7], [37, -21]]);
+      ctx.save();
+      ctx.strokeStyle = "#e9f4c1";
+      ctx.lineWidth = 4.5;
+      path([[-46, -44], [-10, -16]]);
+      path([[-10, -16], [20, -47]]);
+      path([[-18, -17], [-10, -16], [-11, -24]]);
+      path([[11, -44], [20, -47], [17, -38]]);
+      ctx.restore();
       break;
     }
     case "pixels": {
@@ -126,14 +141,19 @@ export function drawMenuIcon(ctx, icon, color) {
       break;
     }
     case "cluster": {
+      // Broad Street-style hand pump: lever, barrel, spout, and base.
+      fillPath([[-14, -18], [11, -18], [11, 34], [-14, 34]], 0.25);
+      path([[-14, 34], [-14, -18], [11, -18], [11, 34]]);
+      path([[-19, 34], [16, 34], [22, 42], [-25, 42]], true);
+      path([[-17, -18], [14, -18]]);
+      path([[-8, -23], [-35, -40], [-42, -40]]);
+      circle(-8, -23, 3.5, true);
+      path([[11, 3], [31, 3], [31, 17]]);
+      path([[25, 17], [37, 17]]);
       ctx.save();
-      ctx.globalAlpha = 0.76;
-      path([[-32, -43], [-21, -8], [-33, 43]]);
-      path([[18, -43], [5, -9], [28, 43]]);
+      ctx.globalAlpha = 0.75;
+      path([[31, 23], [28, 30], [31, 33], [34, 30], [31, 23]]);
       ctx.restore();
-      for (const [x, y] of [[-25, -4], [-17, 16], [-8, 2], [-7, 24],
-        [4, -19], [12, -4], [22, 10], [31, -23], [15, 25]])
-        circle(x, y, 3.8, true);
       break;
     }
     case "flatten": {
@@ -166,26 +186,33 @@ export function drawMenuIcon(ctx, icon, color) {
       break;
     }
     case "contours": {
-      for (const [x, top] of [[-32, -21], [0, -40], [31, -14]]) {
-        path([[x, top + 5], [x, 34]]);
-        circle(x, top, 6, true);
-      }
-      for (const y of [2, 18, 34]) {
-        ctx.beginPath();
-        ctx.moveTo(-46, y);
-        ctx.bezierCurveTo(-21, y + 16, 10, y - 17, 46, y);
-        ctx.stroke();
-      }
+      path([[-44, 41], [44, 41]]);
+      ctx.save();
+      ctx.globalAlpha = 0.8;
+      ctx.lineWidth = 4;
+      for (const [x, top] of [[-32, -15], [0, -38], [32, -11]])
+        path([[x, top + 6], [x, 39]]);
+      ctx.restore();
+      ctx.beginPath();
+      ctx.moveTo(-46, -10);
+      ctx.bezierCurveTo(-26, -17, -15, -36, 0, -38);
+      ctx.bezierCurveTo(16, -39, 23, -10, 46, -7);
+      ctx.stroke();
+      for (const [x, y] of [[-32, -15], [0, -38], [32, -11]])
+        circle(x, y, 5.5, true);
       break;
     }
     case "slice": {
-      fillPath([[-35, -30], [28, -30], [0, 2], [-35, 25]], 0.28);
-      fillPath([[34, -23], [34, 27], [-15, 27], [9, 5]], 0.28);
-      path([[-35, -30], [28, -30], [0, 2], [-35, 25], [-35, -30]]);
-      path([[34, -23], [34, 27], [-15, 27], [9, 5]]);
-      ctx.strokeStyle = "#f1fbf6";
-      ctx.lineWidth = 6;
-      path([[-43, 43], [38, -43]]);
+      fillPath([[-30, -23], [23, -23], [23, 35], [-30, 35]], 0.24);
+      fillPath([[23, -23], [40, -39], [40, 19], [23, 35]], 0.38);
+      path([[-30, -23], [23, -23], [23, 35], [-30, 35]], true);
+      path([[-30, -23], [-13, -39], [40, -39], [23, -23]]);
+      path([[23, -23], [40, -39], [40, 19], [23, 35]]);
+      ctx.fillStyle = "#f1fbf6";
+      ctx.font = "bold 43px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("?", -3, 7);
       break;
     }
     default:
