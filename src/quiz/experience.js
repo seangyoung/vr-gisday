@@ -8,6 +8,8 @@ import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
 const ROUND_INFO_Z = -0.58;
+const INITIAL_ACTION_Z = 0.26;
+const NEXT_ACTION_Z = 0.23;
 const SABER_COLORS = {
   grip: 0x283a32,
   metal: 0x929d8d,
@@ -258,16 +260,17 @@ export class QuizExperience {
         tile.group.position.z = pose.z;
         tile.group.rotation.y = pose.yaw;
       }
-      this.addTarget("Erase", -0.55, -0.58, 0.48, 0.18, 0x6b5c82, () => {
+      const erase = this.addTarget("Erase", -0.55, -0.58, 0.48, 0.18, 0x6b5c82, () => {
         this.initials = this.initials.slice(0, -1);
         this.sound.click();
         this.render();
       });
+      erase.group.position.z = INITIAL_ACTION_Z;
       if (this.initials.length === 3)
         this.addTarget("Start", 0.55, -0.58, 0.48, 0.18, 0x3c9470, () =>
-          this.begin());
+          this.begin()).group.position.z = INITIAL_ACTION_Z;
       else this.addPanel("Slice three letters, then Start", 0.98, 0.15,
-        0.55, -0.58, { fontScale: 0.72 });
+        0.55, -0.58, { z: INITIAL_ACTION_Z, fontScale: 0.72 });
       return;
     }
     if (this.session.phase === "quit-paused") {
@@ -333,7 +336,7 @@ export class QuizExperience {
         this.sound.click();
         if (this.session.complete) this.submitScore();
         else this.render();
-      });
+      }).group.position.z = NEXT_ACTION_Z;
       return;
     }
     this.timerPanel = this.addRoundPanel("18 seconds", 0.95, 0.15, 0, 0.13,
