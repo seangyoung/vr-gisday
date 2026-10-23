@@ -175,6 +175,7 @@ export class QuizExperience {
     this.gisDayRows = [];
     this.submitted = false;
     this.feedbackRevealAt = 0;
+    this.exitAt = 0;
     this.disposed = false;
     this.render();
   }
@@ -276,8 +277,9 @@ export class QuizExperience {
         0, 0.22);
       this.addTarget("Continue", -0.45, -0.31, 0.72, 0.34, 0x2c836d,
         () => { this.session.resume(); this.render(); });
-      this.addTarget("Quit", 0.45, -0.31, 0.72, 0.34, 0x945862,
-        () => { this.session.quit(); this.onExit(); });
+      let exitTarget;
+      exitTarget = this.addTarget("Exit to Menu", 0.53, -0.31,
+        0.88, 0.34, 0x945862, () => this.exitAfterSlice(exitTarget));
       return;
     }
     if (this.session.phase === "complete") {
@@ -300,8 +302,9 @@ export class QuizExperience {
       this.addTarget("Play again", -0.50, -0.75, 0.78, 0.27, 0x2c836d,
         () => { this.session = null; this.initials = ""; this.submitted = false;
           this.leaderboardRows = []; this.gisDayRows = []; this.render(); });
-      this.addTarget("Menu", 0.50, -0.75, 0.78, 0.27, 0x685e9b,
-        () => this.onExit());
+      let exitTarget;
+      exitTarget = this.addTarget("Exit to Menu", 0.51, -0.75,
+        0.88, 0.27, 0x685e9b, () => this.exitAfterSlice(exitTarget));
       return;
     }
     const question = this.session.question;
@@ -365,6 +368,7 @@ export class QuizExperience {
   }
 
   requestQuit() {
+    if (this.exitAt) return;
     if (!this.session || this.session.complete) {
       this.onExit();
       return;
@@ -389,6 +393,13 @@ export class QuizExperience {
 
   clearMotion() {
     for (const blade of this.blades) blade.previous = null;
+  }
+
+  exitAfterSlice(target) {
+    target.group.visible = false;
+    this.targets = [];
+    this.exitAt = this.age + 1.05;
+    this.sound.slice(true);
   }
 
   split(target, cut = { point: { x: 0, y: 0 },
@@ -496,6 +507,13 @@ export class QuizExperience {
       }
     }
     if (!active) { this.clearMotion(); return; }
+    if (this.exitAt) {
+      if (this.age >= this.exitAt) {
+        this.exitAt = 0;
+        this.onExit();
+      } else this.updateBlades(dt, false);
+      return;
+    }
     if (this.feedbackRevealAt) {
       if (this.age < this.feedbackRevealAt) {
         this.updateBlades(dt, false);

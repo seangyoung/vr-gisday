@@ -31,10 +31,34 @@ test("four answer blocks share one row with space between them", () => {
     assert.ok(Math.abs(poses[index].x - expected) < 1e-10);
   for (let i = 1; i < poses.length; i++)
     assert.ok(poses[i].x - poses[i - 1].x > 0.49);
-  assert.ok(poses[0].yaw > 0 && poses[3].yaw < 0,
-    "the two outside faces turn inward toward the viewer");
-  assert.equal(poses[1].yaw, 0);
-  assert.equal(poses[2].yaw, 0);
+  assert.ok(poses[0].yaw > poses[1].yaw && poses[1].yaw > 0,
+    "left-side faces turn inward with a shallow arc");
+  assert.ok(poses[3].yaw < poses[2].yaw && poses[2].yaw < 0,
+    "right-side faces turn inward with a shallow arc");
+  assert.ok(Math.abs(poses[0].yaw) <= Math.PI / 9 &&
+    Math.abs(poses[3].yaw) <= Math.PI / 9,
+  "the outer blocks stay within a comfortable forward view");
+});
+
+test("a sliced exit block falls before the quiz returns to the menu", () => {
+  const quiz = Object.create(QuizExperience.prototype);
+  const target = { group: { visible: true } };
+  let exits = 0;
+  let slices = 0;
+  quiz.age = 3;
+  quiz.targets = [target];
+  quiz.fragments = [];
+  quiz.blades = [];
+  quiz.sound = { slice: () => { slices++; } };
+  quiz.onExit = () => { exits++; };
+  quiz.exitAfterSlice(target);
+  assert.equal(target.group.visible, false);
+  assert.equal(quiz.targets.length, 0);
+  assert.equal(slices, 1);
+  quiz.update(1);
+  assert.equal(exits, 0);
+  quiz.update(0.06);
+  assert.equal(exits, 1);
 });
 
 test("snap turns bring initials around while leaving the quiz panel in place", () => {
