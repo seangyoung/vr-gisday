@@ -135,7 +135,8 @@ let rangeAnimations = [];
 let animationAge = 0;
 let lastAnimatedRangeStep = null;
 let gnssDisplay = null;
-let gnssPart = null;
+let gnssSelection = null;
+let gnssPopup = null;
 let gnssPulseSent = false;
 let gnssClockCorrected = false;
 let gnssEnvironment = null;
@@ -153,7 +154,18 @@ const isSpatial = () => step >= 4 && step < GNSS_SPATIAL_END;
 const isGnssObject = () => step >= GNSS_SATELLITE && step <= GNSS_MULTIPATH;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase && !quiz;
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
+function clearGnssPopup() {
+  if (!gnssPopup) return;
+  gnssPopup.group.traverse((node) => {
+    node.geometry?.dispose();
+    node.material?.map?.dispose();
+    node.material?.dispose();
+  });
+  scene.remove(gnssPopup.group);
+  gnssPopup = null;
+}
 function clear() {
+  clearGnssPopup();
   gnssDisplay = null;
   clusterReadout = null;
   rangeAnimations = [];
@@ -392,7 +404,8 @@ function closeSoundMenu() {
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
   const visualRoots = [
-    root, floatingModel, rain?.group, scan?.group, scan?.clipboard, showcase?.model,
+    root, floatingModel, gnssPopup?.group, rain?.group, scan?.group,
+    scan?.clipboard, showcase?.model,
     quiz?.group, quiz?.letterField, quiz?.effects,
     ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
@@ -605,7 +618,7 @@ function start() {
   preservePose = null;
   step = -2;
   gnssPulseSent = false;
-  gnssPart = null;
+  gnssSelection = null;
   gnssClockCorrected = false;
   gnssEnvironment = null;
   gnssEnvironmentsSeen = new Set();
@@ -1680,6 +1693,7 @@ function next() {
           scale: floatingModel.scale.clone(),
         }
       : null;
+  if (step === GNSS_SATELLITE) gnssSelection = null;
   step++;
   draw();
   sound.cue(isSpatial() || isGnssObject() ? "reveal" : "measure");
@@ -1796,6 +1810,100 @@ function resetModelView() {
   );
   floatingModel.scale.setScalar(inspecting ? 0.66 : gnss ? 0.74 : 0.35);
 }
+function updateGnssPopupPose() {
+  if (!gnssPopup || !floatingModel || !gnssSelection) return;
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  cam.updateWorldMatrix(true, false);
+  floatingModel.updateWorldMatrix(true, true);
+  const anchor = floatingModel.localToWorld(gnssSelection.localPoint.clone());
+  const cameraPosition = cam.getWorldPosition(new THREE.Vector3());
+  const facing = cam.getWorldQuaternion(new THREE.Quaternion());
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(facing);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(facing);
+  const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(facing);
+  const fromEye = anchor.clone().sub(cameraPosition);
+  const depth = Math.max(0.6, fromEye.dot(forward));
+  const horizontal = fromEye.dot(right);
+  const bounds = gnssDisplay.craftBounds;
+  let modelTop = -Infinity;
+  for (const x of [bounds.min.x, bounds.max.x])
+    for (const y of [bounds.min.y, bounds.max.y])
+      for (const z of [bounds.min.z, bounds.max.z])
+        modelTop = Math.max(modelTop,
+          floatingModel.localToWorld(new THREE.Vector3(x, y, z)).dot(up));
+  const lift = Math.max(0.28, modelTop - anchor.dot(up) + 0.18);
+  const side = horizontal >= 0 ? 1 : -1;
+  const halfView = Math.max(0.55,
+    depth / Math.max(0.65, Math.abs(cam.projectionMatrix.elements[0])) * 0.9 - 0.35);
+  const popupX = THREE.MathUtils.clamp(horizontal + side * 0.46,
+    -halfView, halfView);
+  const position = anchor.clone()
+    .addScaledVector(right, popupX - horizontal)
+    .addScaledVector(up, lift)
+    .addScaledVector(cameraPosition.clone().sub(anchor).normalize(), 0.06);
+  gnssPopup.panel.position.copy(position);
+  gnssPopup.panel.quaternion.copy(facing);
+  gnssPopup.marker.position.copy(anchor);
+  const end = position.clone().addScaledVector(right, -side * 0.32)
+    .addScaledVector(up, -0.05);
+  const vertices = gnssPopup.leader.geometry.attributes.position;
+  vertices.setXYZ(0, anchor.x, anchor.y, anchor.z);
+  vertices.setXYZ(1, end.x, end.y, end.z);
+  vertices.needsUpdate = true;
+}
+function showGnssPopup() {
+  if (!gnssSelection) return;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 400;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0b2430";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = "#a6f5d9";
+  ctx.lineWidth = 8;
+  ctx.strokeRect(5, 5, 1014, 390);
+  const [title, detail] = gnssSelection.text.split(" · ");
+  ctx.fillStyle = "#a6f5d9";
+  ctx.font = "600 65px system-ui, sans-serif";
+  ctx.fillText(title, 55, 110, 915);
+  ctx.fillStyle = "#e6f4f5";
+  ctx.font = "500 48px system-ui, sans-serif";
+  let line = "";
+  let lineIndex = 0;
+  for (const word of detail.split(" ")) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (line && ctx.measureText(candidate).width > 900) {
+      ctx.fillText(line, 55, 210 + lineIndex * 66);
+      line = word;
+      lineIndex++;
+    } else line = candidate;
+  }
+  if (line) ctx.fillText(line, 55, 210 + lineIndex * 66, 900);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const group = new THREE.Group();
+  const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.27),
+    new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide,
+      depthTest: false, depthWrite: false }));
+  panel.renderOrder = 21;
+  const leader = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(), new THREE.Vector3(),
+    ]),
+    new THREE.LineBasicMaterial({ color: 0xa6f5d9,
+      depthTest: false, depthWrite: false }),
+  );
+  leader.renderOrder = 20;
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(0.014, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffffff,
+      depthTest: false, depthWrite: false }));
+  marker.renderOrder = 22;
+  group.add(panel, leader, marker);
+  group.visible = !soundMenuOpen;
+  scene.add(group);
+  gnssPopup = { group, panel, leader, marker };
+  updateGnssPopupPose();
+}
 function gnssObject() {
   gnssDisplay = new GnssScene(step, {
     clockCorrected: gnssClockCorrected,
@@ -1811,6 +1919,7 @@ function gnssObject() {
     floatingModel.scale.copy(preservePose.scale);
     preservePose = null;
   }
+  if (step === GNSS_SATELLITE) showGnssPopup();
 }
 function keepGnssPose() {
   if (!floatingModel) return;
@@ -1821,9 +1930,12 @@ function keepGnssPose() {
   };
 }
 function inspectGnssPart(ray) {
-  const part = gnssDisplay?.pickPart(ray);
-  if (!part) return false;
-  gnssPart = part;
+  const picked = gnssDisplay?.pickPart(ray);
+  if (!picked) return false;
+  gnssSelection = {
+    text: picked.text,
+    localPoint: floatingModel.worldToLocal(picked.point),
+  };
   keepGnssPose();
   draw();
   sound.cue("measure");
@@ -2422,8 +2534,6 @@ function drawScene() {
     gnssObject();
     lessonCard(s.title, s.body);
     if (step === GNSS_SATELLITE) {
-      label(gnssPart ?? "Point at the wings, body, or antenna and press a trigger.",
-        0, GUIDED_INFO_Y, 2.35, 0.13, 30, "#b6d1d9", "#0b2430");
       button(s.action, 0, GUIDED_ACTION_Y, next, 1.55);
     }
     if (step === GNSS_SIGNAL) {
@@ -3232,6 +3342,7 @@ renderer.setAnimationLoop((time, frame) => {
     : 0;
   sound.setLandscape(!!(audible && landscapeAudioDemo), riverLevel,
     landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0);
+  updateGnssPopupPose();
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {

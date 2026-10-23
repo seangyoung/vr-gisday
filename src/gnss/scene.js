@@ -118,6 +118,7 @@ export class GnssScene {
     this.craft = satellite(this.group, this.satellitePoint,
       stage === GNSS_SATELLITE ? 1.25 :
         stage === GNSS_CLOCK ? 0.32 : stage === GNSS_MULTIPATH ? 0.65 : 0.9);
+    this.craftBounds = new THREE.Box3().setFromObject(this.craft);
     if (stage === GNSS_SATELLITE) {
       const halo = mesh(this.group, new THREE.SphereGeometry(0.67, 24, 16),
         teal, this.satellitePoint.clone(), { opacity: 0.055 });
@@ -223,8 +224,9 @@ export class GnssScene {
   pickPart(raycaster) {
     if (this.stage !== GNSS_SATELLITE) return null;
     this.group.updateWorldMatrix(true, true);
-    return raycaster.intersectObject(this.craft, true)
-      .find((hit) => hit.object.userData.gnssPart)?.object.userData.gnssPart ?? null;
+    const hit = raycaster.intersectObject(this.craft, true)
+      .find((candidate) => candidate.object.userData.gnssPart);
+    return hit ? { text: hit.object.userData.gnssPart, point: hit.point.clone() } : null;
   }
   hitSurface(raycaster) {
     this.group.updateWorldMatrix(true, true);

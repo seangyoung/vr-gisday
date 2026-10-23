@@ -78,7 +78,10 @@ test("GNSS pointer reaches spacecraft through the decorative radio halo", async 
   const display = new GnssScene(GNSS_SATELLITE);
   const ray = new Raycaster(new Vector3(-0.13, 0.3, 3),
     new Vector3(0, 0, -1));
-  assert.match(display.pickPart(ray), /Clock & radio/);
+  const picked = display.pickPart(ray);
+  assert.match(picked.text, /Clock & radio/);
+  assert.ok(picked.point.distanceTo(ray.ray.origin) > 2.5,
+    "inspection callout anchors to the spacecraft surface");
   const hit = display.hitSurface(ray);
   assert.ok(hit && hit.distance > 2.5, "ray reaches the spacecraft behind halo");
   assert.ok(hit.object.userData.gnssPart);
