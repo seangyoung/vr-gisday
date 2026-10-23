@@ -16,7 +16,16 @@ import {
   OUTLET_A,
   OUTLET_B,
 } from "./terrain.js";
-const COLORS = { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff };
+export const BASIN_PALETTES = [
+  { name: "Coast", colors: { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff },
+    labels: { A: "blue", B: "gold", sink: "purple" } },
+  { name: "Coral", colors: { A: 0x5ac6e8, B: 0xff9e8c, sink: 0xdfb7f2 },
+    labels: { A: "blue", B: "coral", sink: "lavender" } },
+  { name: "Meadow", colors: { A: 0x53d9a3, B: 0xe9a3e8, sink: 0xffce72 },
+    labels: { A: "green", B: "pink", sink: "amber" } },
+  { name: "Contrast", colors: { A: 0x6298ff, B: 0xffd461, sink: 0xe684bf },
+    labels: { A: "blue", B: "yellow", sink: "magenta" } },
+];
 export class RainExperience {
   constructor(scene, onChange, kind = "drainage", onEvent = () => {}) {
     this.kind = kind;
@@ -44,6 +53,8 @@ export class RainExperience {
     this.trees = [];
     this.elapsed = 0;
     this.overlay = false;
+    this.paletteIndex = 0;
+    this.outletMeshes = [];
     this.answer = null;
     this.counts = { A: 0, B: 0, sink: 0 };
     this.source = this.cellAt(-0.45, -0.3);
@@ -195,11 +206,12 @@ export class RainExperience {
         name === "A"
           ? new THREE.CylinderGeometry(0.16, 0.16, 0.025, 32)
           : new THREE.BoxGeometry(0.3, 0.025, 0.25),
-        new THREE.MeshBasicMaterial({ color: COLORS[name] }),
+        new THREE.MeshBasicMaterial({ color: this.basinColor(name) }),
       );
       basin.position.set(p.x, p.y + 0.005, 1.07);
       this.group.add(basin);
-      const caption = this.text(`OUTLET ${name}`, COLORS[name]);
+      this.outletMeshes.push({ name, mesh: basin });
+      const caption = this.text(`OUTLET ${name}`, 0xe6f4f5);
       caption.position.set(p.x, 0.13, 1.27);
       this.group.add(caption);
     }
@@ -226,10 +238,7 @@ export class RainExperience {
       this.group.add(tree);
     }
     this.cloud = new THREE.Group();
-    const cloudMat = new THREE.MeshStandardMaterial({
-      color: 0xf4fbff,
-      roughness: 1,
-    });
+    const cloudMat = new THREE.MeshBasicMaterial({ color: 0xe7f6ff });
     for (const [x, y, r] of [
       [-0.1, 0, 0.1],
       [0, 0.045, 0.125],
@@ -240,16 +249,6 @@ export class RainExperience {
       this.cloud.add(m);
     }
     this.group.add(this.cloud);
-    if (this.kind === "erosion") {
-      this.cloud.visible = false;
-      const pipe = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.025, 0.025, 1.5, 12),
-        new THREE.MeshStandardMaterial({ color: 0x70b9c9 }),
-      );
-      pipe.rotation.z = Math.PI / 2;
-      pipe.position.set(0, 1.14, -0.8);
-      this.group.add(pipe);
-    }
     this.marker = new THREE.Mesh(
       new THREE.TorusGeometry(0.055, 0.014, 8, 28),
       new THREE.MeshBasicMaterial({ color: 0xffe28a }),
@@ -434,7 +433,7 @@ export class RainExperience {
     this.clearTrails();
     this.overlay = false;
     this.divide.visible = false;
-    this.cloud.visible = mode === "rain" && this.kind !== "erosion";
+    this.cloud.visible = mode === "rain";
     this.brush.visible = false;
     this.paint();
     this.onChange();
@@ -723,7 +722,7 @@ export class RainExperience {
     this.mode = "rain";
     this.overlay = false;
     this.brush.visible = false;
-    this.cloud.visible = this.kind !== "erosion";
+    this.cloud.visible = true;
     if (this.originalBed) this.refreshOriginalBed();
     this.paint();
     if (notify) this.onChange();
@@ -761,13 +760,29 @@ export class RainExperience {
     this.group.add(obj);
     return obj;
   }
+  get palette() {
+    return BASIN_PALETTES[this.paletteIndex];
+  }
+  basinColor(name) {
+    return this.palette.colors[name] ?? this.palette.colors.sink;
+  }
+  nextPalette() {
+    if (this.kind !== "drainage") return;
+    this.paletteIndex = (this.paletteIndex + 1) % BASIN_PALETTES.length;
+    for (const { name, mesh } of this.outletMeshes)
+      mesh.material.color.setHex(this.basinColor(name));
+    for (const trail of this.trails)
+      trail.material.color.setHex(this.basinColor(trail.userData.basin));
+    this.paint();
+    this.onChange();
+  }
   paint(displayHeights = this.heights, displayVegetation = this.vegetation) {
     const attr = this.terrain.geometry.getAttribute("color");
     const low = new THREE.Color(this.kind === "erosion" ? 0x805331 : 0x396d4b),
       high = new THREE.Color(this.kind === "erosion" ? 0xe8c78b : 0xb8bd75);
     for (let id = 0; id < this.size * this.size; id++) {
       const c = this.overlay
-        ? new THREE.Color(COLORS[this.basins[id]]).multiplyScalar(0.65)
+        ? new THREE.Color(this.basinColor(this.basins[id])).multiplyScalar(0.82)
         : low
             .clone()
             .lerp(high, Math.min(1, cellPoint(id, displayHeights).y / 0.8));
@@ -799,7 +814,7 @@ export class RainExperience {
   setSource(id) {
     this.source = id;
     const p = cellPoint(id, this.heights);
-    this.cloud.position.set(p.x, p.y + 0.4, p.z);
+    this.cloud.position.set(p.x, p.y + (this.kind === "erosion" ? 0.65 : 0.4), p.z);
   }
   aim(world) {
     if (this.stage !== 1) return;
@@ -876,7 +891,7 @@ export class RainExperience {
     this.endStroke();
     this.mode = "rain";
     this.brush.visible = false;
-    this.cloud.visible = this.kind !== "erosion";
+    this.cloud.visible = true;
     this.stage = 4;
     this.group.visible = false;
     this.playback = 0;
@@ -925,6 +940,7 @@ export class RainExperience {
     this.replayTime = 0;
     this.replayFrameIndex = -1;
     this.group.visible = true;
+    this.cloud.visible = false;
     this.waterSurface.mesh.visible = false;
     this.originalBed.visible = false;
     this.onEvent("reveal");
@@ -938,7 +954,7 @@ export class RainExperience {
     if (this.stage === 4) {
       this.grab.cancel();
       this.group.visible = false;
-    }
+    } else this.cloud.visible = true;
     this.showReplayFrame(this.heights);
     if (this.waterSurface) this.waterSurface.update(this.heights, this.water);
     this.onChange();
@@ -975,8 +991,9 @@ export class RainExperience {
       this.kind !== "erosion" &&
       !this.trails.some((t) => t.userData.cell === id)
     ) {
-      const trail = this.line(points.slice(1), COLORS[this.basins[id]], 0.9);
+      const trail = this.line(points.slice(1), this.basinColor(this.basins[id]), 0.9);
       trail.userData.cell = id;
+      trail.userData.basin = this.basins[id];
       this.trails.push(trail);
       if (this.trails.length > 12) {
         const old = this.trails.shift();

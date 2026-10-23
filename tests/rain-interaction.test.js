@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { RainExperience } from "../src/rain/experience.js";
+import { BASIN_PALETTES, RainExperience } from "../src/rain/experience.js";
 import { createHeights, cellAt } from "../src/rain/terrain.js";
 // Only text sprites need a canvas; geometry and controller motion use real Three.js.
 globalThis.document = {
@@ -108,9 +108,31 @@ test("erosion tray has a visible base and corners with translucent soil sides", 
   assert.equal(r.soilCorners.length, 4);
   assert.equal(r.soilWalls.material.transparent, true);
   assert.ok(r.soilWalls.material.opacity < 0.8);
+  assert.equal(r.cloud.visible, true, "left-hand rain target has a visible cloud");
+  const source = r.cellAt(0.3, -0.4);
+  r.setSource(source);
+  assert.ok(r.cloud.position.y > r.heights[source] + 0.6);
   r.group.rotation.x = 0;
   r.place(camera);
   assert.ok(r.group.rotation.x > 0.45);
+  r.dispose();
+});
+
+test("basin palette changes recolor terrain, outlets, and existing runoff paths", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {});
+  r.explore();
+  r.toggleOverlay();
+  const source = r.basins.findIndex((name) => name === "A");
+  r.emit(source);
+  const before = r.terrain.geometry.attributes.color.array.slice(source * 3, source * 3 + 3);
+  r.nextPalette();
+  assert.equal(r.palette.name, BASIN_PALETTES[1].name);
+  assert.notDeepEqual([...r.terrain.geometry.attributes.color.array.slice(source * 3, source * 3 + 3)], [...before]);
+  assert.equal(r.outletMeshes.find((item) => item.name === "A").mesh.material.color.getHex(),
+    r.palette.colors.A);
+  assert.equal(r.trails[0].material.color.getHex(), r.palette.colors.A);
+  for (let i = 1; i < BASIN_PALETTES.length; i++) r.nextPalette();
+  assert.equal(r.palette.name, BASIN_PALETTES[0].name);
   r.dispose();
 });
 

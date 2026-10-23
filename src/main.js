@@ -1592,6 +1592,7 @@ function drawRainChooserUI() {
 }
 function drawRainUI() {
   const r = rain;
+  const basinLabels = r.palette.labels;
   if (r.stage === 0) {
     drawRainChooserUI();
     return;
@@ -1645,7 +1646,9 @@ function drawRainUI() {
     label(
       `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"}\nGrip: move/size · Grip + stick: turn 45°\n${r.kind === "erosion"
         ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Green cover protects soil; bare patches erode faster."
-        : r.overlay ? "Blue and gold mark the two drainage basins." : "Runoff follows slope; ridges divide basins."}`,
+        : r.overlay
+          ? `${basinLabels.A} and ${basinLabels.B} mark the two drainage basins.`
+          : "Runoff follows slope; ridges divide basins."}`,
       0, GUIDED_INFO_Y, 2.3, 0.22, 29, "#e6f4f5", "#0b2430",
     );
   else lessonCard(title, body);
@@ -1661,12 +1664,14 @@ function drawRainUI() {
         0.42, r.brushTool === "vegetation");
       button("Takeaway", 0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.42);
     } else {
-      button("Reset terrain", -0.59, GUIDED_ACTION_Y,
-        () => { stopRainInput(); r.restore(); }, 0.66);
-      button(r.overlay ? "Hide basins" : "Show basins", 0.08, GUIDED_ACTION_Y,
-        () => r.toggleOverlay(), 0.59);
-      button(r.edited ? "Takeaways" : "Prediction", 0.68, GUIDED_ACTION_Y,
-        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.55);
+      button("Reset terrain", -0.88, GUIDED_ACTION_Y,
+        () => { stopRainInput(); r.restore(); }, 0.51);
+      button(r.overlay ? "Hide basins" : "Show basins", -0.29, GUIDED_ACTION_Y,
+        () => r.toggleOverlay(), 0.51);
+      button(`Colors: ${r.palette.name}`, 0.29, GUIDED_ACTION_Y,
+        () => r.nextPalette(), 0.51);
+      button(r.edited ? "Takeaways" : "Prediction", 0.88, GUIDED_ACTION_Y,
+        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.51);
     }
   }
   if (r.stage === 2) {
@@ -1711,9 +1716,9 @@ function drawRainUI() {
           ? "Time-lapse: saved bed shapes · Water paused · Live returns to experiment"
           : `Dark: cut · Pale: deposits · ${r.terrainChange.changed} cells changed · Replay after pouring`
         : r.overlay && r.edited
-          ? "Blue: A · Gold: B · Purple: pond catchments · Cyan: stored water"
+          ? `${basinLabels.A}: A · ${basinLabels.B}: B · ${basinLabels.sink}: pond catchments · cyan: stored water`
           : r.overlay
-            ? "A: blue / round outlet    ·    B: gold / square outlet"
+            ? `A: ${basinLabels.A} / round outlet    ·    B: ${basinLabels.B} / square outlet`
             : "Surface-flow model · Follow paths and pond overflow",
       0,
       GUIDED_INFO_Y,
