@@ -2,11 +2,11 @@ import * as THREE from "three";
 
 export const PLATFORMS = [
   { id: "satellite", label: "Satellite", name: "Landsat satellite",
-    note: "Revisits wide regions in several light bands." },
+    note: "Wide, repeatable coverage builds a long record of change.\nClouds and the orbit set when a clear view is available." },
   { id: "aircraft", label: "Aircraft", name: "Survey aircraft",
-    note: "Planned flight lines map a city or region." },
+    note: "Planned flights carry specialized sensors over a city or region.\nFlights can be timed and tailored, but require a campaign." },
   { id: "drone", label: "Drone", name: "Camera drone",
-    note: "Close flights show local detail over a small site." },
+    note: "Close, flexible flights reveal fine detail at a local site.\nBattery life and flight rules limit the area covered." },
 ];
 
 const basic = (color, extras = {}) => new THREE.MeshStandardMaterial({
@@ -27,46 +27,85 @@ function cylinder(parent, top, bottom, height, position, material, sides = 12) {
   return mesh;
 }
 
-function satellite(parent, white, blue, lens) {
-  box(parent, [0.17, 0.17, 0.15], [0, 0, 0], white);
+function rod(parent, start, end, radius, material) {
+  const a = new THREE.Vector3(...start);
+  const b = new THREE.Vector3(...end);
+  const mesh = cylinder(parent, radius, radius, a.distanceTo(b),
+    a.clone().add(b).multiplyScalar(0.5).toArray(), material, 8);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0),
+    b.sub(a).normalize());
+  return mesh;
+}
+
+function satellite(parent, white, blue, lens, gold, dark) {
+  // Landsat-like bus, segmented solar wings, nadir-facing imager, and antenna.
+  box(parent, [0.17, 0.18, 0.17], [0, 0, 0], gold);
+  box(parent, [0.14, 0.12, 0.17], [0, 0.015, -0.004], white);
   for (const side of [-1, 1]) {
-    box(parent, [0.25, 0.012, 0.17], [side * 0.23, 0.01, 0], blue);
-    box(parent, [0.03, 0.018, 0.18], [side * 0.23, 0.022, 0], white);
+    rod(parent, [side * 0.085, 0, 0], [side * 0.16, 0, 0], 0.009, dark);
+    for (let panel = 0; panel < 2; panel++) {
+      const x = side * (0.225 + panel * 0.145);
+      box(parent, [0.13, 0.19, 0.008], [x, 0, 0], dark);
+      for (let row = -1; row <= 1; row++)
+        box(parent, [0.119, 0.048, 0.002], [x, row * 0.059, 0.005], blue);
+      box(parent, [0.007, 0.205, 0.011], [x + side * 0.068, 0, 0], white);
+    }
   }
-  cylinder(parent, 0.055, 0.055, 0.08, [0, -0.13, 0], lens);
-  cylinder(parent, 0.014, 0.014, 0.14, [0, 0.15, 0], white);
-  const dish = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.055, 16), white);
-  dish.position.y = 0.24;
+  cylinder(parent, 0.063, 0.075, 0.095, [0, -0.135, 0], white, 16);
+  cylinder(parent, 0.052, 0.052, 0.008, [0, -0.187, 0], lens, 16);
+  rod(parent, [0, 0.09, 0], [0, 0.205, 0], 0.008, white);
+  const dish = new THREE.Mesh(new THREE.ConeGeometry(0.074, 0.04, 18), white);
+  dish.rotation.z = Math.PI;
+  dish.position.y = 0.215;
   parent.add(dish);
 }
 
-function aircraft(parent, white, blue, lens) {
-  const body = cylinder(parent, 0.046, 0.055, 0.41, [0, 0, 0], white);
-  body.rotation.x = Math.PI / 2;
-  box(parent, [0.54, 0.018, 0.095], [0, 0.01, -0.01], blue);
-  box(parent, [0.23, 0.018, 0.055], [0, 0.04, 0.19], white);
-  box(parent, [0.018, 0.12, 0.07], [0, 0.08, 0.18], white);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.046, 0.1, 14), white);
-  nose.rotation.x = Math.PI / 2;
-  nose.position.z = -0.25;
+function aircraft(parent, white, blue, lens, gold, dark) {
+  const fuselage = new THREE.Mesh(new THREE.CapsuleGeometry(0.047, 0.34, 5, 10), white);
+  fuselage.rotation.x = Math.PI / 2;
+  parent.add(fuselage);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.095, 14), white);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -0.253;
   parent.add(nose);
-  cylinder(parent, 0.035, 0.035, 0.045, [0, -0.085, -0.03], lens);
+  const wing = box(parent, [0.59, 0.018, 0.12], [0, 0.045, -0.02], blue);
+  wing.rotation.z = -0.018;
+  for (const side of [-1, 1]) {
+    box(parent, [0.11, 0.003, 0.014], [side * 0.215, 0.056, -0.065], gold);
+    rod(parent, [side * 0.18, 0.038, -0.02],
+      [side * 0.044, -0.055, 0.02], 0.005, white);
+    box(parent, [0.12, 0.011, 0.068], [side * 0.12, 0.018, 0.196], blue);
+  }
+  box(parent, [0.018, 0.095, 0.075], [0, 0.067, 0.195], blue);
+  box(parent, [0.072, 0.02, 0.065], [0, 0.022, -0.128], dark);
+  cylinder(parent, 0.027, 0.032, 0.03, [0, -0.064, -0.012], lens);
+  rod(parent, [0, 0, -0.302], [0, 0.123, -0.302], 0.004, dark);
+  rod(parent, [-0.073, 0.061, -0.302], [0.073, 0.061, -0.302], 0.004, dark);
 }
 
-function drone(parent, white, blue, lens) {
-  box(parent, [0.15, 0.06, 0.14], [0, 0, 0], white);
+function drone(parent, white, blue, lens, gold, dark) {
+  box(parent, [0.17, 0.055, 0.12], [0, 0, 0], white);
+  box(parent, [0.09, 0.009, 0.07], [0, 0.034, 0], gold);
   const rotors = [];
   for (const x of [-0.18, 0.18]) for (const z of [-0.18, 0.18]) {
-    const arm = box(parent, [0.23, 0.018, 0.022], [x / 2, 0.015, z / 2], blue);
-    arm.rotation.y = Math.atan2(z, x);
-    cylinder(parent, 0.028, 0.028, 0.04, [x, 0.035, z], white);
-    const rotor = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.006, 6, 24), blue);
-    rotor.rotation.x = Math.PI / 2;
-    rotor.position.set(x, 0.066, z);
+    rod(parent, [Math.sign(x) * 0.045, 0, Math.sign(z) * 0.035],
+      [x, 0.038, z], 0.012, blue);
+    cylinder(parent, 0.027, 0.027, 0.035, [x, 0.055, z], dark);
+    const rotor = new THREE.Group();
+    rotor.position.set(x, 0.078, z);
+    box(rotor, [0.15, 0.003, 0.014], [0, 0, 0], white);
+    box(rotor, [0.014, 0.003, 0.15], [0, 0, 0], white);
+    cylinder(rotor, 0.017, 0.017, 0.007, [0, 0.004, 0], gold);
     parent.add(rotor);
     rotors.push(rotor);
   }
-  cylinder(parent, 0.04, 0.04, 0.045, [0, -0.075, -0.04], lens);
+  for (const side of [-1, 1]) {
+    rod(parent, [side * 0.07, -0.02, -0.065], [side * 0.09, -0.11, -0.07], 0.006, dark);
+    rod(parent, [side * 0.07, -0.02, 0.065], [side * 0.09, -0.11, 0.07], 0.006, dark);
+    rod(parent, [side * 0.09, -0.11, -0.095], [side * 0.09, -0.11, 0.095], 0.006, dark);
+  }
+  cylinder(parent, 0.027, 0.027, 0.025, [0, -0.075, -0.035], dark);
+  cylinder(parent, 0.037, 0.037, 0.043, [0, -0.105, -0.035], lens);
   parent.userData.rotors = rotors;
 }
 
@@ -77,8 +116,11 @@ export function makePlatformComparison() {
   sun.position.set(-1, 2, 1);
   group.add(sun);
   const white = basic(0xd6e7e9);
-  const blue = basic(0x426b83, { metalness: 0.4 });
+  const blue = basic(0x558eaa, { metalness: 0.32, emissive: 0x133849,
+    emissiveIntensity: 0.5 });
   const lens = basic(0x193c44, { emissive: 0x164b58 });
+  const gold = basic(0xc4a66b, { metalness: 0.54 });
+  const dark = basic(0x253a44, { metalness: 0.35 });
   const items = [];
   const pickTargets = [];
   for (const [index, info] of PLATFORMS.entries()) {
@@ -88,9 +130,9 @@ export function makePlatformComparison() {
     const model = new THREE.Group();
     model.position.set(x, altitude, 0.09);
     group.add(model);
-    if (info.id === "satellite") satellite(model, white, blue, lens);
-    else if (info.id === "aircraft") aircraft(model, white, blue, lens);
-    else drone(model, white, blue, lens);
+    if (info.id === "satellite") satellite(model, white, blue, lens, gold, dark);
+    else if (info.id === "aircraft") aircraft(model, white, blue, lens, gold, dark);
+    else drone(model, white, blue, lens, gold, dark);
     const footprint = new THREE.Mesh(
       new THREE.CircleGeometry(radius, 36),
       new THREE.MeshBasicMaterial({ color: 0x346d69, side: THREE.DoubleSide }),

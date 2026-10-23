@@ -82,7 +82,74 @@ function indexCanvas(falsePixels, width, height) {
   return canvas;
 }
 
-function sceneCanvas(base, sample, width, height) {
+function spectrumCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 410;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#102c37";
+  ctx.fillRect(0, 0, 1024, 410);
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#dceff0";
+  ctx.font = "bold 32px system-ui";
+  ctx.fillText("Electromagnetic radiation: energy carried by waves", 512, 56);
+  ctx.font = "21px system-ui";
+  ctx.fillStyle = "#b6d1d9";
+  ctx.fillText("Example wavelength ranges from Landsat 8", 512, 92);
+  const bands = [
+    { label: "Blue", range: "0.45–0.51 µm", color: "#4d83d0" },
+    { label: "Green", range: "0.53–0.59 µm", color: "#51b97a" },
+    { label: "Red", range: "0.64–0.67 µm", color: "#dd6663" },
+    { label: "Near infrared", range: "0.85–0.88 µm", color: "#b55f85" },
+  ];
+  bands.forEach((band, index) => {
+    const x = 62 + index * 240;
+    ctx.fillStyle = band.color;
+    ctx.fillRect(x, 123, 218, 100);
+    ctx.strokeStyle = "#e4f4ef";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, 123, 218, 100);
+    ctx.fillStyle = "#e6f4f5";
+    ctx.font = "bold 26px system-ui";
+    ctx.fillText(band.label, x + 109, 275);
+    ctx.font = "22px system-ui";
+    ctx.fillStyle = "#b6d1d9";
+    ctx.fillText(band.range, x + 109, 309);
+  });
+  ctx.fillStyle = "#b6d1d9";
+  ctx.font = "23px system-ui";
+  ctx.fillText("Visible to human eyes", 400, 364);
+  ctx.fillText("Recorded by a sensor", 891, 364);
+  return canvas;
+}
+
+function drawIndexLegend(ctx, width, height) {
+  const scale = Math.min(width / 960, height / 540);
+  const x = 18 * scale;
+  const y = height - 111 * scale;
+  const w = 430 * scale;
+  const h = 94 * scale;
+  ctx.fillStyle = "rgba(10, 34, 42, 0.94)";
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = "#f1f8f4";
+  ctx.textAlign = "left";
+  ctx.font = `bold ${24 * scale}px system-ui`;
+  ctx.fillText("NDVI color key", x + 14 * scale, y + 31 * scale);
+  const ramp = ctx.createLinearGradient(x + 14 * scale, 0, x + (w / scale - 14) * scale, 0);
+  ramp.addColorStop(0, "#254e74");
+  ramp.addColorStop(0.32, "#ae996f");
+  ramp.addColorStop(0.65, "#78a95d");
+  ramp.addColorStop(1, "#1d6540");
+  ctx.fillStyle = ramp;
+  ctx.fillRect(x + 14 * scale, y + 39 * scale, w - 28 * scale, 17 * scale);
+  ctx.font = `${18 * scale}px system-ui`;
+  ctx.fillStyle = "#e6f4f5";
+  ctx.fillText("Water / low", x + 14 * scale, y + 81 * scale);
+  ctx.textAlign = "right";
+  ctx.fillText("Stronger vegetation signal", x + w - 14 * scale, y + 81 * scale);
+}
+
+function sceneCanvas(base, sample, width, height, mode) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -99,6 +166,7 @@ function sceneCanvas(base, sample, width, height) {
   ctx.moveTo(x + 11, y);
   ctx.lineTo(x + 18, y);
   ctx.stroke();
+  if (mode === "index") drawIndexLegend(ctx, width, height);
   return canvas;
 }
 
@@ -132,12 +200,11 @@ function graphCanvas(bands, mode, ready) {
   ctx.textAlign = "center";
   ctx.font = "19px system-ui";
   ctx.fillText(mode === "false" ? "Display: NIR → R, red → G, green → B"
-    : mode === "index" ? "Index preview: NIR vs. red" : "Display: visible red, green, blue",
+    : mode === "index" ? "NDVI compares NIR and red" : "Display: visible red, green, blue",
   210, 495, 405);
   ctx.fillStyle = "#b6d1d9";
   ctx.font = "17px system-ui";
-  ctx.fillText(mode === "index" ? "Real NDVI needs calibrated reflectance" :
-    "Display brightness, not calibrated reflectance", 210, 532, 405);
+  ctx.fillText("Compare the bands at your chosen place", 210, 532, 405);
   return canvas;
 }
 
@@ -160,14 +227,16 @@ export class SpectralExperience extends TimedExhibit {
       1.58, 0.89, -0.39, 0.32);
     this.graph = canvasPanel(graphCanvas(this.bands, this.mode, false),
       0.89, 1.18, 0.86, 0.23);
+    this.spectrum = canvasPanel(spectrumCanvas(), 2.35, 0.94, 0, 0.12);
     this.image.visible = false;
     this.graph.visible = false;
+    this.spectrum.visible = false;
     const comparison = makePlatformComparison();
     this.platformGroup = comparison.group;
     this.platformItems = comparison.items;
     this.platformHits = comparison.pickTargets;
     highlightPlatform(this.platformItems, this.platform);
-    this.group.add(this.image, this.graph, this.platformGroup);
+    this.group.add(this.image, this.graph, this.platformGroup, this.spectrum);
     this.loadScene();
     for (const scene of SPECTRAL_SCENES.slice(1))
       this.getSceneData(scene).catch(() => {});
@@ -260,6 +329,8 @@ export class SpectralExperience extends TimedExhibit {
         item.model.rotation.y += dt * (item.id === "drone" ? 0.52 : 0.2);
         item.cone.material.opacity = item.id === this.platform
           ? 0.17 + 0.045 * Math.sin(this.elapsed * 3) : 0.055;
+        for (const rotor of item.model.userData.rotors || [])
+          rotor.rotation.y += dt * 10;
       }
     if (this.finished) this.group.visible = false;
   }
@@ -270,10 +341,17 @@ export class SpectralExperience extends TimedExhibit {
     highlightPlatform(this.platformItems, platform);
     this.onChange();
   }
-  showBands() {
+  showSpectrum() {
     if (!this.started || this.finished || this.phase !== "platforms") return;
-    this.phase = "bands";
+    this.phase = "spectrum";
     this.platformGroup.visible = false;
+    this.spectrum.visible = true;
+    this.onChange();
+  }
+  showBands() {
+    if (!this.started || this.finished || this.phase !== "spectrum") return;
+    this.phase = "bands";
+    this.spectrum.visible = false;
     this.image.visible = true;
     this.graph.visible = true;
     this.onChange();
@@ -293,7 +371,7 @@ export class SpectralExperience extends TimedExhibit {
       this.selectPlatform(hit.object.userData.platform);
       return true;
     }
-    if (!this.ready) return false;
+    if (this.phase !== "bands" || !this.ready) return false;
     this.image.updateWorldMatrix(true, false);
     const hit = raycaster.intersectObject(this.image, false)[0];
     if (!hit?.uv) return false;
@@ -310,7 +388,7 @@ export class SpectralExperience extends TimedExhibit {
       this.pixels.natural.subarray(i, i + 4),
       this.pixels.false.subarray(i, i + 4));
     replacePanelTexture(this.image,
-      sceneCanvas(this.sources[this.mode], this.sample, width, height));
+      sceneCanvas(this.sources[this.mode], this.sample, width, height, this.mode));
     replacePanelTexture(this.graph, graphCanvas(this.bands, this.mode, true));
     if (this.started) this.onChange();
   }

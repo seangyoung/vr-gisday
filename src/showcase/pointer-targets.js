@@ -6,6 +6,7 @@ export function exhibitPanelHit(raycaster, exhibit) {
     exhibit.platformGroup.updateWorldMatrix(true, true);
     return raycaster.intersectObjects(exhibit.platformHits, false)[0] ?? null;
   }
+  if (exhibit.kind === "spectral" && exhibit.phase !== "bands") return null;
   const targets = exhibit.kind === "projection"
     ? [exhibit.globe, exhibit.map]
     : [exhibit.image ?? exhibit.map];

@@ -1214,7 +1214,7 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Remote sensing collects information from a distance.\nSatellites, aircraft, and drones carry imaging sensors.\nSome record sunlight; lidar and radar send pulses.",
+        "Remote sensing collects information from a distance.\nSatellites, aircraft, and drones carry imaging sensors.\nExplore their strengths, then see how sensors record visible and invisible light.",
         "Meet the sensors"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
@@ -1244,21 +1244,33 @@ function drawShowcaseUI() {
   if (exhibit.kind === "spectral" && exhibit.phase === "platforms" && !exhibit.finished) {
     label("See the Invisible · remote sensing platforms", 0, 0.96, 2.45, 0.18,
       43, "#e6f4f5", "#0b2430");
-    label("Different viewing heights trade broad coverage for local detail.",
+    label("Choose a platform to compare its coverage and detail.",
       0, 0.77, 2.36, 0.12, 28, "#b6d1d9", "#0b2430");
     const choice = exhibit.platformItems.find((item) => item.id === exhibit.platform);
-    label(`${choice.name}\n${choice.note}`, 0, -0.55, 2.42, 0.18,
-      27, "#e6f4f5", "#0b2430");
+    label(choice.name, 0, -0.45, 2.42, 0.11,
+      30, "#e6f4f5", "#0b2430");
+    label(choice.note, 0, -0.59, 2.42, 0.18,
+      25, "#d8f3e6", "#0b2430");
     for (const [index, item] of exhibit.platformItems.entries())
-      button(item.label, (index - 1) * 0.78, -0.78,
+      button(item.label, (index - 1) * 0.78, -0.84,
         () => exhibit.selectPlatform(item.id), 0.7, exhibit.platform === item.id);
-    button("Explore Landsat bands", 0, -1.02, () => exhibit.showBands(), 1.48);
+    button("Explore light bands", 0, -1.06, () => exhibit.showSpectrum(), 1.48);
+    return;
+  }
+  if (exhibit.kind === "spectral" && exhibit.phase === "spectrum" && !exhibit.finished) {
+    label("See the Invisible · light in bands", 0, 0.96, 2.45, 0.18,
+      43, "#e6f4f5", "#0b2430");
+    label("A multispectral sensor records several wavelength ranges separately.",
+      0, 0.76, 2.4, 0.13, 27, "#b6d1d9", "#0b2430");
+    label("Blue, green, and red are visible light. Near infrared (NIR) is invisible to us.\nTogether, a place's band responses form a spectral signature.",
+      0, -0.53, 2.43, 0.21, 27, "#e6f4f5", "#0b2430");
+    button("View Landsat scenes", 0, -0.83, () => exhibit.showBands(), 1.48);
     return;
   }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
     lessonCard(`${exhibit.sceneInfo.name} · takeaways`,
-      `Remote sensors record light in separate wavelength bands. A spectral signature describes how a surface responds across them.\nFalse color assigns near infrared (NIR) to red; leafy areas often appear red.\n${exhibit.sceneInfo.observation}`, -0.02);
-    label("NDVI = (NIR − red) / (NIR + red), using calibrated reflectance.\nOur index preview uses display colors to illustrate this idea.",
+      `A spectral signature is a surface's response across bands.\nIn false color, healthy vegetation often appears red.\n${exhibit.sceneInfo.observation}`, -0.02);
+    label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI often marks vigorous green vegetation.",
       0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
     if (!exhibit.finished) {
       button("Keep exploring", -0.58, -0.72, () => exhibit.keepExploring(), 1.0);
@@ -1398,7 +1410,7 @@ function drawShowcaseUI() {
     const modeText = {
       natural: "Natural color: visible red, green, and blue bands",
       false: "False color: NIR → red, red → green, green → blue",
-      index: "NDVI = (NIR − red) / (NIR + red).\nPreview colors use JPEG brightness, stretched within each scene.",
+      index: "NDVI compares near infrared with visible red.\nGreener colors show a stronger vegetation signal.",
     };
     label(`${exhibit.sceneInfo.name} · ${exhibit.sceneInfo.sensor}`,
       0, 0.96, 2.35, 0.18, 40, "#e6f4f5", "#0b2430");
@@ -1410,7 +1422,7 @@ function drawShowcaseUI() {
       0.72, exhibit.mode === "natural");
     button("False color", 0, -0.75, () => exhibit.setMode("false"),
       0.72, exhibit.mode === "false");
-    button("NDVI idea", 0.78, -0.75, () => exhibit.setMode("index"),
+    button("NDVI", 0.78, -0.75, () => exhibit.setMode("index"),
       0.72, exhibit.mode === "index");
     button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
     button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
