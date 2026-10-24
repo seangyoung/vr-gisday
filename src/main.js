@@ -2935,17 +2935,20 @@ function modelHit(c) {
   floatingModel.updateWorldMatrix(true, true);
   return raycaster.intersectObjects(floatingModel.children, false)[0];
 }
+function pointerButtons() {
+  if (soundMenuOpen) return soundButtons;
+  if ((layers?.started && !layers.clipboard.visible) ||
+      (viewshed?.started && !viewshed.clipboard.visible) ||
+      pixels?.hidesWorldUI ||
+      (scan?.station && scan.started && !scan.finished && !scan.clipboard.visible)) return [];
+  return buttons;
+}
 function intersect(c) {
   c.updateWorldMatrix(true, false);
   rotation.extractRotation(c.matrixWorld);
   raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
-  if (soundMenuOpen) return raycaster.intersectObjects(soundButtons, false)[0];
-  if ((layers?.started && !layers.clipboard.visible) ||
-      (viewshed?.started && !viewshed.clipboard.visible) ||
-      (pixels?.started && !pixels.clipboard.visible) ||
-      (scan?.station && scan.started && !scan.finished && !scan.clipboard.visible)) return null;
-  return raycaster.intersectObjects(buttons, false)[0];
+  return raycaster.intersectObjects(pointerButtons(), false)[0];
 }
 async function enter(mode, roomScan = mode === "immersive-ar") {
   if (mode === "immersive-vr") pendingRoomHandoff = false;
@@ -3528,7 +3531,7 @@ if (
       }
       return;
     }
-    const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
+    const ui = raycaster.intersectObjects(pointerButtons(), false)[0];
     if (ui) ui.object.userData.action?.(ui);
     else if (soundMenuOpen) return;
     else if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
@@ -3606,7 +3609,7 @@ if (devPreview) {
       return;
     }
     if (previewInterpolation) {
-      const ui = raycaster.intersectObjects(soundMenuOpen ? soundButtons : buttons, false)[0];
+      const ui = raycaster.intersectObjects(pointerButtons(), false)[0];
       const gauge = ui || soundMenuOpen ? null : showcase.gaugeHit(raycaster);
       showcase.showGaugeHover(2, gauge);
       showcase.showTarget(2, ui || soundMenuOpen || gauge ? null :

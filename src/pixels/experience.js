@@ -126,6 +126,9 @@ export class PixelExperience extends LayerExperience {
   get cell() {
     return this.model.cellAt(this.probe.x, this.probe.z, this.size);
   }
+  get hidesWorldUI() {
+    return this.started && this.phase === "pixels" && !this.clipboard.visible;
+  }
   refreshFootprint(previousSize = null) {
     if (this.footprint) {
       this.footprint.removeFromParent();

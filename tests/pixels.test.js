@@ -87,6 +87,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   let changes = 0;
   const demo = new PixelExperience(scene, () => changes++);
   assert.equal(demo.started, false);
+  assert.equal(demo.hidesWorldUI, false);
   demo.update(240);
   assert.equal(demo.finished, false);
   assert.equal(demo.elapsed, 0);
@@ -95,12 +96,17 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   demo.begin();
   assert.equal(demo.started, true);
   assert.equal(demo.phase, "platforms");
+  assert.equal(demo.hidesWorldUI, false);
   assert.equal(demo.group.visible, false);
   assert.equal(demo.platformScene.group.visible, true);
   assert.equal(demo.platformScene.select("drone"), true);
   assert.equal(demo.platformScene.selection.id, "drone");
   demo.showPixels();
   assert.equal(demo.phase, "pixels");
+  assert.equal(demo.hidesWorldUI, true);
+  demo.clipboard.visible = true;
+  assert.equal(demo.hidesWorldUI, false);
+  demo.clipboard.visible = false;
   assert.equal(demo.group.visible, true);
   assert.equal(demo.flyover.config.kind, "satellite");
   assert.equal(demo.platformScene.group.visible, false);
