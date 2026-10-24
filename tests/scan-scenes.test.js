@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { SCAN_SCENES, createSceneRotation } from "../src/scan/scenes.js";
+import { SCAN_SCENES, buildScanScene, createSceneRotation } from "../src/scan/scenes.js";
 import { ScanExperience } from "../src/scan/experience.js";
 
 test("each synthetic scene gives a distinct, concise observation and takeaway", () => {
@@ -29,6 +29,34 @@ test("shuffled cycles visit every scene without adjacent repeats", () => {
       }
       assert.equal(new Set(ids).size, SCAN_SCENES.length);
     }
+  }
+});
+
+test("every synthetic scene connects its visible parts to the ground", () => {
+  for (const { id } of SCAN_SCENES) {
+    const meshes = [];
+    buildScanScene(id, (geometry, position, kind) => {
+      const mesh = new THREE.Mesh(geometry);
+      mesh.position.set(...position);
+      mesh.userData.kind = kind;
+      meshes.push(mesh);
+      return mesh;
+    });
+    const bounds = meshes.map((mesh) => new THREE.Box3().setFromObject(mesh)
+      .expandByScalar(0.006));
+    const grounded = new Set([0]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 1; i < meshes.length; i++)
+        if (!grounded.has(i) && [...grounded].some((j) =>
+          bounds[i].intersectsBox(bounds[j]))) {
+          grounded.add(i);
+          changed = true;
+        }
+    }
+    assert.equal(grounded.size, meshes.length,
+      `${id}: every railing, roof, boardwalk, and plant has physical support`);
   }
 });
 

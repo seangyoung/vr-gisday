@@ -125,7 +125,7 @@ export function buildScanScene(id, mesh) {
     }
     box([1.8, 0.09, 0.5], [0, 0.465, 0]);
     for (const x of [-0.6, -0.3, 0, 0.3, 0.6])
-      box([0.06, 0.035, 0.55], [x, 0.53, 0]);
+      box([0.06, 0.035, 0.55], [x, 0.525, 0]);
     for (const z of [-0.24, 0.24]) {
       box([1.8, 0.04, 0.04], [0, 0.66, z]);
       for (const x of [-0.8, -0.4, 0, 0.4, 0.8])
@@ -154,7 +154,7 @@ export function buildScanScene(id, mesh) {
         "roof",
       );
       for (const side of [-1, 1])
-        box([0.09, 0.1, 0.012], [x + side * 0.13, y + h * 0.58, z + 0.217],
+        box([0.09, 0.1, 0.012], [x + side * 0.13, y + h * 0.58, z + 0.208],
           "structure", "timber");
     }
     tree(-0.7, -0.45, 0, 0.85);
@@ -168,8 +168,10 @@ export function buildScanScene(id, mesh) {
       box([w, h, d], [0, y, -0.1], "ground");
     for (const x of [-0.22, 0.22])
       for (const z of [-0.24, 0.04]) box([0.045, 0.35, 0.045], [x, 0.655, z]);
-    for (const [w, y] of [[1.5, 0.16], [1.05, 0.32], [0.65, 0.48]])
-      box([w, 0.035, 0.035], [0, y, 0.49 - y * 0.35]);
+    // Stone coping rests directly on each step's front edge.
+    for (const [w, d, top] of [[1.5, 1.2, 0.16], [1.05, 0.85, 0.32], [0.65, 0.5, 0.48]])
+      box([w, 0.035, 0.05], [0, top + 0.014, -0.1 + d / 2 - 0.025],
+        "structure", "stone");
     mesh(
       new THREE.ConeGeometry(0.4, 0.22, 4),
       [0, 0.94, -0.1],
@@ -181,7 +183,7 @@ export function buildScanScene(id, mesh) {
     // A visible boardwalk runs beneath overlapping crowns; removing canopy
     // points should leave honest gaps in the first-surface ground sample.
     for (const z of [-0.54, -0.18, 0.18, 0.54])
-      box([0.27, 0.05, 0.26], [0.02 + z * 0.18, 0.045, z]);
+      box([0.27, 0.05, 0.26], [0.02 + z * 0.18, 0.025, z]);
     for (const x of [-0.48, 0.48])
       for (const z of [-0.44, 0.4]) tree(x, z, 0, 0.72);
     box([0.12, 0.34, 0.1], [-0.13, 0.17, 0.62]);
@@ -190,9 +192,9 @@ export function buildScanScene(id, mesh) {
     box([1.18, 0.62, 0.1], [0, 0.31, -0.46]);
     for (const x of [-0.55, 0.55])
       box([0.1, 0.62, 0.86], [x, 0.31, -0.08]);
-    box([1.18, 0.055, 0.52], [0, 0.68, -0.27]);
+    box([1.18, 0.055, 0.52], [0, 0.647, -0.27]);
     for (const x of [-0.34, 0.34])
-      box([0.075, 0.55, 0.075], [x, 0.275, 0.3]);
+      box([0.075, 0.62, 0.075], [x, 0.31, -0.15]);
     box([0.54, 0.08, 0.28], [0, 0.04, 0.14], "ground");
     tree(0.76, 0.49, 0, 0.62);
     tree(-0.78, -0.5, 0, 0.57);
@@ -205,7 +207,13 @@ export function buildScanScene(id, mesh) {
       box([0.73, 0.035, 0.035], [0, 0.91, z]);
     for (const x of [-0.34, 0.34])
       box([0.035, 0.035, 0.59], [x, 0.91, 0]);
-    box([0.045, 0.21, 0.045], [0, 0.89, 0]);
+    // Uprights transfer the rail load into the deck rather than leaving a
+    // free-floating outline around the lookout.
+    for (const x of [-0.34, 0, 0.34])
+      for (const z of [-0.29, 0.29])
+        box([0.04, 0.17, 0.04], [x, 0.85, z]);
+    for (const x of [-0.34, 0.34])
+      box([0.04, 0.17, 0.04], [x, 0.85, 0]);
     tree(-0.72, 0.4, 0, 0.65);
     tree(0.73, -0.47, 0, 0.61);
   } else throw new Error(`Unknown scan scene: ${id}`);

@@ -19,8 +19,8 @@ const POINT_CSS = Object.fromEntries(Object.entries(POINT_COLORS)
 
 export function stationSurveyTargets(sceneId, meshes) {
   return meshes.slice(1).filter((mesh) => mesh.userData.kind === "structure" ||
-    sceneId === "canopy" && mesh.userData.kind === "vegetation" ||
-    sceneId === "terraces" && ["ground", "vegetation"].includes(mesh.userData.kind));
+    mesh.userData.kind === "vegetation" ||
+    sceneId === "terraces" && mesh.userData.kind === "ground");
 }
 
 function makeTripod() {
@@ -165,8 +165,8 @@ export class StationScanExperience {
     this.tripod.position.set(0, 0, 8.5);
     this.group.add(this.tripod);
     const survey = stationSurveyTargets(sceneInfo.id, this.targets);
-    // One station densely samples its visible faces. The tree-heavy scene uses
-    // a smaller budget to keep headset setup responsive.
+    // One station densely samples visible structure and vegetation faces. The
+    // tree-heavy scene uses a smaller budget to keep headset setup responsive.
     const sampleBudget = sceneInfo.id === "canopy" ? 3200 : 5200;
     this.coverage = new StationCoverage(survey, this.targets, sampleBudget, this.group);
     const bounds = new THREE.Box3().setFromPoints(this.coverage.samples.map((sample) => sample.point));
@@ -187,7 +187,8 @@ export class StationScanExperience {
       cancel: () => {
         this.grab.hands.clear();
         this.holdingHand = null;
-        this.tripod.position.y = this.surfaceHeightAt(this.tripod.position.x, this.tripod.position.z);
+        this.tripod.position.y = this.tripodSurfaceHeightAt(
+          this.tripod.position.x, this.tripod.position.z, this.tripod.position.y);
       },
       release: (id) => this.releaseTripod(id),
       update: (poses) => this.updateTripod(poses),
@@ -233,8 +234,9 @@ export class StationScanExperience {
         this.tripod.position.z - position.z) < MIN_STATION_SPACING);
   }
   get targetName() {
-    return ({ ruins: "ruin walls", bridge: "bridge and supports", village: "buildings",
-      terraces: "terraces and trees", canopy: "trees and canopy", courtyard: "courtyard", tower: "tower" })[this.sceneInfo.id];
+    return ({ ruins: "ruins and trees", bridge: "bridge and trees", village: "buildings and trees",
+      terraces: "terraces and trees", canopy: "trees and canopy",
+      courtyard: "courtyard and trees", tower: "tower and trees" })[this.sceneInfo.id];
   }
   place(camera) {
     const eye = camera.getWorldPosition(V());
@@ -274,6 +276,25 @@ export class StationScanExperience {
     }
     return height;
   }
+  tripodSurfaceHeightAt(x, z, desiredBaseY = 0) {
+    // A carried tripod can settle on a deck, roof, or terrace below its feet.
+    // Limit the search to nearby heights so a bridge overhead does not pull a
+    // tripod up from the riverbed beneath it.
+    const ceiling = Math.max(0.45, desiredBaseY + 0.45);
+    this.group.updateWorldMatrix(true, true);
+    const origin = this.group.localToWorld(new THREE.Vector3(x, ceiling + 0.05, z));
+    const down = new THREE.Vector3(0, -1, 0).transformDirection(this.group.matrixWorld);
+    const ray = new THREE.Raycaster(origin, down, 0, ceiling + 1);
+    let height = 0;
+    for (const hit of ray.intersectObjects(
+      this.targets.filter((mesh) => mesh.userData.kind !== "vegetation"), false)) {
+      if (!hit.face || hit.face.normal.clone()
+        .transformDirection(hit.object.matrixWorld).y < 0.65) continue;
+      const localY = this.group.worldToLocal(hit.point.clone()).y;
+      if (localY <= ceiling + 1e-4) height = Math.max(height, localY);
+    }
+    return height;
+  }
   canPlace(x, z, height = this.surfaceHeightAt(x, z)) {
     if (Math.abs(x) > LIMIT || Math.abs(z) > LIMIT) return false;
     const worldPoint = this.group.localToWorld(new THREE.Vector3(x, height + 0.72, z));
@@ -295,7 +316,8 @@ export class StationScanExperience {
   }
   releaseTripod(id) {
     if (this.grab.hands.delete(id)) {
-      this.tripod.position.y = this.surfaceHeightAt(this.tripod.position.x, this.tripod.position.z);
+      this.tripod.position.y = this.tripodSurfaceHeightAt(
+        this.tripod.position.x, this.tripod.position.z, this.tripod.position.y);
       this.holdingHand = null;
       this.refreshClipboard();
       this.onChange();
@@ -307,10 +329,11 @@ export class StationScanExperience {
     const pose = poses.get(id);
     if (!pose) { this.releaseTripod(id); return; }
     const local = this.group.worldToLocal(new THREE.Vector3().setFromMatrixPosition(pose));
-    const height = this.surfaceHeightAt(local.x, local.z);
+    const desiredBaseY = local.y - 1.1;
+    const height = this.tripodSurfaceHeightAt(local.x, local.z, desiredBaseY);
     if (this.canPlace(local.x, local.z, height))
       this.tripod.position.set(local.x,
-        THREE.MathUtils.clamp(local.y - 1.1, height, height + 0.65), local.z);
+        THREE.MathUtils.clamp(desiredBaseY, height, height + 0.65), local.z);
   }
   startSweep() {
     if (!this.started || this.finished || this.scansLeft <= 0 || this.scanQueue || this.grab.hands.size) return false;

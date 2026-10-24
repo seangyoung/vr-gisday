@@ -41,7 +41,7 @@ test("one dense station scan fills visible faces; a new angle reveals hidden fac
   const back = new THREE.Vector3(0, 1.5, -13);
   for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, front);
   const first = coverage.count;
-  assert.ok(first > 1400, "one station should produce a substantial point cloud");
+  assert.ok(first > 1300, "one station should produce a substantial point cloud");
   for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, front);
   assert.equal(coverage.count, first, "repeating a station cannot fill hidden faces");
   for (let i = 0; i < coverage.samples.length; i++) coverage.capture(i, back);
@@ -52,6 +52,8 @@ test("tripod viewpoints add visible target surfaces across all synthetic scenes"
   for (const { id } of SCAN_SCENES) {
     const { coverage } = survey(id);
     assert.ok(coverage.samples.length > 200, `${id} has a target to survey`);
+    assert.ok(coverage.samples.some((sample) => sample.mesh.userData.kind === "vegetation"),
+      `${id} includes trees in the scored scan target`);
     coverage.prepare();
     const positions = [[0, 13], [11, 0], [0, -13], [-11, 0]];
     let previous = 0;
@@ -63,6 +65,40 @@ test("tripod viewpoints add visible target surfaces across all synthetic scenes"
     }
     assert.ok(coverage.percent >= 55 && coverage.percent <= 100,
       `${id} can be substantially surveyed in four positions`);
+    assert.ok(coverage.samples.some((sample, i) => coverage.captured[i] &&
+      sample.mesh.userData.kind === "vegetation"),
+    `${id} returns vegetation points from a tripod station`);
+  }
+});
+
+test("tripod settles on elevated objects while remaining beneath an overhead bridge", () => {
+  for (const [id, x, z, expected] of [
+    ["bridge", 0, 0, 4.34],
+    ["tower", 0, 0, 6.16],
+    ["village", 6.4, -3.2, 1.12],
+  ]) {
+    const { group, meshes } = survey(id, 8);
+    const station = Object.create(StationScanExperience.prototype);
+    station.group = group;
+    station.targets = meshes;
+    station.sceneInfo = { id };
+    station.tripod = new THREE.Group();
+    group.add(station.tripod);
+    station.grab = { hands: new Map([[1, true]]) };
+    station.scanQueue = null;
+    station.refreshClipboard = () => {};
+    station.onChange = () => {};
+    const pose = group.localToWorld(new THREE.Vector3(x, expected + 1.1, z));
+    station.updateTripod(new Map([[1, new THREE.Matrix4().makeTranslation(...pose.toArray())]]));
+    assert.ok(station.tripod.position.y >= expected - 1e-4,
+      `${id}: carried tripod stays above the support surface`);
+    station.releaseTripod(1);
+    assert.ok(Math.abs(station.tripod.position.y - expected) < 1e-4,
+      `${id}: the feet rest on the elevated surface`);
+    if (id === "bridge") {
+      assert.ok(Math.abs(station.tripodSurfaceHeightAt(0, 0, 0)) < 1e-4,
+        "bridge deck overhead does not lift a tripod from the ravine floor");
+    }
   }
 });
 
