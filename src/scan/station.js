@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { buildScanScene } from "./scenes.js";
 import { scanMaterials } from "./appearance.js";
 import { StationCoverage } from "./station-coverage.js";
+import { buildStationBackdrop } from "./station-backdrop.js";
 
 const LIMIT = 20;
 const TOTAL_SCANS = 4;
@@ -156,10 +157,14 @@ export class StationScanExperience {
       return object;
     };
     buildScanScene(sceneInfo.id, mesh);
-    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(44, 44),
-      new THREE.MeshStandardMaterial({ color: 0x61725e, roughness: 1, side: THREE.DoubleSide }));
+    const { group: backdrop, groundColor } = buildStationBackdrop(sceneInfo.id);
+    this.backdrop = backdrop;
+    this.group.add(backdrop);
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(128, 128),
+      new THREE.MeshStandardMaterial({ color: groundColor, roughness: 1, side: THREE.DoubleSide }));
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.position.y = -0.05;
+    this.ground.renderOrder = -1;
     this.group.add(this.ground);
     this.tripod = makeTripod();
     this.tripod.position.set(0, 0, 8.5);
