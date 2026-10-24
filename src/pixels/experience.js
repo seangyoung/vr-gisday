@@ -9,6 +9,7 @@ import {
 } from "../layers/experience.js";
 import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "./model.js";
 import { RemotePlatformScene } from "../showcase/remote-platforms.js";
+import { PixelFlyover } from "./flyover.js";
 
 const gold = 0xffd36f;
 const clamp = (value) => THREE.MathUtils.clamp(value, -PIXEL_EXTENT + 0.001, PIXEL_EXTENT - 0.001);
@@ -49,8 +50,7 @@ function footprint(cell) {
       path.push(new THREE.Vector3(x, surfaceY(x, z) + 0.3, z));
     }
   path.push(path[0].clone());
-  // At 1 km the actual boundary lies beyond this 144 m study area.
-  if (cell.size <= PIXEL_EXTENT * 2) group.add(new THREE.Mesh(
+  group.add(new THREE.Mesh(
     new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path), path.length * 2, 0.065, 5),
     new THREE.MeshBasicMaterial({ color: gold }),
   ));
@@ -73,15 +73,13 @@ function footprint(cell) {
     geometry,
     new THREE.MeshBasicMaterial({ color: gold, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }),
   ));
-  if (cell.size <= PIXEL_EXTENT * 2) {
-    for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
-      const post = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.055, 0.055, 0.85, 8),
-        new THREE.MeshBasicMaterial({ color: gold }),
-      );
-      post.position.set(x, surfaceY(x, z) + 0.6, z);
-      group.add(post);
-    }
+  for (const [x, z] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]]) {
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.055, 0.85, 8),
+      new THREE.MeshBasicMaterial({ color: gold }),
+    );
+    post.position.set(x, surfaceY(x, z) + 0.6, z);
+    group.add(post);
   }
   return group;
 }
@@ -102,6 +100,7 @@ export class PixelExperience extends LayerExperience {
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.model = new PixelModel();
+    this.flyover = new PixelFlyover(this.group);
     this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
@@ -121,6 +120,7 @@ export class PixelExperience extends LayerExperience {
     this.group.visible = true;
     this.scene.background = this.landscapeBackground;
     this.scene.fog = this.landscapeFog;
+    this.flyover.begin(this.size);
     this.onChange();
   }
   get cell() {
@@ -156,12 +156,14 @@ export class PixelExperience extends LayerExperience {
     const previous = this.size;
     this.size = size;
     this.refreshFootprint(previous);
+    this.flyover.begin(size);
     this.onEvent(size > previous ? "merge" : "reveal");
     this.onChange();
   }
   update(dt) {
     if (!this.started) return;
     super.update(dt);
+    if (this.phase === "pixels" && !this.finished) this.flyover.update(dt);
     if (this.phase === "platforms" && !this.finished)
       this.platformScene.update(dt, this.elapsed);
     if (!this.footprint || this.footprintAge >= 1) return;
@@ -220,10 +222,12 @@ export class PixelExperience extends LayerExperience {
     this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
+    this.flyover.clear();
     this.refreshFootprint();
     this.onChange();
   }
   finish() {
+    this.flyover.clear();
     if (this.phase === "platforms") {
       this.phase = "pixels";
       this.platformScene.hide();
@@ -234,6 +238,7 @@ export class PixelExperience extends LayerExperience {
     super.finish();
   }
   dispose() {
+    this.flyover.dispose();
     this.platformScene.dispose();
     super.dispose();
   }
@@ -243,7 +248,22 @@ export class PixelExperience extends LayerExperience {
     const canvasPerMeter = width / (PIXEL_EXTENT * 2);
     ctx.fillStyle = "#163b3b";
     ctx.fillRect(0, 0, width, width);
-    raster.pixels.forEach(({ rgb }, index) => {
+    if (size === 0.5) {
+      // One ImageData upload avoids thousands of canvas draw calls on Quest.
+      const image = ctx.createImageData(width, width);
+      const sourceWidth = this.model.sampleWidth;
+      for (let y = 0; y < width; y++)
+        for (let x = 0; x < width; x++) {
+          const source = (Math.floor(y * sourceWidth / width) * sourceWidth +
+            Math.floor(x * sourceWidth / width)) * 3;
+          const target = (y * width + x) * 4;
+          image.data[target] = this.model.rgb[source];
+          image.data[target + 1] = this.model.rgb[source + 1];
+          image.data[target + 2] = this.model.rgb[source + 2];
+          image.data[target + 3] = 255;
+        }
+      ctx.putImageData(image, 0, 0);
+    } else raster.pixels.forEach(({ rgb }, index) => {
       const col = index % raster.cells;
       const row = Math.floor(index / raster.cells);
       ctx.fillStyle = `rgb(${rgb[0]} ${rgb[1]} ${rgb[2]})`;
@@ -251,7 +271,7 @@ export class PixelExperience extends LayerExperience {
         Math.min(size, this.model.width - col * size) * canvasPerMeter + 0.5,
         Math.min(size, this.model.width - row * size) * canvasPerMeter + 0.5);
     });
-    if (size * canvasPerMeter >= 8 && size <= PIXEL_EXTENT * 2) {
+    if (size * canvasPerMeter >= 8) {
       ctx.strokeStyle = "#13292666";
       ctx.lineWidth = 1;
       for (let i = 0; i <= raster.cells; i++) {
@@ -277,6 +297,6 @@ export class PixelExperience extends LayerExperience {
     ctx.fillRect(0, 0, width, 42);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 23px system-ui, sans-serif";
-    ctx.fillText(`MODEL COLORS · ${pixelSizeLabel(size)}${size > this.model.width ? " (partial)" : ""}`, 12, 29);
+    ctx.fillText(`MODEL COLORS · ${pixelSizeLabel(size)}`, 12, 29);
   }
 }

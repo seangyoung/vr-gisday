@@ -1201,7 +1201,7 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 1 m, 10 m, 30 m, and 1 km pixels.",
+      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 1 m, 10 m, and 30 m pixels.",
       0.13,
     );
     button("Meet the sensors", 0, -0.43, () => p.begin(), 1.5);
@@ -1232,22 +1232,25 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Satellite, aircraft, and drone sensors trade coverage for ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend roads and rivers with nearby land; this 144 m scene fills about 2% of a 1 km pixel.",
+      "Satellite, aircraft, and drone sensors trade coverage for ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nAt 30 m, narrow rivers and roads blend with nearby land inside mixed pixels.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
 
     return;
   }
+  const flightHint = p.size === 0.5 ? "Drone · illustrated at ~100 ft"
+    : p.size === 1 ? "Aircraft · illustrated at ~200 ft"
+    : "Satellite marker · illustrated at ~200 ft; real orbit is much higher";
   label(
-    "Left stick: walk · Right stick: turn sideways\nRight stick forward: aim ray · release to teleport",
+    `Look up for the flyover · ${flightHint}\nLeft stick: walk · Right stick: turn or teleport`,
     0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430",
   );
   for (const [index, size] of PIXEL_SIZES.entries())
     button(pixelSizeLabel(size), (index - 1.5) * 0.56, 0.5,
       () => p.setSize(size), 0.48)
       .material.color.set(p.size === size ? 0xffffff : 0x91a6a4);
-  for (const [size, x] of [[1, -0.56], [p.size, 0.56]]) {
+  for (const [size, x] of [[0.5, -0.56], [p.size, 0.56]]) {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
     p.renderMap(canvas.getContext("2d"), size);
@@ -1266,9 +1269,7 @@ function drawPixelsUI() {
   }
   const cell = p.cell;
   const percent = (index) => Math.round((cell.counts[index] / cell.sampledArea) * 100);
-  const sizeInfo = p.size === 1000
-    ? "Selected 1 km GSD · 1,000,000 m² · the modeled 144 m scene fills about 2%.\nThe map color averages this patch only; the full pixel reaches far beyond it."
-    : cell.sampledArea < p.size ** 2
+  const sizeInfo = cell.sampledArea < p.size ** 2
     ? `Selected ${pixelSizeLabel(p.size)} GSD · edge pixel cropped by the map.\n${cell.sampledArea} m² shown of ${p.size ** 2} m² · Move the dot inward for a full pixel.`
     : `Selected ${pixelSizeLabel(p.size)} GSD · ${(p.size ** 2).toLocaleString()} m² · White dot: you\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`;
   label(

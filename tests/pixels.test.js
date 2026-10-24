@@ -1,12 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel } from "../src/pixels/model.js";
+import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "../src/pixels/model.js";
 import { PixelExperience } from "../src/pixels/experience.js";
+import { PixelFlyover, flyoverForSize } from "../src/pixels/flyover.js";
+import { landscapeHeight } from "../src/layers/experience.js";
 
 test("pixel size changes ground area while retaining the same source landscape", () => {
   const model = new PixelModel();
-  assert.deepEqual(PIXEL_SIZES, [1, 10, 30, 1000]);
+  assert.deepEqual(PIXEL_SIZES, [0.5, 1, 10, 30]);
+  assert.equal(pixelSizeLabel(0.5), "50 cm");
   for (const size of PIXEL_SIZES) {
     const raster = model.raster(size);
     assert.equal(raster.cells, Math.ceil((PIXEL_EXTENT * 2) / size));
@@ -19,7 +22,7 @@ test("pixel size changes ground area while retaining the same source landscape",
     }
     assert.equal(totalArea, (PIXEL_EXTENT * 2) ** 2);
   }
-  const fine = model.cellAt(0, -3, 1);
+  const fine = model.cellAt(0, -3, 0.5);
   const coarse = model.cellAt(0, -3, 30);
   assert.equal(fine.x0, 0);
   assert.equal(fine.z0, -3);
@@ -29,29 +32,53 @@ test("pixel size changes ground area while retaining the same source landscape",
   assert.ok(model.raster(30) === model.raster(30));
   assert.equal(model.raster(10).pixels.at(-1).sampledArea, 4 ** 2);
   assert.equal(model.raster(30).pixels.at(-1).sampledArea, 24 ** 2);
-  assert.deepEqual(model.cellAt(0, -3, 1000).counts, model.raster(1000).pixels[0].counts);
-  assert.equal(model.cellAt(0, -3, 1000).x0, -500);
+  assert.equal(fine.sampledArea, 0.25);
+  assert.equal(model.sampleWidth, 288);
   assert.throws(() => model.raster(7), RangeError);
 });
 
 test("a coarse pixel color is the area-weighted mean of its fine pixels", () => {
   const model = new PixelModel();
   const coarse = model.cellAt(0, -3, 30);
-  const fine = model.raster(1);
+  const fine = model.raster(0.5);
   const sums = [0, 0, 0, 0];
-  for (let row = 0; row < 30; row++)
-    for (let col = 0; col < 30; col++) {
-      const cell = fine.pixels[(coarse.row * 30 + row) * fine.cells + coarse.col * 30 + col];
+  for (let row = 0; row < 60; row++)
+    for (let col = 0; col < 60; col++) {
+      const cell = fine.pixels[(coarse.row * 60 + row) * fine.cells + coarse.col * 60 + col];
       for (let cover = 0; cover < 4; cover++) sums[cover] += cell.counts[cover];
     }
   assert.deepEqual(sums, coarse.counts);
   const rgb = [0, 0, 0];
-  for (let dz = 0; dz < 30; dz++)
-    for (let dx = 0; dx < 30; dx++) {
-      const source = (coarse.row * 30 + dz) * model.width + coarse.col * 30 + dx;
+  for (let dz = 0; dz < 60; dz++)
+    for (let dx = 0; dx < 60; dx++) {
+      const source = (coarse.row * 60 + dz) * model.sampleWidth + coarse.col * 60 + dx;
       for (let band = 0; band < 3; band++) rgb[band] += model.rgb[source * 3 + band];
     }
-  assert.deepEqual(coarse.rgb, rgb.map((sum) => Math.round(sum / 30 ** 2)));
+  assert.deepEqual(coarse.rgb, rgb.map((sum) => Math.round(sum / 60 ** 2)));
+});
+
+test("each ground sample distance starts the requested overhead sensor", () => {
+  assert.deepEqual(PIXEL_SIZES.map(flyoverForSize), [
+    { kind: "drone", feet: 100 },
+    { kind: "aircraft", feet: 200 },
+    { kind: "satellite", feet: 200 },
+    { kind: "satellite", feet: 200 },
+  ]);
+  const parent = new THREE.Group();
+  const flyover = new PixelFlyover(parent);
+  for (const size of PIXEL_SIZES) {
+    flyover.begin(size);
+    const { kind, feet } = flyover.config;
+    assert.equal(parent.children.length, 1);
+    assert.ok(Math.abs(flyover.group.position.y -
+      landscapeHeight(-68, -60) - feet * 0.3048) < 1e-9);
+    flyover.update(2);
+    assert.ok(flyover.group.position.x > -68);
+    assert.equal(flyover.config.kind, kind);
+  }
+  flyover.update(10);
+  assert.equal(parent.children.length, 0);
+  flyover.dispose();
 });
 
 test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
@@ -63,7 +90,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   demo.update(240);
   assert.equal(demo.finished, false);
   assert.equal(demo.elapsed, 0);
-  demo.setSize(1000);
+  demo.setSize(0.5);
   assert.equal(demo.size, 30);
   demo.begin();
   assert.equal(demo.started, true);
@@ -75,6 +102,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   demo.showPixels();
   assert.equal(demo.phase, "pixels");
   assert.equal(demo.group.visible, true);
+  assert.equal(demo.flyover.config.kind, "satellite");
   assert.equal(demo.platformScene.group.visible, false);
   assert.equal(demo.size, 30);
   assert.equal(demo.selected.has("topography"), true);
@@ -82,10 +110,13 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.ok(demo.pickGround.geometry.attributes.position.count < demo.ground.raised.geometry.attributes.position.count / 10);
   assert.equal(demo.ground.raised.geometry.attributes.position.count, 401 ** 2);
   assert.ok(demo.footprint.parent === demo.variants.raised.world);
-  demo.setSize(1000);
-  assert.equal(demo.cell.size, 1000);
-  assert.equal(demo.cell.sampledArea, 144 ** 2);
-  assert.ok(demo.footprint.scale.x < 1);
+  demo.setSize(0.5);
+  assert.equal(demo.cell.size, 0.5);
+  assert.equal(demo.cell.sampledArea, 0.25);
+  assert.equal(demo.flyover.config.kind, "drone");
+  assert.ok(Math.abs(demo.flyover.group.position.y -
+    (landscapeHeight(-68, -60) + 100 * 0.3048)) < 1e-9);
+  assert.notEqual(demo.footprint.scale.x, 1);
   demo.update(0.7);
   assert.equal(demo.footprint.scale.x, 1);
   assert.equal(demo.pureWaterAt30, false);

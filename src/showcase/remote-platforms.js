@@ -211,6 +211,21 @@ function drone(parent, white, blue, lens, gold, dark) {
   parent.userData.rotors = rotors;
 }
 
+// Reuse the lesson's detailed aircraft and drone for the landscape flyovers.
+export function makePlatformModel(id) {
+  const model = new THREE.Group();
+  const white = basic(0xd6e7e9);
+  const blue = basic(0x558eaa, { metalness: 0.32, emissive: 0x133849,
+    emissiveIntensity: 0.5 });
+  const lens = basic(0x193c44, { emissive: 0x164b58 });
+  const gold = basic(0xc4a66b, { metalness: 0.54 });
+  const dark = basic(0x253a44, { metalness: 0.35 });
+  if (id === "drone") drone(model, white, blue, lens, gold, dark);
+  else if (id === "aircraft") aircraft(model, white, blue, lens, gold, dark);
+  else throw new RangeError("Unsupported flyover platform");
+  return model;
+}
+
 export function makePlatformComparison() {
   const group = new THREE.Group();
   group.add(new THREE.HemisphereLight(0xe8f4ff, 0x4b6654, 2.1));
