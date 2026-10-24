@@ -44,7 +44,7 @@ import { LandscapeTeleport, teleportStickAction } from "./layers/teleport.js";
 import { ViewshedExperience } from "./viewshed/experience.js";
 import { VIEWSHED_SCENES } from "./viewshed/scenes.js";
 import { PixelExperience } from "./pixels/experience.js";
-import { PIXEL_EXTENT, PIXEL_SIZES, pixelSizeLabel } from "./pixels/model.js";
+import { PIXEL_DETAIL_EXTENT, PIXEL_EXTENT, PIXEL_SIZES, pixelSizeLabel } from "./pixels/model.js";
 import { SpectralExperience } from "./showcase/spectral-experience.js";
 import { SPECTRAL_LESSON_STEPS } from "./showcase/spectral-lesson.js";
 import { ClusterExperience } from "./showcase/cluster-experience.js";
@@ -1215,7 +1215,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis 144 m scene fills only about 2% of a 1 km pixel.",
+      "Ground sample distance (GSD) is a pixel's width on the ground.\nThe 1 km pixel spans the full surrounding landscape: one square kilometer.\nIts single color blends forest, water, roads, and other ground.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -1233,7 +1233,8 @@ function drawPixelsUI() {
   for (const [size, x] of [[1, -0.56], [p.size, 0.56]]) {
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 512;
-    p.renderMap(canvas.getContext("2d"), size);
+    const mapExtent = size === 1000 ? PIXEL_EXTENT : PIXEL_DETAIL_EXTENT;
+    p.renderMap(canvas.getContext("2d"), size, mapExtent);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const map = new THREE.Mesh(
@@ -1241,16 +1242,16 @@ function drawPixelsUI() {
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
     );
     map.position.set(x, -0.07, 0.06);
-    map.userData.action = (hit) => { sound.click(); p.placeFromMap(hit); };
+    map.userData.action = (hit) => { sound.click(); p.placeFromMap(hit, mapExtent); };
     map.userData.debugHidden = true;
     uiParent.add(map);
     buttons.push(map);
-    p.registerVisitorMarker(map, PIXEL_EXTENT);
+    p.registerVisitorMarker(map, mapExtent);
   }
   const cell = p.cell;
   const percent = (index) => Math.round((cell.counts[index] / cell.sampledArea) * 100);
   const sizeInfo = p.size === 1000
-    ? "Selected 1 km GSD · 1,000,000 m² · the modeled 144 m scene fills about 2%.\nThe map color averages this patch only; the full pixel reaches far beyond it."
+    ? `Selected 1 km GSD · full 1,000,000 m² footprint.\nOne color blends forest ${percent(1)}%, water ${percent(2)}%, road ${percent(3)}%, other ${percent(0)}%.`
     : cell.sampledArea < p.size ** 2
     ? `Selected ${pixelSizeLabel(p.size)} GSD · edge pixel cropped by the map.\n${cell.sampledArea} m² shown of ${p.size ** 2} m² · Move the dot inward for a full pixel.`
     : `Selected ${pixelSizeLabel(p.size)} GSD · ${(p.size ** 2).toLocaleString()} m² · White dot: you\nForest ${percent(1)}% · Water ${percent(2)}% · Road ${percent(3)}% · Other ${percent(0)}%`;

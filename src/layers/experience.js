@@ -107,8 +107,8 @@ function surfaceGeometry(raised, size = 400) {
   geometry.computeVertexNormals();
   return geometry;
 }
-function outerTerrainGeometry(raised) {
-  const rings = [extent, 230, 330, 480], segments = 96;
+export function outerTerrainGeometry(raised, rings = [extent, 230, 330, 480]) {
+  const segments = 96;
   const vertices = [], colors = [], indices = [];
   const add = (x, z) => {
     const y = landscapeHeight(x, z, raised);
@@ -245,11 +245,11 @@ function makeTrees(group, raised) {
   }
   group.add(shrubs);
 }
-function ribbonAlongZ(raised, halfWidth, yAt, color, crossSegments = 1) {
+function ribbonAlongZ(raised, halfWidth, yAt, color, crossSegments = 1, span = extent) {
   const vertices = [], indices = [];
-  const segments = 440;
+  const segments = Math.ceil(2 * span / 0.73);
   for (let i = 0; i <= segments; i++) {
-    const z = -extent + (2 * extent * i) / segments;
+    const z = -span + (2 * span * i) / segments;
     const center = riverX(z);
     for (let cross = 0; cross <= crossSegments; cross++) {
       const x = center - halfWidth + (2 * halfWidth * cross) / crossSegments;
@@ -273,15 +273,17 @@ function ribbonAlongZ(raised, halfWidth, yAt, color, crossSegments = 1) {
     new THREE.MeshStandardMaterial({ color, roughness: 0.52, metalness: 0.08, side: THREE.DoubleSide }),
   );
 }
-function makeHydrology(group, raised) {
+export function makeHydrology(group, raised, span = extent) {
   group.add(
-    ribbonAlongZ(raised, 3.4, (x, z, relief) => landscapeHeight(x, z, relief) + 0.025, 0xb4a58a, 8),
+    ribbonAlongZ(raised, 3.4, (x, z, relief) => landscapeHeight(x, z, relief) + 0.025, 0xb4a58a, 8, span),
   );
   const water = ribbonAlongZ(
     raised,
     2.2,
     (_x, z, relief) => relief ? riverWaterHeight(z) : 0.032,
     0x388fb2,
+    1,
+    span,
   );
   water.material.roughness = 0.24;
   water.material.metalness = 0.18;
@@ -322,12 +324,12 @@ export function highwayWalkingHeight(x, z, raised = true) {
   const t = (distance - ROAD_EDGE) / (SHOULDER_EDGE - ROAD_EDGE);
   return Math.max(landscapeHeight(x, z, raised), THREE.MathUtils.lerp(deck, outer, t));
 }
-function roadShoulderRibbon(raised) {
+function roadShoulderRibbon(raised, span = extent) {
   const vertices = [], indices = [];
-  const segments = Math.ceil((2 * extent) / 0.65);
+  const segments = Math.ceil((2 * span) / 0.65);
   const offsets = [-SHOULDER_EDGE, -ROAD_EDGE, ROAD_EDGE, SHOULDER_EDGE];
   for (let i = 0; i <= segments; i++) {
-    const x = -extent + (2 * extent * i) / segments;
+    const x = -span + (2 * span * i) / segments;
     const centerZ = highwayZ(x);
     const deck = highwayDeckHeight(x, raised);
     for (const offset of offsets)
@@ -375,9 +377,9 @@ function roadRibbon(raised, halfWidth, lift, color, start = -extent, end = exten
     new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide }),
   );
 }
-function makeRoads(group, raised) {
-  group.add(roadShoulderRibbon(raised));
-  group.add(roadRibbon(raised, 5.2, 0.016, 0x353b3d));
+export function makeRoads(group, raised, span = extent) {
+  group.add(roadShoulderRibbon(raised, span));
+  group.add(roadRibbon(raised, 5.2, 0.016, 0x353b3d, -span, span));
   const markings = { white: { vertices: [], indices: [] }, yellow: { vertices: [], indices: [] } };
   const addMark = (x0, x1, offset, width, kind) => {
     const { vertices, indices } = markings[kind];
@@ -389,15 +391,15 @@ function makeRoads(group, raised) {
     }
     indices.push(first, first + 1, first + 2, first + 1, first + 3, first + 2);
   };
-  for (let x = -extent; x < extent; x += 5.5) {
+  for (let x = -span; x < span; x += 5.5) {
     for (const side of [-2.55, 2.55])
-      addMark(x, Math.min(extent, x + 3.2), side, 0.12, "white");
+      addMark(x, Math.min(span, x + 3.2), side, 0.12, "white");
   }
-  for (let x = -extent; x < extent; x += 1.5) {
+  for (let x = -span; x < span; x += 1.5) {
     for (const side of [-4.75, 4.75])
-      addMark(x, Math.min(extent, x + 1.5), side, 0.11, "white");
+      addMark(x, Math.min(span, x + 1.5), side, 0.11, "white");
     for (const side of [-0.14, 0.14])
-      addMark(x, Math.min(extent, x + 1.5), side, 0.1, "yellow");
+      addMark(x, Math.min(span, x + 1.5), side, 0.1, "yellow");
   }
   for (const [kind, { vertices, indices }] of Object.entries(markings)) {
     const geometry = new THREE.BufferGeometry();
@@ -529,6 +531,8 @@ export class LayerExperience {
     this.fallingFromRoad = false;
     this.fallVelocity = 0;
     this.visitorMarkers = [];
+    this.walkExtent = LANDSCAPE_EXTENT;
+    this.teleportMaxDistance = TELEPORT_MAX_DISTANCE;
     this.floorY = 0;
     this.walkForward = new THREE.Vector3();
     this.group = new THREE.Group();
@@ -636,7 +640,10 @@ export class LayerExperience {
     const variant = raised ? this.variants.raised : this.variants.flat;
     const pick = raised ? this.pickGround : this.pickFlatGround;
     pick.updateWorldMatrix(true, false);
-    const groundHit = raycaster.intersectObject(pick, false)[0];
+    for (const extra of this.additionalPickGround ?? [])
+      extra.updateWorldMatrix(true, false);
+    const groundHit = raycaster.intersectObjects(
+      raised ? [pick, ...(this.additionalPickGround ?? [])] : [pick], false)[0];
     const roadMesh = this.selected.has("roads") && variant.roads.visible &&
       variant.roads.scale.y > 0.95 ? variant.roads.children[1] : null;
     roadMesh?.updateWorldMatrix(true, false);
@@ -644,7 +651,7 @@ export class LayerExperience {
     const roadFromAbove = roadHit && raycaster.ray.origin.y > roadHit.point.y + 0.1;
     const onRoad = !!roadFromAbove && (!groundHit || roadHit.distance < groundHit.distance);
     const hit = onRoad ? roadHit : groundHit;
-    if (!hit || hit.distance > TELEPORT_MAX_DISTANCE || hit.distance < 1) return null;
+    if (!hit || hit.distance > this.teleportMaxDistance || hit.distance < 1) return null;
     if (uiHit && uiHit.distance < hit.distance) return null;
     if (this.clipboard.visible) {
       const board = this.clipboard.children[0];
@@ -653,7 +660,7 @@ export class LayerExperience {
       if (boardHit && boardHit.distance < hit.distance) return null;
     }
     const local = this.group.worldToLocal(hit.point.clone());
-    const limit = LANDSCAPE_EXTENT - 4;
+    const limit = this.walkExtent - 4;
     if (Math.abs(local.x) > limit || Math.abs(local.z) > limit) return null;
     const scaleY = variant.world.scale.y;
     const groundAt = (x, z) => this.walkHeightAt(x, z, raised) * scaleY;
@@ -674,7 +681,7 @@ export class LayerExperience {
   teleportTo(candidate, camera) {
     if (!this.started || this.finished || !candidate?.valid) return false;
     if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.z)) return false;
-    const limit = LANDSCAPE_EXTENT - 4;
+    const limit = this.walkExtent - 4;
     if (Math.abs(candidate.x) > limit || Math.abs(candidate.z) > limit) return false;
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const landing = this.group.localToWorld(new THREE.Vector3(candidate.x, 0, candidate.z));
@@ -703,7 +710,7 @@ export class LayerExperience {
       const s = Math.sin(this.group.rotation.y);
       const dx = c * worldX - s * worldZ;
       const dz = s * worldX + c * worldZ;
-      const limit = LANDSCAPE_EXTENT - 4;
+      const limit = this.walkExtent - 4;
       const nextX = THREE.MathUtils.clamp(local.x + dx, -limit, limit);
       const nextZ = THREE.MathUtils.clamp(local.z + dz, -limit, limit);
       const appliedX = nextX - local.x;

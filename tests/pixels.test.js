@@ -11,6 +11,15 @@ test("pixel size changes ground area while retaining the same source landscape",
     const raster = model.raster(size);
     assert.equal(raster.cells, Math.ceil((PIXEL_EXTENT * 2) / size));
     assert.equal(raster.pixels.length, raster.cells ** 2);
+    if (size === 1) {
+      for (const index of [0, raster.cells * 500 + 500, raster.pixels.length - 1]) {
+        const { counts, rgb, sampledArea } = raster.pixels[index];
+        assert.equal(counts.reduce((sum, n) => sum + n, 0), sampledArea);
+        assert.equal(sampledArea, 1);
+        assert.ok(rgb.every((band) => band >= 0 && band <= 255));
+      }
+      continue;
+    }
     let totalArea = 0;
     for (const { counts, rgb, sampledArea } of raster.pixels) {
       assert.equal(counts.reduce((sum, n) => sum + n, 0), sampledArea);
@@ -23,12 +32,12 @@ test("pixel size changes ground area while retaining the same source landscape",
   const coarse = model.cellAt(0, -3, 30);
   assert.equal(fine.x0, 0);
   assert.equal(fine.z0, -3);
-  assert.equal(coarse.x0, -12);
-  assert.equal(coarse.z0, -12);
+  assert.equal(coarse.x0, -20);
+  assert.equal(coarse.z0, -20);
   assert.ok(coarse.counts.filter(Boolean).length >= 3);
   assert.ok(model.raster(30) === model.raster(30));
-  assert.equal(model.raster(10).pixels.at(-1).sampledArea, 4 ** 2);
-  assert.equal(model.raster(30).pixels.at(-1).sampledArea, 24 ** 2);
+  assert.equal(model.raster(10).pixels.at(-1).sampledArea, 10 ** 2);
+  assert.equal(model.raster(30).pixels.at(-1).sampledArea, 10 ** 2);
   assert.deepEqual(model.cellAt(0, -3, 1000).counts, model.raster(1000).pixels[0].counts);
   assert.equal(model.cellAt(0, -3, 1000).x0, -500);
   assert.throws(() => model.raster(7), RangeError);
@@ -75,15 +84,28 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.ok(demo.footprint.parent === demo.variants.raised.world);
   demo.setSize(1000);
   assert.equal(demo.cell.size, 1000);
-  assert.equal(demo.cell.sampledArea, 144 ** 2);
+  assert.equal(demo.cell.sampledArea, 1000 ** 2);
+  assert.equal(demo.walkExtent, 500);
+  assert.ok(demo.additionalPickGround[0].geometry.attributes.position.count > 0);
   assert.ok(demo.footprint.scale.x < 1);
   demo.update(0.7);
   assert.equal(demo.footprint.scale.x, 1);
+  const bounds = new THREE.Box3().setFromObject(demo.footprint);
+  assert.ok(bounds.min.x <= -499 && bounds.max.x >= 499);
+  assert.ok(bounds.min.z <= -499 && bounds.max.z >= 499);
   assert.equal(demo.pureWaterAt30, false);
   demo.predictPureWater(false);
   assert.equal(demo.answer, false);
   demo.placeFromMap({ uv: new THREE.Vector2(0.25, 0.75) });
   assert.deepEqual(demo.probe, { x: -36, z: -36 });
+  demo.placeFromMap({ uv: new THREE.Vector2(0.25, 0.75) }, 500);
+  assert.deepEqual(demo.probe, { x: -250, z: -250 });
+  const farRay = new THREE.Raycaster(
+    new THREE.Vector3(400, 250, 0),
+    new THREE.Vector3(0, -1, 0),
+  );
+  assert.equal(demo.placeFromRay(farRay), true);
+  assert.ok(Math.abs(demo.probe.x - 400) < 1);
   const ray = new THREE.Raycaster(
     new THREE.Vector3(9, 60, -18),
     new THREE.Vector3(0, -1, 0),
