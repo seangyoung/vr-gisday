@@ -1,12 +1,13 @@
 import * as THREE from "three";
+import { GlobeSpin } from "./projection-model.js";
 
 export const PLATFORMS = [
   { id: "satellite", label: "Satellite", name: "Landsat satellite",
-    note: "Spatial resolution: 30 m pixels across wide areas.\nTemporal resolution: scheduled revisits; clouds can hide the ground.\nCost: Landsat images are free to use." },
+    note: "Landsat often records 30 m pixels across a wide swath.\nOne pixel can blend roads, fields, and water.\nRepeat coverage is scheduled; Landsat images are free." },
   { id: "aircraft", label: "Aircraft", name: "Survey aircraft",
-    note: "Spatial resolution: finer detail over a chosen region.\nTemporal resolution: fly when conditions and schedules allow.\nCost: aircraft, crew, and sensors make each survey costly." },
+    note: "A survey aircraft can capture sub-meter pixels over a region.\nSensor optics and flight height set the pixel width.\nFlights need aircraft, crew, and sensors." },
   { id: "drone", label: "Drone", name: "Camera drone",
-    note: "Spatial resolution: very fine detail over a small site.\nTemporal resolution: repeat flights as weather and rules allow.\nCost: a lower-cost launch, with many flights for broad coverage." },
+    note: "Low flights can make centimeter-scale pixels.\nA flight covers a small area; many flights cover a region.\nDetail depends on camera, height, and overlap." },
 ];
 
 const basic = (color, extras = {}) => new THREE.MeshStandardMaterial({
@@ -281,6 +282,103 @@ export function alignSensingFootprints(group, items) {
     item.footprint.position.z = aperture.z;
     item.ring.position.x = aperture.x;
     item.ring.position.z = aperture.z;
+  }
+}
+
+export class RemotePlatformScene {
+  constructor(parent, onChange) {
+    const { group, items, pickTargets } = makePlatformComparison();
+    this.group = group;
+    this.items = items;
+    this.pickTargets = pickTargets;
+    this.selected = "satellite";
+    this.spinBy = null;
+    this.spinItem = null;
+    this.onChange = onChange;
+    for (const item of items) item.spin = new GlobeSpin();
+    highlightPlatform(items, this.selected);
+    group.visible = false;
+    parent.add(group);
+  }
+  get selection() {
+    return this.items.find((item) => item.id === this.selected);
+  }
+  select(id) {
+    if (!this.group.visible || !this.items.some((item) => item.id === id)) return false;
+    this.selected = id;
+    highlightPlatform(this.items, id);
+    alignSensingFootprints(this.group, this.items);
+    this.onChange();
+    return true;
+  }
+  selectFromRay(raycaster) {
+    if (!this.group.visible) return false;
+    this.group.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObjects(this.pickTargets, false)[0];
+    return hit ? this.select(hit.object.userData.platform) : false;
+  }
+  rayAngles(raycaster) {
+    this.group.updateWorldMatrix(true, false);
+    const direction = raycaster.ray.direction.clone()
+      .transformDirection(this.group.matrixWorld.clone().invert());
+    return [Math.atan2(direction.x, -direction.z),
+      Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1))];
+  }
+  beginSpin(raycaster, source) {
+    if (!this.group.visible || this.spinBy !== null) return false;
+    this.group.updateWorldMatrix(true, true);
+    const hit = raycaster.intersectObjects(this.pickTargets, false)[0];
+    if (!hit) return false;
+    const item = this.items.find(({ id }) => id === hit.object.userData.platform);
+    this.spinBy = source;
+    this.spinItem = item;
+    item.spin.begin(...this.rayAngles(raycaster));
+    this.select(item.id);
+    return true;
+  }
+  dragSpin(raycaster, source, dt) {
+    if (this.spinBy !== source || !this.spinItem) return false;
+    this.spinItem.spin.drag(...this.rayAngles(raycaster), dt);
+    this.spinItem.model.rotation.set(
+      this.spinItem.spin.pitch, this.spinItem.spin.yaw, 0, "XYZ");
+    alignSensingFootprints(this.group, this.items);
+    return true;
+  }
+  endSpin(source) {
+    if (this.spinBy !== source) return false;
+    this.spinItem.spin.end();
+    this.spinBy = null;
+    this.spinItem = null;
+    return true;
+  }
+  update(dt, elapsed) {
+    if (!this.group.visible) return;
+    for (const item of this.items) {
+      item.spin.step(dt);
+      item.model.rotation.set(item.spin.pitch, item.spin.yaw, 0, "XYZ");
+      item.cone.material.opacity = item.id === this.selected
+        ? 0.17 + 0.045 * Math.sin(elapsed * 3) : 0.055;
+      for (const rotor of item.model.userData.rotors || [])
+        rotor.rotation.y += dt * 10;
+    }
+    alignSensingFootprints(this.group, this.items);
+  }
+  hide() {
+    if (this.spinBy !== null) this.endSpin(this.spinBy);
+    this.group.visible = false;
+  }
+  dispose() {
+    this.hide();
+    this.group.removeFromParent();
+    const geometries = new Set(), materials = new Set();
+    this.group.traverse((object) => {
+      if (object.geometry) geometries.add(object.geometry);
+      if (object.material)
+        for (const material of Array.isArray(object.material)
+          ? object.material : [object.material]) materials.add(material);
+    });
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
   }
 }
 

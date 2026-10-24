@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { TimedExhibit } from "../src/showcase/exhibit.js";
 import { displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "../src/showcase/spectral-model.js";
-import { makePlatformComparison, highlightPlatform,
+import { makePlatformComparison, highlightPlatform, RemotePlatformScene,
   alignSensingFootprints } from "../src/showcase/remote-platforms.js";
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "../src/showcase/spectral-scenes.js";
 import { SPECTRAL_LESSON_STEPS,
@@ -81,6 +81,25 @@ test("all sensing footprints originate at their cameras while models spin", () =
     assert.ok(camera.distanceTo(tip) < 1e-6,
       `${item.id} sensing cone should begin at its camera`);
   }
+});
+
+test("the moved platform scene still supports selection and inertial trigger spinning", () => {
+  const parent = new THREE.Group();
+  const platforms = new RemotePlatformScene(parent, () => {});
+  platforms.group.visible = true;
+  const ray = new THREE.Raycaster(
+    new THREE.Vector3(0, 0.09, 1), new THREE.Vector3(0, 0, -1));
+  assert.equal(platforms.beginSpin(ray, 1), true);
+  assert.equal(platforms.selection.id, "aircraft");
+  const moved = new THREE.Raycaster(
+    new THREE.Vector3(0, 0.09, 1),
+    new THREE.Vector3(0.18, 0, -1).normalize());
+  assert.equal(platforms.dragSpin(moved, 1, 0.1), true);
+  assert.equal(platforms.endSpin(1), true);
+  platforms.update(0.016, 1);
+  assert.notEqual(platforms.selection.model.rotation.y, 0);
+  platforms.dispose();
+  assert.equal(parent.children.length, 0);
 });
 
 test("real spectral scenes rotate without an immediate repeat", () => {

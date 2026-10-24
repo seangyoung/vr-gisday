@@ -781,7 +781,7 @@ function startPixels() {
   viewshed?.dispose();
   viewshed = null;
   pixels?.dispose();
-  pixels = new PixelExperience(scene, draw, (event) => sound.cue(event));
+  pixels = new PixelExperience(scene, draw, (event) => sound.cue(event), root);
   pixels.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -1201,12 +1201,29 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Ground sample distance (GSD) is one image pixel's width on the ground.\nA larger pixel can mix a narrow river or road with nearby land.\nCompare 1 m, 10 m, 30 m, and 1 km views of the same place.",
+      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 1 m, 10 m, 30 m, and 1 km pixels.",
       0.13,
     );
-    button("Compare pixels", 0, -0.43, () => p.begin(), 1.5);
-    label("Raise your left hand for the clipboard.\nUse the right trigger to compare pixels.",
+    button("Meet the sensors", 0, -0.43, () => p.begin(), 1.5);
+    label("Point at a platform or trigger-drag a model to spin it.",
       0, -0.72, 2.3, 0.17, 29, "#b6d1d9", "#0b2430");
+    return;
+  }
+  if (p.phase === "platforms") {
+    label("How Big Is a Pixel? · spatial resolution", 0, 1.14, 2.45, 0.18,
+      43, "#e6f4f5", "#0b2430");
+    label("Circles show coverage; GSD is one pixel's ground width.\nOptics and altitude affect detail. Trigger-drag a model to spin.",
+      0, 0.94, 2.36, 0.14, 27, "#b6d1d9", "#0b2430");
+    const choice = p.platformScene.selection;
+    label(choice.name, 0, -0.44, 2.42, 0.09,
+      30, "#e6f4f5", "#0b2430");
+    label(choice.note, 0, -0.61, 2.42, 0.21,
+      25, "#d8f3e6", "#0b2430");
+    for (const [index, item] of p.platformScene.items.entries())
+      button(item.label, (index - 1) * 0.78, -0.84,
+        () => p.platformScene.select(item.id), 0.7,
+        p.platformScene.selected === item.id);
+    button("Enter pixel landscape", 0, -1.06, () => p.showPixels(), 1.6);
     return;
   }
   label(
@@ -1215,7 +1232,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Ground sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend narrow roads and rivers with nearby land.\nThis 144 m scene fills only about 2% of a 1 km pixel.",
+      "Satellite, aircraft, and drone sensors trade coverage for ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nLarge pixels blend roads and rivers with nearby land; this 144 m scene fills about 2% of a 1 km pixel.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -1274,8 +1291,8 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Remote sensing collects information from a distance.\nSatellites, aircraft, and drones carry imaging sensors.\nExplore their strengths, then see how sensors record visible and invisible light.",
-        "Meet the sensors"],
+        "Remote sensing measures energy reflected by Earth's surfaces.\nSensors record visible light and wavelengths our eyes cannot see.\nFollow light through a prism, then use near infrared to assess vegetation.",
+        "Explore light bands"],
       cluster: ["Where Did the Cluster Go?",
         "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
@@ -1299,22 +1316,6 @@ function drawShowcaseUI() {
       ? "About four minutes · Use the action buttons below."
       : "About four minutes · Raise a controller to see its button labels.",
       0, -0.72, 2.3, 0.12, 29, "#b6d1d9", "#0b2430");
-    return;
-  }
-  if (exhibit.kind === "spectral" && exhibit.phase === "platforms" && !exhibit.finished) {
-    label("See the Invisible · remote sensing platforms", 0, 1.06, 2.45, 0.18,
-      43, "#e6f4f5", "#0b2430");
-    label("Spatial resolution = detail; temporal resolution = revisit time.\nTrigger-drag a model to spin it.",
-      0, 0.86, 2.36, 0.14, 28, "#b6d1d9", "#0b2430");
-    const choice = exhibit.platformItems.find((item) => item.id === exhibit.platform);
-    label(choice.name, 0, -0.44, 2.42, 0.09,
-      30, "#e6f4f5", "#0b2430");
-    label(choice.note, 0, -0.61, 2.42, 0.21,
-      25, "#d8f3e6", "#0b2430");
-    for (const [index, item] of exhibit.platformItems.entries())
-      button(item.label, (index - 1) * 0.78, -0.84,
-        () => exhibit.selectPlatform(item.id), 0.7, exhibit.platform === item.id);
-    button("Explore light bands", 0, -1.06, () => exhibit.showSpectrum(), 1.48);
     return;
   }
   if (exhibit.kind === "spectral" && exhibit.phase === "spectrum" && !exhibit.finished) {
@@ -2255,7 +2256,8 @@ function draw() {
       };
       panel.append(b);
     }
-    const previewLandscape = pixels ?? viewshed ?? layers;
+    const previewLandscape = (pixels?.phase === "pixels" ? pixels : null) ??
+      viewshed ?? layers;
     if (previewLandscape?.started && !previewLandscape.finished) {
       const b = document.createElement("button");
       b.textContent = teleport.active
@@ -2324,7 +2326,10 @@ function controllerGuideContext(hand) {
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
       viewshed.isAtTop ? "Grip pole" : "Grip rung / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
-  if ((layers?.started && !layers.finished) || (pixels?.started && !pixels.finished))
+  if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
+    return ["Select / spin", null, onMenu, exitLabel];
+  if ((layers?.started && !layers.finished) ||
+      (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
     return [hand === "left" ? null : "Select", null, onMenu, exitLabel, teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
@@ -2337,7 +2342,8 @@ function controllerGuideContext(hand) {
 }
 function leftHoldsClipboard(controller) {
   return controller.userData.xrInput?.handedness === "left" &&
-    (layers?.started || viewshed?.started || pixels?.started ||
+    (layers?.started || viewshed?.started ||
+      pixels?.started && pixels.phase === "pixels" ||
       scan?.station && scan.started && !scan.finished);
 }
 function updateControllerGuides(cam, tracked, dt) {
@@ -2387,7 +2393,7 @@ function drawScene() {
     rain ? `rain:${rain.kind}:${rain.stage}` : `position:${step}`;
   if (key !== lastUIKey) uiFadeAge = 0;
   lastUIKey = key;
-  uiParent = (pixels?.started ? pixels.ui : null) ??
+  uiParent = (pixels?.started && pixels.phase === "pixels" ? pixels.ui : null) ??
     (viewshed?.started ? viewshed.ui : null) ??
     (layers?.started ? layers.ui : null) ??
     (scan?.station && scan.started && !scan.finished ? scan.ui : null) ?? content;
@@ -2773,15 +2779,13 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (pixels) {
-      if (pixels.placeFromRay(raycaster)) sound.click();
+      if (pixels.phase === "platforms") {
+        if (pixels.platformScene.beginSpin(raycaster, i) ||
+            pixels.platformScene.selectFromRay(raycaster)) sound.click();
+      } else if (pixels.placeFromRay(raycaster)) sound.click();
       return;
     }
     if (showcase) {
-      if (showcase.kind === "spectral" &&
-          showcase.beginPlatformSpin(raycaster, i)) {
-        sound.click();
-        return;
-      }
       if (["projection", "change"].includes(showcase.kind) &&
           showcase.beginInteraction(raycaster, i)) {
         sound.click();
@@ -2798,7 +2802,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("selectend", () => {
     showcase?.endInteraction?.(i);
-    showcase?.endPlatformSpin?.(i);
+    pixels?.platformScene?.endSpin(i);
     scan?.endPreviewDrag?.(i);
     rain?.endStroke(i);
     c.userData.raining = false;
@@ -2905,7 +2909,7 @@ for (let i = 0; i < 2; i++) {
     rain?.grab.release(i, false);
     showcase?.grab?.release(i, false);
     showcase?.endContinentGrip?.(i);
-    showcase?.endPlatformSpin?.(i);
+    pixels?.platformScene?.endSpin(i);
     rain?.endStroke(i);
     c.userData.raining = false;
     c.userData.scanning = false;
@@ -3105,7 +3109,10 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    const landscapeDemo = pixels ?? viewshed ?? layers ?? (scan?.station ? scan : null);
+    const landscapeDemo = (pixels?.phase === "pixels" ? pixels : null) ??
+      viewshed ?? layers ?? (scan?.station ? scan : null);
+    if (pixels?.phase === "platforms" && visibleSession && !soundMenuOpen)
+      pixels.update(dt);
     if (["projection", "change"].includes(showcase?.kind) &&
         showcase.draggingBy !== null) {
       const active = controllers.find(({ id }) => id === showcase.draggingBy);
@@ -3116,13 +3123,13 @@ renderer.setAnimationLoop((time, frame) => {
         showcase.dragInteraction(raycaster, active.id, dt);
       }
     }
-    if (showcase?.kind === "spectral" && showcase.platformSpinBy !== null) {
-      const active = controllers.find(({ id }) => id === showcase.platformSpinBy);
+    if (pixels?.platformScene?.spinBy != null) {
+      const active = controllers.find(({ id }) => id === pixels.platformScene.spinBy);
       if (!visibleSession || !active?.c.visible || soundMenuOpen)
-        showcase.endPlatformSpin(showcase.platformSpinBy);
+        pixels.platformScene.endSpin(pixels.platformScene.spinBy);
       else {
         intersect(active.c);
-        showcase.dragPlatformSpin(raycaster, active.id, dt);
+        pixels.platformScene.dragSpin(raycaster, active.id, dt);
       }
     }
     if (showcase?.kind === "projection" &&
@@ -3345,7 +3352,7 @@ renderer.setAnimationLoop((time, frame) => {
         !showcase?.grab?.hands.has(id) &&
         showcase?.continentGripBy !== id &&
         showcase?.draggingBy !== id &&
-        showcase?.platformSpinBy !== id;
+        pixels?.platformScene?.spinBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
       if (teleport.active && teleport.demo === landscapeDemo &&
           c.userData.xrInput?.handedness === "right") {
@@ -3383,9 +3390,12 @@ renderer.setAnimationLoop((time, frame) => {
   }
   if (devPreview && (pixels || viewshed || layers || scan?.station) && !renderer.xr.isPresenting &&
       !soundMenuOpen) {
-    const landscapeDemo = pixels ?? viewshed ?? layers ?? scan;
-    if (!landscapeDemo.station) landscapeDemo.update(dt);
-    landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
+    if (pixels?.phase === "platforms") pixels.update(dt);
+    else {
+      const landscapeDemo = pixels ?? viewshed ?? layers ?? scan;
+      if (!landscapeDemo.station) landscapeDemo.update(dt);
+      landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
+    }
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
     showcase.update(dt);
@@ -3415,7 +3425,8 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
-  const landscapeAudioDemo = pixels ?? viewshed ?? layers ?? (scan?.station ? scan : null);
+  const landscapeAudioDemo = (pixels?.phase === "pixels" ? pixels : null) ??
+    viewshed ?? layers ?? (scan?.station ? scan : null);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
   sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
   const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
@@ -3521,13 +3532,19 @@ if (
     else if (soundMenuOpen) return;
     else if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
-    else if (pixels) pixels.placeFromRay(raycaster);
+    else if (pixels) {
+      if (pixels.phase === "platforms") {
+        if (pixels.platformScene.beginSpin(raycaster, "preview")) {
+          previewSpinPointer = e.pointerId;
+          previewSpinTime = e.timeStamp;
+          renderer.domElement.setPointerCapture(e.pointerId);
+        } else pixels.platformScene.selectFromRay(raycaster);
+      } else pixels.placeFromRay(raycaster);
+    }
     else if (showcase) {
       const picked = showcase.kind === "projection" &&
         showcase.beginContinentGrip(raycaster, "preview");
-      if (picked || (showcase.kind === "spectral" &&
-          showcase.beginPlatformSpin(raycaster, "preview")) ||
-          (["projection", "change"].includes(showcase.kind) &&
+      if (picked || (["projection", "change"].includes(showcase.kind) &&
           showcase.beginInteraction(raycaster, "preview"))) {
         previewSpinPointer = e.pointerId;
         previewSpinTime = e.timeStamp;
@@ -3551,7 +3568,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
-      showcase?.endPlatformSpin?.("preview");
+      pixels?.platformScene?.endSpin("preview");
       previewSpinPointer = null;
     }
   });
@@ -3559,7 +3576,7 @@ if (devPreview) {
     if (e.pointerId === previewSpinPointer) {
       showcase?.endInteraction?.("preview");
       showcase?.endContinentGrip?.("preview");
-      showcase?.endPlatformSpin?.("preview");
+      pixels?.platformScene?.endSpin("preview");
       previewSpinPointer = null;
     }
   });
@@ -3582,7 +3599,7 @@ if (devPreview) {
       showcase?.dragInteraction?.(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       showcase?.dragContinentGrip?.(raycaster, "preview");
-      showcase?.dragPlatformSpin?.(raycaster, "preview",
+      pixels?.platformScene?.dragSpin(raycaster, "preview",
         Math.min(0.1, (e.timeStamp - previewSpinTime) / 1000));
       previewSpinTime = e.timeStamp;
       return;

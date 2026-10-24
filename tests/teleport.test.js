@@ -89,6 +89,7 @@ test("the pixel and viewshed demos inherit teleport, with canyon walls rejected"
   const pixels = new PixelExperience(new THREE.Scene(), () => {});
   pixels.place(camera);
   pixels.begin();
+  pixels.showPixels();
   const pixelRay = new THREE.Raycaster(
     pixels.group.localToWorld(new THREE.Vector3(25, 30, 25)),
     new THREE.Vector3(0, -1, 0),

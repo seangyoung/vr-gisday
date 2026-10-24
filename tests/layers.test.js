@@ -261,6 +261,7 @@ test("layers and pixel visitors briefly fall after walking off the bridge side",
     camera.position.set(0, 1.6, 0);
     demo.place(camera);
     demo.begin();
+    if (demo instanceof PixelExperience) demo.showPixels();
     demo.selected = new Set(["topography", "roads"]);
     demo.applyVisibility();
     demo.group.rotation.y = 0;

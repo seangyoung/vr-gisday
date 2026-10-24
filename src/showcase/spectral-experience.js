@@ -5,9 +5,6 @@ import { BAND_NAMES, displayedBandBrightness, displayIndexPixel, displayIndexVal
 import { SPECTRAL_SCENES, createSpectralSceneRotation } from "./spectral-scenes.js";
 import { SPECTRAL_LESSON_STEPS, nextSpectralLessonStep,
   drawSpectralLesson } from "./spectral-lesson.js";
-import { makePlatformComparison, highlightPlatform,
-  alignSensingFootprints } from "./remote-platforms.js";
-import { GlobeSpin } from "./projection-model.js";
 import bayNaturalUrl from "./data/landsat-sf-natural.jpg";
 import bayFalseUrl from "./data/landsat-sf-false.jpg";
 import evergladesNaturalUrl from "./data/landsat-florida-natural.jpg";
@@ -149,8 +146,7 @@ export class SpectralExperience extends TimedExhibit {
   constructor(root, onChange) {
     super(root, onChange);
     this.kind = "spectral";
-    this.phase = "platforms";
-    this.platform = "satellite";
+    this.phase = "spectrum";
     this.mode = "natural";
     this.nextSceneInRotation = createSpectralSceneRotation();
     this.sceneInfo = this.nextSceneInRotation();
@@ -174,16 +170,7 @@ export class SpectralExperience extends TimedExhibit {
     this.spectrum = canvasPanel(this.lessonCanvas, 2.35, 1.13, 0, 0.2);
     this.image.visible = false;
     this.graph.visible = false;
-    this.spectrum.visible = false;
-    const comparison = makePlatformComparison();
-    this.platformGroup = comparison.group;
-    this.platformItems = comparison.items;
-    this.platformHits = comparison.pickTargets;
-    this.platformSpinBy = null;
-    this.platformSpinItem = null;
-    for (const item of this.platformItems) item.spin = new GlobeSpin();
-    highlightPlatform(this.platformItems, this.platform);
-    this.group.add(this.image, this.graph, this.platformGroup, this.spectrum);
+    this.group.add(this.image, this.graph, this.spectrum);
     this.loadScene();
     for (const scene of SPECTRAL_SCENES.slice(1))
       this.getSceneData(scene).catch(() => {});
@@ -275,74 +262,7 @@ export class SpectralExperience extends TimedExhibit {
         this.lessonFrameTime = 0;
       }
     }
-    if (this.started && !this.finished && this.phase === "platforms")
-      for (const item of this.platformItems) {
-        item.spin.step(dt);
-        item.model.rotation.set(item.spin.pitch, item.spin.yaw, 0, "XYZ");
-        item.cone.material.opacity = item.id === this.platform
-          ? 0.17 + 0.045 * Math.sin(this.elapsed * 3) : 0.055;
-        for (const rotor of item.model.userData.rotors || [])
-          rotor.rotation.y += dt * 10;
-      }
-    if (this.started && !this.finished && this.phase === "platforms")
-      alignSensingFootprints(this.platformGroup, this.platformItems);
-    if (this.finished && this.platformSpinBy !== null)
-      this.endPlatformSpin(this.platformSpinBy);
     if (this.finished) this.group.visible = false;
-  }
-  selectPlatform(platform) {
-    if (!this.started || this.finished || this.phase !== "platforms" ||
-        !this.platformItems.some((item) => item.id === platform)) return;
-    this.platform = platform;
-    highlightPlatform(this.platformItems, platform);
-    alignSensingFootprints(this.platformGroup, this.platformItems);
-    this.onChange();
-  }
-  platformRayAngles(raycaster) {
-    this.group.updateWorldMatrix(true, false);
-    const inverse = this.group.matrixWorld.clone().invert();
-    const direction = raycaster.ray.direction.clone().transformDirection(inverse);
-    return [Math.atan2(direction.x, -direction.z),
-      Math.asin(THREE.MathUtils.clamp(direction.y, -1, 1))];
-  }
-  beginPlatformSpin(raycaster, source) {
-    if (!this.started || this.finished || this.phase !== "platforms" ||
-        this.platformSpinBy !== null) return false;
-    this.platformGroup.updateWorldMatrix(true, true);
-    const hit = raycaster.intersectObjects(this.platformHits, false)[0];
-    if (!hit) return false;
-    const item = this.platformItems.find(({ id }) => id === hit.object.userData.platform);
-    this.platformSpinBy = source;
-    this.platformSpinItem = item;
-    item.spin.begin(...this.platformRayAngles(raycaster));
-    this.selectPlatform(item.id);
-    return true;
-  }
-  dragPlatformSpin(raycaster, source, dt) {
-    if (this.platformSpinBy !== source || !this.platformSpinItem) return false;
-    this.platformSpinItem.spin.drag(...this.platformRayAngles(raycaster), dt);
-    this.platformSpinItem.model.rotation.set(
-      this.platformSpinItem.spin.pitch, this.platformSpinItem.spin.yaw, 0, "XYZ");
-    alignSensingFootprints(this.platformGroup, this.platformItems);
-    return true;
-  }
-  endPlatformSpin(source) {
-    if (this.platformSpinBy !== source) return false;
-    this.platformSpinItem.spin.end();
-    this.platformSpinBy = null;
-    this.platformSpinItem = null;
-    return true;
-  }
-  showSpectrum() {
-    if (!this.started || this.finished || this.phase !== "platforms") return;
-    if (this.platformSpinBy !== null) this.endPlatformSpin(this.platformSpinBy);
-    this.phase = "spectrum";
-    this.lessonStep = 0;
-    this.lessonTime = 0;
-    this.lessonFrameTime = 0;
-    this.platformGroup.visible = false;
-    this.spectrum.visible = true;
-    this.onChange();
   }
   advanceLesson() {
     if (!this.started || this.finished || this.phase !== "spectrum") return;
@@ -375,13 +295,6 @@ export class SpectralExperience extends TimedExhibit {
   }
   selectFromRay(raycaster) {
     if (!this.started || this.finished || this.takeawayOpen) return false;
-    if (this.phase === "platforms") {
-      this.platformGroup.updateWorldMatrix(true, true);
-      const hit = raycaster.intersectObjects(this.platformHits, false)[0];
-      if (!hit) return false;
-      this.selectPlatform(hit.object.userData.platform);
-      return true;
-    }
     if (this.phase !== "bands" || !this.ready) return false;
     this.image.updateWorldMatrix(true, false);
     const hit = raycaster.intersectObject(this.image, false)[0];

@@ -67,6 +67,15 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.equal(demo.size, 30);
   demo.begin();
   assert.equal(demo.started, true);
+  assert.equal(demo.phase, "platforms");
+  assert.equal(demo.group.visible, false);
+  assert.equal(demo.platformScene.group.visible, true);
+  assert.equal(demo.platformScene.select("drone"), true);
+  assert.equal(demo.platformScene.selection.id, "drone");
+  demo.showPixels();
+  assert.equal(demo.phase, "pixels");
+  assert.equal(demo.group.visible, true);
+  assert.equal(demo.platformScene.group.visible, false);
   assert.equal(demo.size, 30);
   assert.equal(demo.selected.has("topography"), true);
   assert.equal(demo.selected.has("floodplain"), false);

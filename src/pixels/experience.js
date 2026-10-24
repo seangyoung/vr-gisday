@@ -8,6 +8,7 @@ import {
   riverX,
 } from "../layers/experience.js";
 import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "./model.js";
+import { RemotePlatformScene } from "../showcase/remote-platforms.js";
 
 const gold = 0xffd36f;
 const clamp = (value) => THREE.MathUtils.clamp(value, -PIXEL_EXTENT + 0.001, PIXEL_EXTENT - 0.001);
@@ -86,8 +87,15 @@ function footprint(cell) {
 }
 
 export class PixelExperience extends LayerExperience {
-  constructor(scene, onChange, onEvent = () => {}) {
+  constructor(scene, onChange, onEvent = () => {}, platformParent = scene) {
     super(scene, onChange);
+    this.phase = "platforms";
+    this.landscapeBackground = scene.background;
+    this.landscapeFog = scene.fog;
+    scene.background = this.previousBackground;
+    scene.fog = null;
+    this.group.visible = false;
+    this.platformScene = new RemotePlatformScene(platformParent, onChange);
     this.onEvent = onEvent;
     this.clipboardBaseScale = 0.26;
     this.clipboard.scale.setScalar(this.clipboardBaseScale);
@@ -100,6 +108,20 @@ export class PixelExperience extends LayerExperience {
     this.footprintAge = 1;
     this.footprint = null;
     this.refreshFootprint();
+  }
+  begin() {
+    if (this.started) return;
+    this.platformScene.group.visible = true;
+    super.begin();
+  }
+  showPixels() {
+    if (!this.started || this.finished || this.phase !== "platforms") return;
+    this.phase = "pixels";
+    this.platformScene.hide();
+    this.group.visible = true;
+    this.scene.background = this.landscapeBackground;
+    this.scene.fog = this.landscapeFog;
+    this.onChange();
   }
   get cell() {
     return this.model.cellAt(this.probe.x, this.probe.z, this.size);
@@ -129,7 +151,8 @@ export class PixelExperience extends LayerExperience {
     this.variants.raised.world.add(this.footprint);
   }
   setSize(size) {
-    if (!this.started || this.finished || !PIXEL_SIZES.includes(size) || this.size === size) return;
+    if (!this.started || this.finished || this.phase !== "pixels" ||
+        !PIXEL_SIZES.includes(size) || this.size === size) return;
     const previous = this.size;
     this.size = size;
     this.refreshFootprint(previous);
@@ -139,6 +162,8 @@ export class PixelExperience extends LayerExperience {
   update(dt) {
     if (!this.started) return;
     super.update(dt);
+    if (this.phase === "platforms" && !this.finished)
+      this.platformScene.update(dt, this.elapsed);
     if (!this.footprint || this.footprintAge >= 1) return;
     this.footprintAge = Math.min(1, this.footprintAge + dt / 0.7);
     const current = this.footprint.scale.x;
@@ -151,13 +176,15 @@ export class PixelExperience extends LayerExperience {
       sampledArea === 30 ** 2 && counts[2] === sampledArea);
   }
   predictPureWater(answer) {
-    if (!this.started || this.finished || this.answer !== null) return;
+    if (!this.started || this.finished || this.phase !== "pixels" ||
+        this.answer !== null) return;
     this.answer = answer;
     this.onEvent(answer === this.pureWaterAt30 ? "correct" : "blocked");
     this.onChange();
   }
   setProbe(x, z) {
-    if (!this.started || this.finished || !Number.isFinite(x) || !Number.isFinite(z)) return;
+    if (!this.started || this.finished || this.phase !== "pixels" ||
+        !Number.isFinite(x) || !Number.isFinite(z)) return;
     this.probe.x = clamp(x);
     this.probe.z = clamp(z);
     this.refreshFootprint();
@@ -172,6 +199,7 @@ export class PixelExperience extends LayerExperience {
     return true;
   }
   hitTerrain(raycaster) {
+    if (this.phase !== "pixels") return null;
     this.pickGround.updateWorldMatrix(true, false);
     this.clipboard.children[0].updateWorldMatrix(true, false);
     if (this.clipboard.visible && raycaster.intersectObject(this.clipboard.children[0], false).length)
@@ -179,7 +207,7 @@ export class PixelExperience extends LayerExperience {
     return raycaster.intersectObject(this.pickGround, false)[0] ?? null;
   }
   placeFromRay(raycaster) {
-    if (!this.started || this.finished) return false;
+    if (!this.started || this.finished || this.phase !== "pixels") return false;
     const hit = this.hitTerrain(raycaster);
     if (!hit) return false;
     const local = this.group.worldToLocal(hit.point.clone());
@@ -194,6 +222,20 @@ export class PixelExperience extends LayerExperience {
     this.answer = null;
     this.refreshFootprint();
     this.onChange();
+  }
+  finish() {
+    if (this.phase === "platforms") {
+      this.phase = "pixels";
+      this.platformScene.hide();
+      this.group.visible = true;
+      this.scene.background = this.landscapeBackground;
+      this.scene.fog = this.landscapeFog;
+    }
+    super.finish();
+  }
+  dispose() {
+    this.platformScene.dispose();
+    super.dispose();
   }
   renderMap(ctx, size = this.size) {
     const raster = this.model.raster(size);
