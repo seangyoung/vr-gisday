@@ -1333,11 +1333,7 @@ function drawShowcaseUI() {
       `A spectral signature is a surface's response across bands.\nIn false color, healthy vegetation often appears red.\n${exhibit.sceneInfo.observation}`, -0.02);
     label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI often marks vigorous green vegetation.",
       0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
-    if (!exhibit.finished) {
-      button("Keep exploring", -0.58, -0.72, () => exhibit.keepExploring(), 1.0);
-      button("Next scene", 0.58, -0.72, () => exhibit.nextScene(), 1.0);
-    }
-    takeawayActions(exhibit.finished ? -0.72 : -0.96);
+    takeawayActions(-0.72);
     return;
   }
   if (exhibit.kind === "change" && exhibit.finished) {

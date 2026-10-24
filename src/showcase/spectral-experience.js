@@ -263,12 +263,6 @@ export class SpectralExperience extends TimedExhibit {
     this.group.visible = false;
     this.onChange();
   }
-  keepExploring() {
-    if (!this.takeawayOpen || this.finished) return;
-    this.takeawayOpen = false;
-    this.group.visible = true;
-    this.onChange();
-  }
   update(dt) {
     super.update(dt);
     if (this.started && !this.finished && this.phase === "spectrum") {
