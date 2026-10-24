@@ -206,12 +206,14 @@ test("each ward has a closed polygon within the map extent", () => {
         const nx = -dy / length, ny = dx / length;
         const left = owner(mx + nx, my + ny);
         const right = owner(mx - nx, my - ny);
-        assert.ok(left !== right || left < 0,
-          `${mode} has no boundary with the same ward on both sides`);
+        assert.ok(left !== right && (left >= 0 || right >= 0),
+          `${mode} boundaries separate wards or mark the outside edge`);
       }
     }
     assert.ok(segments.size > 30, `${mode} has a visible boundary network`);
-    assert.ok(vertices < 150, `${mode} does not follow every block-edge wiggle`);
+    assert.ok(vertices < 110, `${mode} does not follow every block-edge wiggle`);
+    assert.ok(zoneBoundaryLines(mode).length <= (mode === "wardD" ? 10 : 16),
+      `${mode} has no narrow exterior boundary spurs`);
     return JSON.stringify(polygons);
   });
   assert.equal(new Set(footprints).size, plans.length);

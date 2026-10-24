@@ -21,9 +21,12 @@ modes = json.loads(subprocess.check_output(
      "import { CLUSTER_MODES } from './src/showcase/cluster-model.js'; "
      "console.log(JSON.stringify(CLUSTER_MODES));"], cwd=ROOT, text=True))
 extent = box(529115, 180770, 529700, 181350)
-urban_footprint = unary_union(
-    [Polygon(block[3][0]) for block in blocks]
-).buffer(8, join_style=2).intersection(extent)
+housing_footprint = unary_union([Polygon(block[3][0]) for block in blocks])
+# Close narrow street gaps in the *outside* envelope. Otherwise an exterior
+# border follows a road into a ward and back out as a spurious-looking spur.
+# The ward-to-ward divisions below still follow the original block geometry.
+urban_footprint = (housing_footprint.buffer(18, join_style=2)
+                   .buffer(-8, join_style=2).intersection(extent))
 
 # Samples along the real block edges make the dividing lines run down streets
 # rather than cutting across the buildings. Voronoi cells partition the street
@@ -58,7 +61,7 @@ for mode, definition in modes.items():
         raise ValueError(f"{mode} is not an edge-matched polygon coverage")
     # Simplify the coverage together: neighboring wards retain precisely the
     # same street-center line instead of drawing two near-parallel lines.
-    wards = coverage_simplify(wards, 9)
+    wards = coverage_simplify(wards, 13)
     polygons = []
     outlines = []
     for ward in wards:

@@ -1,7 +1,7 @@
 import { TimedExhibit, canvasPanel } from "./exhibit.js";
 import {
   CLUSTER_MODES, SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor, zoneBoundaryLines,
+  aggregationFor, blockAt, wardFor, zoneBoundaryLines, zonePolygons,
 } from "./cluster-model.js";
 
 const plot = { x: 45, y: 35, size: 520 };
@@ -35,6 +35,17 @@ function traceBoundary(ctx, line) {
     if (index === 0) ctx.moveTo(px(x), py(y));
     else ctx.lineTo(px(x), py(y));
   });
+}
+
+function zonePath(ctx, rings) {
+  ctx.beginPath();
+  for (const ring of rings) {
+    ring.forEach(([x, y], index) => {
+      if (index === 0) ctx.moveTo(px(x), py(y));
+      else ctx.lineTo(px(x), py(y));
+    });
+    ctx.closePath();
+  }
 }
 
 function drawZoneLabels(ctx, mode) {
@@ -71,14 +82,27 @@ function drawMap(canvas, mode) {
   ctx.rect(plot.x, plot.y, plot.size, plot.size);
   ctx.clip();
   const zones = aggregationFor(mode);
+  if (mode !== "points") {
+    // A soft fill carries the ward color across streets; the block colors
+    // drawn next retain the exact values shown in the legend.
+    ctx.globalAlpha = 0.35;
+    for (const zone of zones) {
+      zonePath(ctx, zonePolygons(mode)[zone.id]);
+      ctx.fillStyle = countColor(zone.deaths);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
   for (const block of SNOW_BLOCKS) {
     blockPath(ctx, block);
     const zone = zones[wardFor(block, mode)];
     ctx.fillStyle = zone ? countColor(zone.deaths) : "#25444f";
     ctx.fill("evenodd");
-    ctx.strokeStyle = "#dae7d5";
-    ctx.lineWidth = 0.9;
-    ctx.stroke();
+    if (mode === "points") {
+      ctx.strokeStyle = "#dae7d5";
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+    }
   }
   if (mode !== "points") {
     ctx.strokeStyle = "#183847";
@@ -181,15 +205,17 @@ function drawSelection(canvas, selection, mode) {
     ctx.lineWidth = 3;
     ctx.stroke();
   } else if (selection?.type === "zone") {
-    for (const block of selection.zone.blocks) {
-      blockPath(ctx, block);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-    }
+    zonePath(ctx, zonePolygons(mode)[selection.zone.id]);
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
   }
-  // This overlay sits in front of the selected-block outlines, so the ward
-  // letters remain readable even when a selected block runs under a label.
+  // This overlay sits in front of the selected ward outline, so its letter
+  // remains readable even when the ward runs under a label.
   drawZoneLabels(ctx, mode);
   ctx.restore();
 }
