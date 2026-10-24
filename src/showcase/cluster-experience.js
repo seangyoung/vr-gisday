@@ -1,7 +1,7 @@
 import { TimedExhibit, canvasPanel } from "./exhibit.js";
 import {
   CLUSTER_MODES, SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor, zonePolygons,
+  aggregationFor, blockAt, wardFor, zoneBoundaryLines,
 } from "./cluster-model.js";
 
 const plot = { x: 45, y: 35, size: 520 };
@@ -29,15 +29,12 @@ function blockPath(ctx, block) {
   }
 }
 
-function traceZone(ctx, rings) {
+function traceBoundary(ctx, line) {
   ctx.beginPath();
-  for (const ring of rings) {
-    ring.forEach(([x, y], index) => {
-      if (index === 0) ctx.moveTo(px(x), py(y));
-      else ctx.lineTo(px(x), py(y));
-    });
-    ctx.closePath();
-  }
+  line.forEach(([x, y], index) => {
+    if (index === 0) ctx.moveTo(px(x), py(y));
+    else ctx.lineTo(px(x), py(y));
+  });
 }
 
 function drawZoneLabels(ctx, mode) {
@@ -84,13 +81,12 @@ function drawMap(canvas, mode) {
     ctx.stroke();
   }
   if (mode !== "points") {
-    ctx.fillStyle = "rgba(255, 255, 255, 0)";
     ctx.strokeStyle = "#183847";
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
-    for (const rings of zonePolygons(mode)) {
-      traceZone(ctx, rings);
-      ctx.fill();
+    ctx.lineCap = "round";
+    for (const line of zoneBoundaryLines(mode)) {
+      traceBoundary(ctx, line);
       ctx.stroke();
     }
   }

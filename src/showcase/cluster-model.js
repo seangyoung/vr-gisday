@@ -133,8 +133,12 @@ export function blockAt(x, y, roadTolerance = 10) {
   return distance <= roadTolerance ? closest : null;
 }
 
-// Precomputed road-centered polygons keep the map light enough for Quest.
-// Each ward contains one or more exterior rings; the fill remains transparent.
+// Precomputed road-centered polygons and one shared boundary network keep the
+// map light enough for Quest. Each ward contains one or more exterior rings.
 export function zonePolygons(mode) {
-  return zoneSource[mode] ?? [];
+  return zoneSource[mode]?.zones ?? [];
+}
+
+export function zoneBoundaryLines(mode) {
+  return zoneSource[mode]?.boundaries ?? [];
 }

@@ -11,7 +11,7 @@ import { SPECTRAL_LESSON_STEPS,
   nextSpectralLessonStep } from "../src/showcase/spectral-lesson.js";
 import {
   SNOW_BLOCKS, SNOW_BUILDINGS, SNOW_PUMPS, SNOW_TOTAL, SNOW_WINDOW,
-  aggregationFor, blockAt, wardFor, zonePolygons,
+  aggregationFor, blockAt, wardFor, zoneBoundaryLines, zonePolygons,
 } from "../src/showcase/cluster-model.js";
 import {
   GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, continentDistortionSummary,
@@ -142,17 +142,57 @@ test("Snow blocks are conserved by each hypothetical ward plan", () => {
 
 test("each ward has a closed polygon within the map extent", () => {
   assert.deepEqual(zonePolygons("points"), []);
+  assert.deepEqual(zoneBoundaryLines("points"), []);
   const plans = ["wardA", "wardB", "wardC", "wardD"];
+  const inside = (x, y, ring) => {
+    let contained = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [ax, ay] = ring[i], [bx, by] = ring[j];
+      if ((ay > y) !== (by > y) &&
+          x < (bx - ax) * (y - ay) / (by - ay) + ax) contained = !contained;
+    }
+    return contained;
+  };
   const footprints = plans.map((mode) => {
     const polygons = zonePolygons(mode);
     assert.equal(polygons.length, aggregationFor(mode).length);
-    assert.ok(polygons.every((rings) => rings.length > 0));
+    assert.ok(polygons.every((rings) => rings.length === 1),
+      `${mode} has one connected outline per ward`);
     for (const rings of polygons) for (const ring of rings) {
       assert.deepEqual(ring[0], ring.at(-1));
       assert.ok(ring.every(([x, y]) =>
         x >= SNOW_WINDOW.minX && x <= SNOW_WINDOW.maxX &&
         y >= SNOW_WINDOW.minY && y <= SNOW_WINDOW.maxY));
     }
+    const segments = new Set();
+    let vertices = 0;
+    const owner = (x, y) => polygons.findIndex((rings) => rings.some((ring) =>
+      inside(x, y, ring)));
+    for (const line of zoneBoundaryLines(mode)) {
+      assert.ok(line.length >= 2);
+      vertices += line.length;
+      for (const point of line) {
+        assert.ok(point[0] >= SNOW_WINDOW.minX && point[0] <= SNOW_WINDOW.maxX &&
+          point[1] >= SNOW_WINDOW.minY && point[1] <= SNOW_WINDOW.maxY);
+      }
+      for (let i = 1; i < line.length; i++) {
+        const [ax, ay] = line[i - 1], [bx, by] = line[i];
+        const a = line[i - 1].join(","), b = line[i].join(",");
+        const edge = [a, b].sort().join("|");
+        assert.ok(!segments.has(edge), `${mode} draws each shared edge once`);
+        segments.add(edge);
+        const dx = bx - ax, dy = by - ay, length = Math.hypot(dx, dy);
+        if (length < 0.01) continue;
+        const mx = (ax + bx) / 2, my = (ay + by) / 2;
+        const nx = -dy / length, ny = dx / length;
+        const left = owner(mx + nx, my + ny);
+        const right = owner(mx - nx, my - ny);
+        assert.ok(left !== right || left < 0,
+          `${mode} has no boundary with the same ward on both sides`);
+      }
+    }
+    assert.ok(segments.size > 30, `${mode} has a visible boundary network`);
+    assert.ok(vertices < 150, `${mode} does not follow every block-edge wiggle`);
     return JSON.stringify(polygons);
   });
   assert.equal(new Set(footprints).size, plans.length);
