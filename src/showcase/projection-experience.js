@@ -747,13 +747,6 @@ export class ProjectionExperience extends TimedExhibit {
     this.projectionPickerOpen = !this.projectionPickerOpen;
     this.onChange();
   }
-  setStandardParallel(parallel) {
-    if (!this.started || this.finished || this.projection !== "equalArea" ||
-        ![0, 30, 45].includes(parallel)) return;
-    this.standardParallel = parallel;
-    if (this.selectedContinent) this.paintContinentOverlay();
-    this.transitionTo(true);
-  }
   turnCenter(delta, redraw = true) {
     if (!this.started || this.finished) return;
     this.centralMeridian = ((this.centralMeridian + delta + 540) % 360) - 180;
