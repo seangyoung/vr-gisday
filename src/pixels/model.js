@@ -5,8 +5,7 @@ import {
   riverX,
 } from "../layers/experience.js";
 
-export const PIXEL_EXTENT = 500;
-export const PIXEL_DETAIL_EXTENT = 72;
+export const PIXEL_EXTENT = 72;
 export const PIXEL_SIZES = [1, 10, 30, 1000];
 export const pixelSizeLabel = (size) => size >= 1000
   ? `${size / 1000} km` : `${size} m`;
@@ -19,33 +18,6 @@ const COLORS = [
   [70, 78, 82],
 ];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-const seeded = (x, z) => {
-  const n = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
-  return n - Math.floor(n);
-};
-
-export function regionalForestAt(x, z) {
-  const patches = 0.55 * Math.sin(x * 0.014 + z * 0.004) +
-    0.48 * Math.cos(z * 0.018 - x * 0.003) +
-    0.25 * Math.sin(x * 0.044 + z * 0.032);
-  return patches > 0.23;
-}
-
-export const REGIONAL_TREES = (() => {
-  const trees = [];
-  for (let row = -45; row <= 45; row++)
-    for (let col = -45; col <= 45; col++) {
-      const x = col * 11 + (seeded(col, row) - 0.5) * 6;
-      const z = row * 11 + (seeded(row, col + 300) - 0.5) * 6;
-      if (Math.max(Math.abs(x), Math.abs(z)) <= 160 ||
-          !regionalForestAt(x, z) ||
-          Math.abs(x - riverX(z)) <= 7 ||
-          Math.abs(z - highwayZ(x)) <= 11) continue;
-      trees.push({ x, z, scale: 0.8 + seeded(col + 700, row) * 0.7,
-        evergreen: seeded(col, row + 500) > 0.52 });
-    }
-  return trees;
-})();
 
 export class PixelModel {
   constructor() {
@@ -74,15 +46,11 @@ export class PixelModel {
         const x = -PIXEL_EXTENT + col + 0.5;
         const z = -PIXEL_EXTENT + row + 0.5;
         const i = row * WIDTH + col;
-        if (Math.max(Math.abs(x), Math.abs(z)) > 160 && regionalForestAt(x, z))
-          this.cover[i] = 1;
         if (Math.abs(x - riverX(z)) <= 2.2) this.cover[i] = 2;
         if (Math.abs(z - highwayZ(x)) <= 5.2) this.cover[i] = 3;
         const [red, green, blue] = COLORS[this.cover[i]];
         const shade = this.cover[i] === 0
-          ? clamp(1 + (Math.max(Math.abs(x), Math.abs(z)) <= 160
-            ? landscapeHeight(x, z) * 0.008
-            : 0.08 * Math.sin(x * 0.015 + z * 0.008)), 0.92, 1.2)
+          ? clamp(1 + landscapeHeight(x, z) * 0.008, 0.95, 1.2)
           : 1;
         this.rgb[i * 3] = red * shade;
         this.rgb[i * 3 + 1] = green * shade;
@@ -92,30 +60,6 @@ export class PixelModel {
   raster(size) {
     if (!PIXEL_SIZES.includes(size)) throw new RangeError("Unsupported pixel size");
     if (this.rasters.has(size)) return this.rasters.get(size);
-    if (size === 1) {
-      // A million individual JS pixel objects are expensive on Quest. Keep the
-      // 1 m raster in typed arrays and expose cells only when requested.
-      const finePixel = (index) => {
-        if (index < 0 || index >= WIDTH * WIDTH) return undefined;
-        const counts = [0, 0, 0, 0];
-        counts[this.cover[index]] = 1;
-        return { counts, sampledArea: 1,
-          rgb: Array.from(this.rgb.subarray(index * 3, index * 3 + 3)) };
-      };
-      const pixels = new Proxy({
-        length: WIDTH * WIDTH,
-        at: (index) => finePixel(index < 0 ? WIDTH * WIDTH + index : index),
-      }, {
-        get(target, key) {
-          if (key in target) return target[key];
-          if (typeof key === "string" && /^\d+$/.test(key)) return finePixel(Number(key));
-          return undefined;
-        },
-      });
-      const result = { size, cells: WIDTH, pixels };
-      this.rasters.set(size, result);
-      return result;
-    }
     const cells = Math.ceil(WIDTH / size);
     const pixels = new Array(cells * cells);
     for (let row = 0; row < cells; row++)
@@ -150,8 +94,8 @@ export class PixelModel {
     return {
       ...raster.pixels[row * raster.cells + col],
       col, row, size,
-      x0: -PIXEL_EXTENT + col * size,
-      z0: -PIXEL_EXTENT + row * size,
+      x0: size > WIDTH ? -size / 2 : -PIXEL_EXTENT + col * size,
+      z0: size > WIDTH ? -size / 2 : -PIXEL_EXTENT + row * size,
     };
   }
 }
