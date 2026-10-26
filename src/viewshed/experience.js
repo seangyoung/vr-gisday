@@ -407,7 +407,7 @@ export class ViewshedExperience extends LayerExperience {
     this.lookoutSlide.set(0, 0);
     this.group.position.y = this.climbGroundY - CLIMB_HEIGHT;
     this.lockLookout();
-    this.onEvent("reveal");
+    this.onEvent("platform");
     this.onChange();
     return true;
   }
@@ -449,10 +449,12 @@ export class ViewshedExperience extends LayerExperience {
     if (this.topLocked) {
       if (!this.nearTowerPole(handWorld) && !this.nearestRung(handWorld)) return false;
       this.returnToRungs(id);
+      this.onEvent("rung");
       return true;
     }
     if (this.nearLookoutRim(handWorld)) {
       this.pullOntoLookout();
+      this.onEvent("rung");
       return true;
     }
     if (!this.nearestRung(handWorld)) return false;
@@ -461,6 +463,7 @@ export class ViewshedExperience extends LayerExperience {
     this.climbHands.set(id, handWorld.y);
     this.fallSpeed = 0;
     this.clipboard.visible = false;
+    this.onEvent("rung");
     if (firstHand) this.onChange();
     return true;
   }
@@ -549,7 +552,7 @@ export class ViewshedExperience extends LayerExperience {
       this.lookoutGoal.copy(transition.toSlide);
       this.marker.userData.lookoutEdge.color.setHex(0x78e4c5);
       this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
-      this.onEvent("reveal");
+      this.onEvent("platform");
     } else if (!transition.released && poses.has(transition.handId)) {
       const handY = new THREE.Vector3().setFromMatrixPosition(
         poses.get(transition.handId)).y;
@@ -585,7 +588,7 @@ export class ViewshedExperience extends LayerExperience {
       if (this.climbHeight <= CLIMB_HEIGHT - 0.15) this.topLockReady = true;
       if (this.topLockReady && this.climbHeight >= CLIMB_HEIGHT - 0.01) {
         this.lockLookout();
-        this.onEvent("reveal");
+        this.onEvent("platform");
         this.onChange();
       }
     } else if (this.climbHeight > 0 && !this.topLocked) {

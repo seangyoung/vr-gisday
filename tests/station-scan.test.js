@@ -48,6 +48,35 @@ test("one dense station scan fills visible faces; a new angle reveals hidden fac
   assert.ok(coverage.count > first + 500, "a new angle reveals many hidden faces");
 });
 
+test("finishing a tripod sweep reports the new coverage for its sound cue", () => {
+  const events = [];
+  const station = Object.create(StationScanExperience.prototype);
+  station.started = true;
+  station.finished = false;
+  station.walkHeight = 0;
+  station.walkSupportHeight = 0;
+  station.tripod = new THREE.Group();
+  station.tripod.userData.head = new THREE.Group();
+  station.scanQueue = new THREE.Vector3(0, 1.5, 0);
+  station.scanCursor = 0;
+  station.scanStartCount = 4;
+  station.activeStation = new THREE.Vector3(2, 0, 1);
+  station.records = [];
+  station.coverage = {
+    samples: [{}], count: 4,
+    prepare() {}, capture() { this.count++; },
+  };
+  station.refreshCloud = () => {};
+  station.refreshClipboard = () => {};
+  station.onChange = () => {};
+  station.onEvent = (name, record) => events.push({ name, record });
+  station.update(0.016);
+  assert.equal(station.scanQueue, null);
+  assert.equal(station.records[0].added, 1);
+  assert.equal(events[0].name, "scanComplete");
+  assert.equal(events[0].record, station.records[0]);
+});
+
 test("tripod viewpoints add visible target surfaces across all synthetic scenes", () => {
   for (const { id } of SCAN_SCENES) {
     const { coverage } = survey(id);

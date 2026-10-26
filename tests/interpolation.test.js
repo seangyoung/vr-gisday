@@ -115,6 +115,22 @@ test("pointing at a gauge head reveals its reading until the ray moves away", ()
   demo.dispose();
 });
 
+test("showing IDW math cues the currently selected neighbors and a new estimate", () => {
+  const events = [];
+  const demo = new InterpolationExperience(new THREE.Group(),
+    (reason) => events.push(reason), new THREE.Scene());
+  demo.begin();
+  demo.setMode("idw");
+  demo.toggleWeights();
+  assert.equal(events.at(-1), "idwWeights");
+  assert.equal(demo.estimate.neighbors.length, 3);
+  demo.placeProbe(0.4, -0.2);
+  assert.equal(events.at(-1), "idwWeights");
+  demo.toggleWeights();
+  assert.equal(events.at(-1), "reveal");
+  demo.dispose();
+});
+
 test("the rainfall model turns with a held grip without moving its estimate", () => {
   const demo = new InterpolationExperience(new THREE.Group(), () => {}, new THREE.Scene());
   const camera = new THREE.PerspectiveCamera();

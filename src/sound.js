@@ -77,6 +77,24 @@ function forestLoop(ctx) {
   return buffer;
 }
 
+function placeAudioSource(node, point) {
+  if (!node || !point) return;
+  for (const [axis, value] of [["X", point.x], ["Y", point.y], ["Z", point.z]])
+    if (Number.isFinite(value) && node[`position${axis}`])
+      node[`position${axis}`].value = value;
+}
+
+function spatialNode(ctx, refDistance, maxDistance, rolloffFactor) {
+  if (!ctx.createPanner) return null;
+  const node = ctx.createPanner();
+  node.panningModel = "HRTF";
+  node.distanceModel = "inverse";
+  node.refDistance = refDistance;
+  node.maxDistance = maxDistance;
+  node.rolloffFactor = rolloffFactor;
+  return node;
+}
+
 export class LabSound {
   constructor() {
     this.muted = false;
@@ -125,7 +143,19 @@ export class LabSound {
         this.water.gain.value = 0;
         noise.connect(filter);
         filter.connect(this.water);
-        this.water.connect(this.effectsBus);
+        const runoffFilter = ctx.createBiquadFilter();
+        runoffFilter.type = "lowpass";
+        runoffFilter.frequency.value = 480;
+        this.runoff = ctx.createGain();
+        this.runoff.gain.value = 0;
+        noise.connect(runoffFilter);
+        runoffFilter.connect(this.runoff);
+        this.rainBus = ctx.createGain();
+        this.water.connect(this.rainBus);
+        this.runoff.connect(this.rainBus);
+        this.rainPanner = spatialNode(ctx, 2.5, 12, 0.6);
+        this.rainBus.connect(this.rainPanner ?? this.effectsBus);
+        this.rainPanner?.connect(this.effectsBus);
         const windFilter = ctx.createBiquadFilter();
         windFilter.type = "lowpass";
         windFilter.frequency.value = 320;
@@ -142,7 +172,9 @@ export class LabSound {
           ? 0.22 * (this.riverLevel ?? 0) : 0;
         noise.connect(riverFilter);
         riverFilter.connect(this.river);
-        this.river.connect(this.master);
+        this.riverPanner = spatialNode(ctx, 7, 90, 0.6);
+        this.river.connect(this.riverPanner ?? this.master);
+        this.riverPanner?.connect(this.master);
         noise.start();
         this.menu = ctx.createGain();
         this.menu.gain.value = this.menuMusicOn && this.musicEnabled ? 0.1 : 0;
@@ -170,7 +202,11 @@ export class LabSound {
   }
   setActive(active) {
     this.active = active;
-    if (!active) this.stopFlyover();
+    if (!active) {
+      this.stopFlyover();
+      this.stopScanner();
+      this.setRunoff(0);
+    }
     if (!this.master) return;
     if (this.appliedActive === active && this.appliedMuted === this.muted &&
         this.appliedVolume === this.volume)
@@ -220,7 +256,13 @@ export class LabSound {
     if (category === "music")
       this.menu.gain.setTargetAtTime(this.menuMusicOn && enabled ? 0.1 : 0, now, 0.12);
     else if (category === "ambience") this.updateLandscapeMix();
-    else this.effectsBus.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.025);
+    else {
+      this.effectsBus.gain.setTargetAtTime(enabled ? 1 : 0, now, 0.025);
+      if (!enabled) {
+        this.stopFlyover();
+        this.stopScanner();
+      }
+    }
   }
   setMenuMusic(on) {
     if (this.menuMusicOn === on) return;
@@ -229,25 +271,45 @@ export class LabSound {
       this.menu.gain.setTargetAtTime(on && this.musicEnabled ? 0.1 : 0,
         this.context.currentTime, 0.18);
   }
-  setLandscape(on, riverLevel = 0, forestLevel = 0) {
+  setLandscape(on, riverLevel = 0, forestLevel = 0, height = 0) {
     const river = Math.max(0, Math.min(1, riverLevel));
     const forest = Math.max(0, Math.min(1, forestLevel));
+    const altitude = Math.max(0, Math.min(1, height));
     if (this.landscapeOn === on &&
         Math.abs((this.riverLevel ?? 0) - river) < 0.04 &&
-        this.forestLevel === forest)
+        this.forestLevel === forest &&
+        Math.abs((this.windHeight ?? 0) - altitude) < 0.04)
       return;
     this.landscapeOn = on;
     this.riverLevel = river;
     this.forestLevel = forest;
+    this.windHeight = altitude;
     this.updateLandscapeMix();
   }
   updateLandscapeMix() {
     if (!this.context || !this.forest) return;
     const now = this.context.currentTime;
     const enabled = this.landscapeOn && this.ambienceEnabled;
-    this.wind.gain.setTargetAtTime(enabled ? 0.22 : 0, now, 0.3);
+    this.wind.gain.setTargetAtTime(enabled ? 0.22 + 0.18 * (this.windHeight ?? 0) : 0, now, 0.3);
     this.forest.gain.setTargetAtTime(enabled ? 0.26 * this.forestLevel : 0, now, 0.3);
     this.river.gain.setTargetAtTime(enabled ? 0.22 * this.riverLevel : 0, now, 0.3);
+  }
+  setListener(position, forward, up) {
+    const listener = this.context?.listener;
+    if (!listener) return;
+    placeAudioSource(listener, position);
+    for (const [prefix, direction] of [["forward", forward], ["up", up]])
+      if (direction) for (const [axis, value] of [["X", direction.x], ["Y", direction.y], ["Z", direction.z]])
+        if (listener[`${prefix}${axis}`]) listener[`${prefix}${axis}`].value = value;
+  }
+  setRiverPosition(position) { placeAudioSource(this.riverPanner, position); }
+  setRainPosition(position) { placeAudioSource(this.rainPanner, position); }
+  setRunoff(level) {
+    if (!this.runoff) return;
+    const next = this.active ? Math.max(0, Math.min(1, level)) : 0;
+    if (Math.abs((this.runoffLevel ?? 0) - next) < 0.025) return;
+    this.runoffLevel = next;
+    this.runoff.gain.setTargetAtTime(0.17 * next, this.context.currentTime, 0.16);
   }
   stopFlyover() {
     if (!this.flyoverSound) return;
@@ -257,7 +319,7 @@ export class LabSound {
     for (const source of sources) source.stop(now + 0.12);
     this.flyoverSound = null;
   }
-  setFlyover(kind, progress = 0) {
+  setFlyover(kind, progress = 0, position = null) {
     if (!this.context || this.context.state !== "running" || !this.active ||
         this.muted || !this.effectsEnabled || this.volume === 0 ||
         !["drone", "aircraft"].includes(kind) || progress >= 1) {
@@ -269,7 +331,9 @@ export class LabSound {
       this.stopFlyover();
       const envelope = ctx.createGain();
       envelope.gain.value = 0;
-      envelope.connect(this.effectsBus);
+      const panner = spatialNode(ctx, 55, 180, 0.45);
+      envelope.connect(panner ?? this.effectsBus);
+      panner?.connect(this.effectsBus);
       const sources = [];
       for (const [type, frequency, level] of kind === "drone"
         ? [["sawtooth", 174, 0.16], ["sine", 349, 0.075]]
@@ -300,10 +364,11 @@ export class LabSound {
       let remaining = sources.length;
       for (const source of sources) source.onended = () => {
         source.disconnect();
-        if (--remaining === 0) envelope.disconnect();
+        if (--remaining === 0) { envelope.disconnect(); panner?.disconnect(); }
       };
-      this.flyoverSound = { kind, envelope, sources };
+      this.flyoverSound = { kind, envelope, panner, sources };
     }
+    placeAudioSource(this.flyoverSound.panner, position);
     const passage = Math.sin(Math.PI * Math.max(0, Math.min(1, progress)));
     this.flyoverSound.envelope.gain.setTargetAtTime(
       0.7 * passage ** 1.5, ctx.currentTime, 0.07);
@@ -311,6 +376,108 @@ export class LabSound {
     const base = kind === "drone" ? 174 : 92;
     this.flyoverSound.sources[0].frequency.setTargetAtTime(
       base * (1.04 - 0.08 * progress), ctx.currentTime, 0.12);
+  }
+  stopScanner() {
+    if (!this.scannerSound) return;
+    const { envelope, sources } = this.scannerSound;
+    envelope.gain.setTargetAtTime(0, this.context.currentTime, 0.025);
+    for (const source of sources) source.stop(this.context.currentTime + 0.12);
+    this.scannerSound = null;
+  }
+  setScanner(active, position = null, progress = 0) {
+    if (!active || !this.context || this.context.state !== "running" ||
+        !this.active || this.muted || !this.effectsEnabled || this.volume === 0) {
+      this.stopScanner();
+      return;
+    }
+    if (!this.scannerSound) {
+      const ctx = this.context;
+      const envelope = ctx.createGain();
+      envelope.gain.value = 0;
+      const panner = spatialNode(ctx, 2, 35, 0.7);
+      envelope.connect(panner ?? this.effectsBus);
+      panner?.connect(this.effectsBus);
+      const motor = ctx.createOscillator();
+      motor.type = "triangle";
+      motor.frequency.value = 128;
+      motor.connect(envelope);
+      motor.start();
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.effectNoise;
+      noise.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 1400;
+      filter.Q.value = 1.8;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = 0.26;
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(envelope);
+      noise.start();
+      const sources = [motor, noise];
+      let remaining = sources.length;
+      for (const source of sources) source.onended = () => {
+        source.disconnect();
+        if (--remaining === 0) { envelope.disconnect(); panner?.disconnect(); }
+      };
+      this.scannerSound = { envelope, panner, sources };
+    }
+    placeAudioSource(this.scannerSound.panner, position);
+    this.scannerSound.sources[0].frequency.setTargetAtTime(
+      124 + 8 * Math.sin(6 * Math.PI * progress), this.context.currentTime, 0.08);
+    this.scannerSound.envelope.gain.setTargetAtTime(0.045,
+      this.context.currentTime, 0.08);
+  }
+  stationComplete(added) {
+    this.unlock();
+    if (!this.context) return;
+    this.stopScanner();
+    this.noiseBurst(0.22, 1650, 480, 0.055);
+    this.tone(added > 0 ? 780 : 360, 0.13, 0.09);
+    if (added > 0) this.tone(1040, 0.17, 0.055);
+  }
+  gnssSignal(kind) {
+    this.unlock();
+    if (kind === "send") this.tone(760, 0.075, 0.085);
+    else if (kind === "bounce") {
+      this.noiseBurst(0.10, 950, 390, 0.06);
+      this.tone(525, 0.09, 0.055);
+    } else if (kind === "receive") this.tone(560, 0.13, 0.11);
+  }
+  climb(kind) {
+    this.unlock();
+    if (kind === "rung") {
+      this.noiseBurst(0.065, 680, 310, 0.05);
+      this.tone(290, 0.07, 0.055);
+    } else if (kind === "platform") {
+      this.noiseBurst(0.16, 470, 170, 0.09);
+      this.tone(490, 0.17, 0.07);
+    }
+  }
+  idwNeighbors(neighbors) {
+    if (!Array.isArray(neighbors) || !neighbors.length) return;
+    this.unlock();
+    if (!this.context || this.context.state !== "running" || !this.active ||
+        this.muted || !this.effectsEnabled || this.volume === 0) return;
+    const now = this.context.currentTime;
+    // Play nearest first; amplitude follows each normalized IDW weight.
+    for (const [index, neighbor] of neighbors.slice(0, 3).entries()) {
+      const oscillator = this.context.createOscillator();
+      const envelope = this.context.createGain();
+      const start = now + index * 0.19;
+      oscillator.type = "sine";
+      oscillator.frequency.value = 360 + 9 * neighbor.station.value;
+      envelope.gain.setValueAtTime(0, start);
+      envelope.gain.linearRampToValueAtTime(
+        0.035 + 0.15 * neighbor.weight, start + 0.012);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
+      oscillator.connect(envelope);
+      envelope.connect(this.effectsBus);
+      oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+      oscillator.start(start);
+      oscillator.stop(start + 0.16);
+    }
   }
   tone(frequency, duration = 0.065, gain = 0.13) {
     if (
@@ -406,6 +573,7 @@ export class LabSound {
     }[kind];
     if (!notes) return;
     this.tone(notes[0], 0.11, 0.085);
+    if (kind === "spill") this.noiseBurst(0.32, 1100, 230, 0.14);
     // Schedule the second note through the audio graph, not a wall-clock timer.
     if (this.muted || !this.active || !this.effectsEnabled || this.volume === 0 ||
         this.context.state !== "running") return;

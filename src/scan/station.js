@@ -379,12 +379,14 @@ export class StationScanExperience {
       this.refreshCloud();
     if (end === this.coverage.samples.length) {
       this.scanQueue = null;
-      this.records.push({
+      const record = {
         position: this.activeStation,
         count: this.coverage.count,
         added: this.coverage.count - this.scanStartCount,
-      });
+      };
+      this.records.push(record);
       this.activeStation = null;
+      this.onEvent("scanComplete", record);
       this.refreshClipboard();
       this.onChange();
     }

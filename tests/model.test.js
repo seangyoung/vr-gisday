@@ -102,3 +102,29 @@ test("clock correction introduces a fourth spacecraft and reflected route takes 
   assert.ok(canyon.pathRatio > 1.2);
   assert.ok(canyon.signalDuration > open.signalDuration);
 });
+
+test("GNSS sound events follow transmission, reflection, and the longer arrival", async () => {
+  const { GnssScene } = await import("../src/gnss/scene.js");
+  const pulseEvents = [];
+  const pulse = new GnssScene(GNSS_SIGNAL,
+    { onEvent: (event) => pulseEvents.push(event) });
+  pulse.fire();
+  pulse.update(1.79);
+  assert.deepEqual(pulseEvents, ["send"]);
+  pulse.update(0.02);
+  assert.deepEqual(pulseEvents, ["send", "receive"]);
+  const openEvents = [], canyonEvents = [];
+  const open = new GnssScene(GNSS_MULTIPATH,
+    { environment: "open", onEvent: (event) => openEvents.push(event) });
+  const canyon = new GnssScene(GNSS_MULTIPATH,
+    { environment: "canyon", onEvent: (event) => canyonEvents.push(event) });
+  open.update(0.01);
+  canyon.update(0.01);
+  open.update(open.signalDuration);
+  canyon.update(open.signalDuration);
+  assert.deepEqual(openEvents, ["send", "receive"]);
+  assert.ok(canyonEvents.includes("bounce"));
+  assert.ok(!canyonEvents.includes("receive"));
+  canyon.update(canyon.signalDuration - open.signalDuration);
+  assert.equal(canyonEvents.at(-1), "receive");
+});

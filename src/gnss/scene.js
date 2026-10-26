@@ -107,8 +107,10 @@ function receiver(parent, position) {
 }
 
 export class GnssScene {
-  constructor(stage, { clockCorrected = false, environment = null } = {}) {
+  constructor(stage, { clockCorrected = false, environment = null,
+    onEvent = () => {} } = {}) {
     this.group = new THREE.Group();
+    this.onEvent = onEvent;
     this.group.userData.radius = 1.3;
     this.pulseAge = -1;
     this.fourthAge = -1;
@@ -199,6 +201,10 @@ export class GnssScene {
         this.signalAge = 0;
         this.signalDuration = 1.4 * pathLength(this.signalRoute.map((p) => p.toArray())) /
           pathLength(direct.map((p) => p.toArray()));
+        if (this.signalRoute.length > 2)
+          this.bounceAt = this.signalDuration *
+            this.signalRoute[0].distanceTo(this.signalRoute[1]) /
+            pathLength(this.signalRoute.map((p) => p.toArray()));
         this.signalMarker = mesh(this.group,
           new THREE.SphereGeometry(0.032, 12, 8),
           environment === "canyon" ? gold : teal, this.satellitePoint.clone());
@@ -215,6 +221,7 @@ export class GnssScene {
     if (!this.pulseShell) return;
     this.pulseAge = 0;
     this.pulseShell.visible = true;
+    this.onEvent("send");
   }
   revealFourth() {
     if (!this.fourth) return;
@@ -236,8 +243,17 @@ export class GnssScene {
   }
   update(dt) {
     if (this.signalRoute) {
+      const previousAge = this.signalAge;
       this.signalAge += dt;
       const cycle = this.signalDuration + 0.5;
+      const crossed = (at) => Math.floor((this.signalAge - at) / cycle) >
+        Math.floor((previousAge - at) / cycle);
+      if (!this.signalFirstSent || crossed(cycle)) {
+        this.onEvent("send");
+        this.signalFirstSent = true;
+      }
+      if (this.bounceAt && crossed(this.bounceAt)) this.onEvent("bounce");
+      if (crossed(this.signalDuration)) this.onEvent("receive");
       const elapsed = this.signalAge % cycle;
       const progress = Math.min(1, elapsed / this.signalDuration);
       const lengths = [];
@@ -270,6 +286,7 @@ export class GnssScene {
       if (progress === 1) {
         this.pulseShell.visible = false;
         this.pulseAge = -1;
+        this.onEvent("receive");
       }
     }
   }

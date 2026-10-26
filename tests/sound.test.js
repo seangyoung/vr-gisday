@@ -22,6 +22,10 @@ class Param {
 class Node {
   gain = new Param();
   frequency = new Param();
+  Q = new Param();
+  positionX = new Param();
+  positionY = new Param();
+  positionZ = new Param();
   connect() {}
   disconnect() {}
   start() { this.started = true; }
@@ -36,6 +40,11 @@ class Context {
   destination = {};
   tones = 0;
   sources = [];
+  listener = {
+    positionX: new Param(), positionY: new Param(), positionZ: new Param(),
+    forwardX: new Param(), forwardY: new Param(), forwardZ: new Param(),
+    upX: new Param(), upY: new Param(), upZ: new Param(),
+  };
   createGain() {
     return new Node();
   }
@@ -49,6 +58,9 @@ class Context {
     return source;
   }
   createBiquadFilter() {
+    return new Node();
+  }
+  createPanner() {
     return new Node();
   }
   createOscillator() {
@@ -208,6 +220,65 @@ test("drone and plane flyovers follow the pass and stop with effects or visibili
     assert.equal(sound.flyoverSound.kind, "aircraft");
     sound.setActive(false);
     assert.equal(sound.flyoverSound, null);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
+test("world sounds follow moving sources and the listener; rain flow and tower wind respond", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.unlock();
+    sound.setListener({ x: 2, y: 1.6, z: -3 },
+      { x: 0, y: 0, z: -1 }, { x: 0, y: 1, z: 0 });
+    assert.equal(sound.context.listener.positionX.value, 2);
+    assert.equal(sound.context.listener.forwardZ.value, -1);
+    sound.setRiverPosition({ x: 12, y: 0, z: -3 });
+    assert.equal(sound.riverPanner.positionX.value, 12);
+    sound.setRainPosition({ x: -0.4, y: 1, z: -1 });
+    assert.equal(sound.rainPanner.positionX.value, -0.4);
+    sound.setRunoff(0.8);
+    assert.ok(sound.runoff.gain.value > 0);
+    sound.setLandscape(true, 1, 0, 1);
+    assert.equal(sound.wind.gain.value, 0.4);
+    sound.setFlyover("drone", 0.5, { x: -10, y: 30, z: -15 });
+    assert.equal(sound.flyoverSound.panner.positionX.value, -10);
+    sound.setFlyover("drone", 0.6, { x: 4, y: 30, z: -15 });
+    assert.equal(sound.flyoverSound.panner.positionX.value, 4);
+    sound.setScanner(true, { x: 5, y: 1.5, z: -4 }, 0.4);
+    assert.equal(sound.scannerSound.panner.positionX.value, 5);
+    assert.ok(sound.scannerSound.sources[0].frequency.value > 120);
+    sound.stationComplete(1200);
+    assert.equal(sound.scannerSound, null);
+    sound.setActive(false);
+    assert.equal(sound.runoff.gain.value, 0);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
+test("GNSS timing and IDW neighbor cues use the effects bus and respect mute", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.unlock();
+    sound.gnssSignal("send");
+    sound.gnssSignal("bounce");
+    sound.gnssSignal("receive");
+    assert.equal(sound.context.tones, 3);
+    sound.idwNeighbors([
+      { station: { value: 20 }, weight: 0.6 },
+      { station: { value: 30 }, weight: 0.3 },
+      { station: { value: 40 }, weight: 0.1 },
+    ]);
+    assert.equal(sound.context.tones, 6);
+    sound.muted = true;
+    sound.gnssSignal("send");
+    sound.idwNeighbors([{ station: { value: 20 }, weight: 1 }]);
+    assert.equal(sound.context.tones, 6);
   } finally {
     globalThis.AudioContext = old;
   }

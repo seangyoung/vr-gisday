@@ -89,7 +89,9 @@ test("viewshed reuses the layered landscape and moves the observation point", ()
 });
 
 test("rung grips pull the visitor upward, pause walking, and release into a return to ground", () => {
-  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const sounds = [];
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {},
+    (event) => sounds.push(event));
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   demo.place(camera);
@@ -122,6 +124,7 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   rung.getWorldPosition(hand);
   assert.equal(demo.gripRung(0, hand.clone().add(new THREE.Vector3(2, 0, 0))), false);
   assert.equal(demo.gripRung(0, hand), true);
+  assert.equal(sounds.at(-1), "rung");
   assert.equal(demo.isClimbing, true);
   demo.updateClipboard(null, camera, true);
   assert.equal(demo.clipboard.visible, false);
@@ -150,7 +153,9 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
 });
 
 test("the tower top locks, restores the clipboard, and allows regripping to descend or drop", () => {
-  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const sounds = [];
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {},
+    (event) => sounds.push(event));
   const camera = new THREE.PerspectiveCamera();
   camera.position.set(0, 1.6, 0);
   demo.place(camera);
@@ -168,6 +173,7 @@ test("the tower top locks, restores the clipboard, and allows regripping to desc
   }
   assert.equal(demo.observer.height, 12);
   assert.equal(demo.isAtTop, true);
+  assert.ok(sounds.includes("platform"));
   assert.equal(demo.isClimbing, false);
   for (let i = 0; i < 30; i++) demo.updateClimb(new Map(), 0.016);
   assert.ok(Math.abs(demo.visitor.x - demo.observer.x) < 0.02);

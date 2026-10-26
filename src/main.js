@@ -37,6 +37,7 @@ import {
   LAYER_NAMES,
   LAYER_HINTS,
   LANDSCAPE_EXTENT,
+  riverWaterHeight,
   riverX,
 } from "./layers/experience.js";
 import { renderLayerMap } from "./layers/map.js";
@@ -94,6 +95,11 @@ const camera = new THREE.PerspectiveCamera(
   700,
 );
 camera.position.set(0, 0, 0);
+const audioPosition = new THREE.Vector3();
+const audioDirection = new THREE.Vector3();
+const audioUp = new THREE.Vector3();
+const audioSource = new THREE.Vector3();
+const audioOrientation = new THREE.Quaternion();
 const root = new THREE.Group();
 scene.add(root);
 const content = new THREE.Group();
@@ -736,7 +742,10 @@ function startStationScan(sceneInfo) {
   viewshed?.dispose(); viewshed = null;
   pixels?.dispose(); pixels = null;
   scan?.dispose();
-  scan = new StationScanExperience(scene, draw, sceneInfo, (event) => sound.cue(event));
+  scan = new StationScanExperience(scene, draw, sceneInfo, (event, record) => {
+    if (event === "scanComplete") sound.stationComplete(record.added);
+    else sound.cue(event);
+  });
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -766,7 +775,10 @@ function startViewshed() {
   pixels?.dispose();
   pixels = null;
   viewshed?.dispose();
-  viewshed = new ViewshedExperience(scene, draw, (event) => sound.cue(event));
+  viewshed = new ViewshedExperience(scene, draw, (event) => {
+    if (["rung", "platform"].includes(event)) sound.climb(event);
+    else sound.cue(event);
+  });
   viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -806,6 +818,8 @@ function startShowcase(kind) {
   showcase = new Constructor(root, (reason) => {
     if (reason === "selection" && showcase?.kind === "cluster") updateClusterReadout();
     else {
+      if (reason === "idwWeights" && showcase?.kind === "interpolation")
+        sound.idwNeighbors(showcase.estimate.neighbors);
       if (["correct", "blocked", "reveal"].includes(reason)) sound.cue(reason);
       draw();
     }
@@ -1949,6 +1963,7 @@ function gnssObject() {
   gnssDisplay = new GnssScene(step, {
     clockCorrected: gnssClockCorrected,
     environment: gnssEnvironment,
+    onEvent: (event) => sound.gnssSignal(event),
   });
   floatingModel = gnssDisplay.group;
   scene.add(floatingModel);
@@ -2603,7 +2618,6 @@ function drawScene() {
           keepGnssPose();
           draw();
           gnssDisplay.fire();
-          sound.cue("measure");
         }, gnssPulseSent ? 1.0 : 1.25);
       if (gnssPulseSent) button("Clock bias", 0.55, GUIDED_ACTION_Y, next, 1.0);
     }
@@ -2816,7 +2830,6 @@ for (let i = 0; i < 2; i++) {
     if (viewshed?.started && grip.visible) {
       grip.updateWorldMatrix(true, false);
       if (viewshed.gripRung(i, grip.getWorldPosition(new THREE.Vector3()))) {
-        sound.click();
         return;
       }
     }
@@ -3192,7 +3205,8 @@ renderer.setAnimationLoop((time, frame) => {
         } else if (action === "commit") {
           const uiHit = intersect(right.c);
           teleport.aim(raycaster, uiHit);
-          if (teleport.release(renderer.xr.getCamera())) sound.cue("reveal");
+          if (teleport.release(renderer.xr.getCamera()) && !viewshed?.isAtTop)
+            sound.cue("reveal");
           rightTurnReady = false;
           teleportHandled = true;
         } else if (action === "cancel") {
@@ -3429,22 +3443,42 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
+  if (audible) {
+    const audioCamera = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+    audioCamera.getWorldPosition(audioPosition);
+    audioCamera.getWorldQuaternion(audioOrientation);
+    audioDirection.set(0, 0, -1).applyQuaternion(audioOrientation);
+    audioUp.set(0, 1, 0).applyQuaternion(audioOrientation);
+    sound.setListener(audioPosition, audioDirection, audioUp);
+  }
   const overhead = pixels?.phase === "pixels" && !pixels.finished &&
     !soundMenuOpen ? pixels.flyover : null;
-  sound.setFlyover(audible ? overhead?.config?.kind : null, overhead?.progress);
+  sound.setFlyover(audible ? overhead?.config?.kind : null, overhead?.progress,
+    overhead?.group?.getWorldPosition(audioSource));
   const landscapeAudioDemo = (pixels?.phase === "pixels" ? pixels : null) ??
     viewshed ?? layers ?? (scan?.station ? scan : null);
-  if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);
-  sound.setWater(!!(audible && rain?.stage === 1 && time < waterSoundUntil));
-  const riverLevel = landscapeAudioDemo?.selected.has("hydrology")
-    ? THREE.MathUtils.clamp(
-        1 - Math.abs(landscapeAudioDemo.visitor.x -
-          riverX(landscapeAudioDemo.visitor.y)) / 24,
-        0, 1,
-      )
-    : 0;
+  if (audible && !scan?.station && (scan?.records.length ?? 0) > previousSamples)
+    sound.scan(scan.lastRange);
+  const scanning = audible && !soundMenuOpen && scan?.station && !!scan.scanQueue;
+  sound.setScanner(scanning,
+    scanning ? scan.tripod.userData.head.getWorldPosition(audioSource) : null,
+    scanning ? scan.scanCursor / scan.coverage.samples.length : 0);
+  const raining = audible && !soundMenuOpen && rain?.stage === 1;
+  sound.setWater(!!(raining && time < waterSoundUntil));
+  const flux = raining ? rain.water.flux.reduce((sum, value) => sum + Math.abs(value), 0) : 0;
+  sound.setRunoff(Math.min(1, Math.sqrt(flux * 20)));
+  if (raining) sound.setRainPosition(rain.cloud.getWorldPosition(audioSource));
+  const hasRiver = landscapeAudioDemo?.selected.has("hydrology");
+  const riverSpec = landscapeAudioDemo?.sceneChoice;
+  const riverAt = riverSpec?.river ?? riverX;
+  const z = landscapeAudioDemo?.visitor.y ?? 0;
+  if (hasRiver) sound.setRiverPosition(landscapeAudioDemo.group.localToWorld(
+    audioSource.set(riverAt(z), riverSpec?.water?.(z) ?? riverWaterHeight(z), z)));
+  const riverLevel = hasRiver ? sound.riverPanner ? 1 : THREE.MathUtils.clamp(
+    1 - Math.abs(landscapeAudioDemo.visitor.x - riverAt(z)) / 24, 0, 1) : 0;
   sound.setLandscape(!!(audible && landscapeAudioDemo), riverLevel,
-    landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0);
+    landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0,
+    viewshed?.started ? viewshed.climbHeight / 12 : 0);
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {
