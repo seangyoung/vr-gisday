@@ -3429,6 +3429,9 @@ renderer.setAnimationLoop((time, frame) => {
       (renderer.xr.isPresenting &&
         renderer.xr.getSession()?.visibilityState === "visible"));
   sound.setActive(audible);
+  const overhead = pixels?.phase === "pixels" && !pixels.finished &&
+    !soundMenuOpen ? pixels.flyover : null;
+  sound.setFlyover(audible ? overhead?.config?.kind : null, overhead?.progress);
   const landscapeAudioDemo = (pixels?.phase === "pixels" ? pixels : null) ??
     viewshed ?? layers ?? (scan?.station ? scan : null);
   if (audible && (scan?.records.length ?? 0) > previousSamples) sound.scan(scan.lastRange);

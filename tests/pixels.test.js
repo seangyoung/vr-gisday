@@ -74,10 +74,12 @@ test("each ground sample distance starts the requested overhead sensor", () => {
       landscapeHeight(-68, -60) - feet * 0.3048) < 1e-9);
     flyover.update(2);
     assert.ok(flyover.group.position.x > -68);
+    assert.ok(flyover.progress > 0 && flyover.progress < 1);
     assert.equal(flyover.config.kind, kind);
   }
   flyover.update(10);
   assert.equal(parent.children.length, 0);
+  assert.equal(flyover.progress, 1);
   flyover.dispose();
 });
 

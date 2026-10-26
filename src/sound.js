@@ -170,6 +170,7 @@ export class LabSound {
   }
   setActive(active) {
     this.active = active;
+    if (!active) this.stopFlyover();
     if (!this.master) return;
     if (this.appliedActive === active && this.appliedMuted === this.muted &&
         this.appliedVolume === this.volume)
@@ -247,6 +248,69 @@ export class LabSound {
     this.wind.gain.setTargetAtTime(enabled ? 0.22 : 0, now, 0.3);
     this.forest.gain.setTargetAtTime(enabled ? 0.26 * this.forestLevel : 0, now, 0.3);
     this.river.gain.setTargetAtTime(enabled ? 0.22 * this.riverLevel : 0, now, 0.3);
+  }
+  stopFlyover() {
+    if (!this.flyoverSound) return;
+    const { envelope, sources } = this.flyoverSound;
+    const now = this.context.currentTime;
+    envelope.gain.setTargetAtTime(0, now, 0.025);
+    for (const source of sources) source.stop(now + 0.12);
+    this.flyoverSound = null;
+  }
+  setFlyover(kind, progress = 0) {
+    if (!this.context || this.context.state !== "running" || !this.active ||
+        this.muted || !this.effectsEnabled || this.volume === 0 ||
+        !["drone", "aircraft"].includes(kind) || progress >= 1) {
+      this.stopFlyover();
+      return;
+    }
+    const ctx = this.context;
+    if (this.flyoverSound?.kind !== kind) {
+      this.stopFlyover();
+      const envelope = ctx.createGain();
+      envelope.gain.value = 0;
+      envelope.connect(this.effectsBus);
+      const sources = [];
+      for (const [type, frequency, level] of kind === "drone"
+        ? [["sawtooth", 174, 0.16], ["sine", 349, 0.075]]
+        : [["triangle", 92, 0.22], ["sawtooth", 184, 0.085]]) {
+        const oscillator = ctx.createOscillator();
+        oscillator.type = type;
+        oscillator.frequency.value = frequency;
+        const gain = ctx.createGain();
+        gain.gain.value = level;
+        oscillator.connect(gain);
+        gain.connect(envelope);
+        oscillator.start();
+        sources.push(oscillator);
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.effectNoise;
+      noise.loop = true;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = kind === "drone" ? 850 : 420;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.value = kind === "drone" ? 0.035 : 0.065;
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(envelope);
+      noise.start();
+      sources.push(noise);
+      let remaining = sources.length;
+      for (const source of sources) source.onended = () => {
+        source.disconnect();
+        if (--remaining === 0) envelope.disconnect();
+      };
+      this.flyoverSound = { kind, envelope, sources };
+    }
+    const passage = Math.sin(Math.PI * Math.max(0, Math.min(1, progress)));
+    this.flyoverSound.envelope.gain.setTargetAtTime(
+      0.7 * passage ** 1.5, ctx.currentTime, 0.07);
+    // A restrained pitch shift makes the approach and departure audible.
+    const base = kind === "drone" ? 174 : 92;
+    this.flyoverSound.sources[0].frequency.setTargetAtTime(
+      base * (1.04 - 0.08 * progress), ctx.currentTime, 0.12);
   }
   tone(frequency, duration = 0.065, gain = 0.13) {
     if (

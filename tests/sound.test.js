@@ -183,6 +183,36 @@ test("landscape ambience follows visible layers and sound-menu category controls
   }
 });
 
+test("drone and plane flyovers follow the pass and stop with effects or visibility", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.unlock();
+    sound.setFlyover("satellite", 0.5);
+    assert.equal(sound.flyoverSound, undefined);
+    sound.setFlyover("drone", 0.25);
+    assert.equal(sound.flyoverSound.kind, "drone");
+    assert.equal(sound.flyoverSound.sources.length, 3);
+    const approaching = sound.flyoverSound.envelope.gain.value;
+    sound.setFlyover("drone", 0.5);
+    assert.ok(sound.flyoverSound.envelope.gain.value > approaching);
+    sound.setFlyover("aircraft", 0.5);
+    assert.equal(sound.flyoverSound.kind, "aircraft");
+    assert.equal(sound.flyoverSound.sources.length, 3);
+    sound.setCategory("effects", false);
+    sound.setFlyover("aircraft", 0.6);
+    assert.equal(sound.flyoverSound, null);
+    sound.setCategory("effects", true);
+    sound.setFlyover("aircraft", 0.6);
+    assert.equal(sound.flyoverSound.kind, "aircraft");
+    sound.setActive(false);
+    assert.equal(sound.flyoverSound, null);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
 test("sound menu preferences survive a new sound session", () => {
   const previous = globalThis.localStorage;
   const values = new Map();

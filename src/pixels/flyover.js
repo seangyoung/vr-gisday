@@ -54,11 +54,14 @@ export class PixelFlyover {
     this.age = 0;
     this.update(0);
   }
+  get progress() {
+    if (!this.config) return 1;
+    return Math.min(1, this.age / (this.config.kind === "drone" ? 7 : 5.5));
+  }
   update(dt) {
     if (!this.group) return;
     this.age += dt;
-    const duration = this.config.kind === "drone" ? 7 : 5.5;
-    const t = Math.min(1, this.age / duration);
+    const t = this.progress;
     const x = THREE.MathUtils.lerp(-68, 68, t);
     const z = -60;
     this.group.position.set(x,
