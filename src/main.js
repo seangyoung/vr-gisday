@@ -818,8 +818,6 @@ function startShowcase(kind) {
   showcase = new Constructor(root, (reason) => {
     if (reason === "selection" && showcase?.kind === "cluster") updateClusterReadout();
     else {
-      if (reason === "idwWeights" && showcase?.kind === "interpolation")
-        sound.idwNeighbors(showcase.estimate.neighbors);
       if (["correct", "blocked", "reveal"].includes(reason)) sound.cue(reason);
       draw();
     }

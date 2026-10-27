@@ -259,7 +259,7 @@ test("world sounds follow moving sources and the listener; rain flow and tower w
   }
 });
 
-test("GNSS timing and IDW neighbor cues use the effects bus and respect mute", () => {
+test("GNSS timing cues use the effects bus and respect mute", () => {
   const old = globalThis.AudioContext;
   globalThis.AudioContext = Context;
   try {
@@ -269,16 +269,9 @@ test("GNSS timing and IDW neighbor cues use the effects bus and respect mute", (
     sound.gnssSignal("bounce");
     sound.gnssSignal("receive");
     assert.equal(sound.context.tones, 3);
-    sound.idwNeighbors([
-      { station: { value: 20 }, weight: 0.6 },
-      { station: { value: 30 }, weight: 0.3 },
-      { station: { value: 40 }, weight: 0.1 },
-    ]);
-    assert.equal(sound.context.tones, 6);
     sound.muted = true;
     sound.gnssSignal("send");
-    sound.idwNeighbors([{ station: { value: 20 }, weight: 1 }]);
-    assert.equal(sound.context.tones, 6);
+    assert.equal(sound.context.tones, 3);
   } finally {
     globalThis.AudioContext = old;
   }

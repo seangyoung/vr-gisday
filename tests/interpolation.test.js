@@ -115,17 +115,17 @@ test("pointing at a gauge head reveals its reading until the ray moves away", ()
   demo.dispose();
 });
 
-test("showing IDW math cues the currently selected neighbors and a new estimate", () => {
+test("showing IDW math updates the selected neighbors and a new estimate", () => {
   const events = [];
   const demo = new InterpolationExperience(new THREE.Group(),
     (reason) => events.push(reason), new THREE.Scene());
   demo.begin();
   demo.setMode("idw");
   demo.toggleWeights();
-  assert.equal(events.at(-1), "idwWeights");
+  assert.equal(events.at(-1), "reveal");
   assert.equal(demo.estimate.neighbors.length, 3);
   demo.placeProbe(0.4, -0.2);
-  assert.equal(events.at(-1), "idwWeights");
+  assert.equal(events.at(-1), "selection");
   demo.toggleWeights();
   assert.equal(events.at(-1), "reveal");
   demo.dispose();

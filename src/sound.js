@@ -455,30 +455,6 @@ export class LabSound {
       this.tone(490, 0.17, 0.07);
     }
   }
-  idwNeighbors(neighbors) {
-    if (!Array.isArray(neighbors) || !neighbors.length) return;
-    this.unlock();
-    if (!this.context || this.context.state !== "running" || !this.active ||
-        this.muted || !this.effectsEnabled || this.volume === 0) return;
-    const now = this.context.currentTime;
-    // Play nearest first; amplitude follows each normalized IDW weight.
-    for (const [index, neighbor] of neighbors.slice(0, 3).entries()) {
-      const oscillator = this.context.createOscillator();
-      const envelope = this.context.createGain();
-      const start = now + index * 0.19;
-      oscillator.type = "sine";
-      oscillator.frequency.value = 360 + 9 * neighbor.station.value;
-      envelope.gain.setValueAtTime(0, start);
-      envelope.gain.linearRampToValueAtTime(
-        0.035 + 0.15 * neighbor.weight, start + 0.012);
-      envelope.gain.exponentialRampToValueAtTime(0.0001, start + 0.15);
-      oscillator.connect(envelope);
-      envelope.connect(this.effectsBus);
-      oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
-      oscillator.start(start);
-      oscillator.stop(start + 0.16);
-    }
-  }
   tone(frequency, duration = 0.065, gain = 0.13) {
     if (
       !this.context ||

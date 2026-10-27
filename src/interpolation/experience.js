@@ -398,7 +398,7 @@ export class InterpolationExperience extends TimedExhibit {
     this.showWeights = !this.showWeights;
     this.smoothResiduals.visible = false;
     this.placeProbe(this.probe.x, this.probe.z, false);
-    this.onChange(this.showWeights ? "idwWeights" : "reveal");
+    this.onChange("reveal");
   }
 
   placeProbe(x, z, notify = true) {
@@ -452,7 +452,7 @@ export class InterpolationExperience extends TimedExhibit {
         new THREE.Vector3(station.x, h + 0.005, station.z),
       ], 0xffd070, 0.75));
     });
-    if (notify) this.onChange(this.showWeights ? "idwWeights" : "selection");
+    if (notify) this.onChange("selection");
   }
 
   targetHit(raycaster) {
