@@ -21,6 +21,7 @@ import { GnssScene } from "./gnss/scene.js";
 import "./style.css";
 import { landingMarkup } from "./landing.js";
 import { LabSound } from "./sound.js";
+import { fitWrappedText } from "./ui-text.js";
 const sound = new LabSound();
 import { RoomScan } from "./scan/room.js";
 import { createSceneRotation, SCAN_SCENES } from "./scan/scenes.js";
@@ -286,12 +287,22 @@ function paintLabel(c, text, w, size, color, bg) {
   ctx.fillStyle = color;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const lines = text.split("\n");
+  const wrapped = w >= 1.3 && c.height >= 90;
+  const layout = wrapped
+    ? fitWrappedText(ctx, text, {
+      maxWidth: c.width - 35,
+      maxHeight: c.height - 12,
+      fontSize: size,
+      minFontSize: 19,
+      preserveBreaks: c.height < 145,
+    })
+    : { lines: text.split("\n"), spacing: size * 1.4 };
+  const { lines, spacing } = layout;
   lines.forEach((s, i) =>
     ctx.fillText(
       s,
       c.width / 2,
-      c.height / 2 + (i - (lines.length - 1) / 2) * size * 1.4,
+      c.height / 2 + (i - (lines.length - 1) / 2) * spacing,
       c.width - 35,
     ),
   );
@@ -318,9 +329,12 @@ function lessonCard(title, body, y = GUIDED_CARD_Y) {
   ctx.fillStyle = "#e6f4f5";
   ctx.font = "600 59px system-ui, sans-serif";
   ctx.fillText(title, 600, 48, 1140);
-  ctx.font = "500 43px system-ui, sans-serif";
-  body.split("\n").forEach((line, index, lines) =>
-    ctx.fillText(line, 600, 170 + (index - (lines.length - 1) / 2) * 50, 1140),
+  const { lines, spacing } = fitWrappedText(ctx, body, {
+    maxWidth: 1140, maxHeight: 150, fontSize: 43,
+    minFontSize: 24,
+  });
+  lines.forEach((line, index) =>
+    ctx.fillText(line, 600, 168 + (index - (lines.length - 1) / 2) * spacing, 1140),
   );
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -1059,7 +1073,7 @@ function drawLayersUI() {
   if (!l.started) {
     lessonCard(
       "Stand Inside the Layers",
-      "A geographic information system (GIS) combines place data in layers.\nAdd terrain, trees, water, roads, and boundaries to this landscape.\nWatch the overhead map and the world around you change together.",
+      "A geographic information system (GIS) combines place data in layers.\nAdd terrain, trees, water, roads, and boundaries to this landscape.\nWatch the map on your clipboard and the world around you change together.",
       0.13,
     );
     button("Start building", 0, -0.43, () => l.begin(), 1.5);
@@ -1079,7 +1093,7 @@ function drawLayersUI() {
   );
   if (l.finished) {
     label(
-      "GIS overlays datasets at shared locations to reveal relationships.\nThe river follows low terrain; roads cross it; flood studies add water levels.\nDistrict boundaries organize places and services.",
+      "GIS overlays datasets (called layers) at shared locations to reveal relationships.\nEach layer corresponds to some feature or attribute of the real world, even if it may not always be visible on the ground (e.g., floodplains or political boundaries).\nGIS let us explore how phenomena are arranged in space, and also examine how different layers relate to each other, like how hydrography is constrained by topography.",
       0,
       0.48,
       2.35,
@@ -2477,7 +2491,7 @@ function drawScene() {
     label("HOW SATELLITES FIND YOU", 0, 0.78, 2, 0.14, 38, "#a6f5d9");
     label("One distance. Many directions.", 0, 0.52, 2.15, 0.2, 52);
     label(
-      "GNSS means Global Navigation Satellite System.\nGPS is one such satellite system. A receiver uses\nsignal travel times to estimate distances to satellites.",
+      "GNSS stands for Global Navigation Satellite System.\nGPS (the US Global Positioning System) is one such satellite system. A receiver uses\nsignal travel times to estimate distances to satellites.",
       0,
       0.13,
       2.15,
