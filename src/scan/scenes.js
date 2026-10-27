@@ -7,7 +7,7 @@ export const SCAN_SCENES = [
     prompt: "Scan one wall, then turn the ruins around.\nWhich faces appear only from the other side?",
     takeaway: {
       title: "A wall can hide what lies behind it.",
-      body: "The wall blocks rays from surfaces behind it: occlusion.\nScan from another side to fill some of the gap.\nSurveyors align multiple lidar views for a fuller 3D map.",
+      body: "The wall blocks rays from surfaces behind it: this is called occlusion.\nScan from another side to fill some of the gap.\nSurveyors align multiple lidar views for a more complete 3D model.",
     },
   },
   {
@@ -31,7 +31,7 @@ export const SCAN_SCENES = [
     prompt: "Scan the stepped ground and nearby trees.\nWhich faces need a higher or lower viewpoint?",
     takeaway: {
       title: "Height changes need well-placed samples.",
-      body: "The steps and trees return points at different heights.\nGround points reveal terrace tops and vertical faces.\nA digital elevation model (DEM) stores ground heights in a grid.",
+      body: "The steps and trees return points at different heights.\nGround points reveal terrace tops and vertical faces.\nLidar point clouds can be used to generate digital elevation models (DEMs).",
     },
   },
   {
@@ -55,7 +55,7 @@ export const SCAN_SCENES = [
     prompt: "Sweep the platform and its narrow supports.\nDo all the slender pieces get the same number of points?",
     takeaway: {
       title: "Thin features need denser sampling.",
-      body: "Narrow supports catch fewer rays than broad surfaces.\nPoint density limits the detail a scan can resolve.\nDenser lidar sampling helps document thin features.",
+      body: "Narrow supports catch fewer lidar points than broad surfaces.\nPoint density limits the detail a scan can resolve.\nDenser lidar sampling helps document thin features.",
     },
   },
 ];

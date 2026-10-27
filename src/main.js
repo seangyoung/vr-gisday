@@ -949,8 +949,8 @@ function drawScanUI() {
     if (s.stage === 0) {
       lessonCard("The LiDAR Field Survey",
         s.sceneInfo.id === "terraces"
-          ? "Survey the terraces and trees from several positions.\nLidar times returning laser pulses to sample visible surfaces.\nAim teleport at a step face to climb onto its top."
-          : `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar times returning laser pulses to sample visible surfaces.\nFour stations at least 3 m apart reveal hidden sides.`);
+          ? "Survey the terraces and trees from several positions.\nLidar measures returning laser pulses to sample visible surfaces.\nAim teleport at a step face to climb onto its top."
+          : `Walk through ${s.sceneInfo.name.toLowerCase()} and survey the ${s.targetName}.\nLidar measures returning laser pulses to sample visible surfaces. Multiple scans improve the model.\nHow much of the site can you capture with only four scanning locations?`);
       button("Start survey", 0, GUIDED_ACTION_Y, () => s.begin(), 1.5);
       label("Grip tripod to carry · Right trigger scans/selects clipboard\nLeft stick: walk · Right stick: teleport/turn",
         0, GUIDED_INFO_Y, 2.3, 0.18, 26, "#b6d1d9", "#0b2430");
@@ -958,7 +958,7 @@ function drawScanUI() {
     }
     if (s.stage === 2) {
       lessonCard(`${s.score}% of the target captured`,
-        `${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} target samples.\nEach pulse stops at the first surface it reaches. Repeating a station adds no new faces.\nSurveyors merge scans from different angles to reveal hidden sides.`);
+        `${s.records.length} tripod ${s.records.length === 1 ? "scan captured" : "scans captured"} ${s.coverage.count} of ${s.coverage.samples.length} target samples.\nSurveyors merge scans from different angles to reveal hidden sides. The resulting point clouds can be used to create detailed 3D models for visualization and further analysis.`);
       takeawayActions(GUIDED_ACTION_Y, () => startStationScan(s.sceneInfo));
       foregroundTakeaway();
       return;
@@ -1149,7 +1149,7 @@ function drawViewshedUI() {
   if (!v.started) {
     lessonCard(
       "Can You See It?",
-      "A viewshed maps the ground visible from one observation point.\nA bare-earth digital elevation model (DEM) supplies the heights.\nChoose Tower, climb its rungs, then grip the platform rim to pull up.",
+      "A viewshed maps the ground visible from a single observation point.\nA bare-earth digital elevation model (DEM) supplies the heights, which determine what can be seen.\nExplore the viewshed on the clipboard map. Move the observation point and change the observation height to see how the viewshed changes.",
       0.13,
     );
     button("Test the view", 0, -0.43, () => v.begin(), 1.5);
@@ -1163,7 +1163,7 @@ function drawViewshedUI() {
   );
   if (v.finished) {
     label(
-      "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights.\nCanyon walls can hide the opposite bank; raising the observer may reveal it.\nA surface model could also add trees and buildings to the analysis.",
+      "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights. Other models could add trees or buildings to the analysis.\nRaising the observation height may reveal a previously hidden target.\nMore variable terrain will generally shrink the viewshed.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -1227,7 +1227,7 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 2 m, 10 m, and 30 m pixels.",
+      "Satellites, aircraft, and drones image Earth at different levels of detail, or spatial resolutions.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 2 m, 10 m, and 30 m pixels.",
       0.13,
     );
     button("Meet the sensors", 0, -0.43, () => p.begin(), 1.5);
@@ -1258,7 +1258,7 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Satellite, aircraft, and drone sensors trade coverage for ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nAt 30 m, narrow rivers and roads blend with nearby land inside mixed pixels.",
+      "Satellite, aircraft, and drone sensors make different trade-offs between coverage and ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nAt 30 m, narrow rivers and roads blend with nearby land inside mixed pixels.",
       0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
@@ -1315,19 +1315,19 @@ function drawShowcaseUI() {
   if (!exhibit.started) {
     const introductions = {
       spectral: ["See the Invisible",
-        "Remote sensing measures energy reflected by Earth's surfaces.\nSensors record visible light and wavelengths our eyes cannot see.\nFollow light through a prism, then use near infrared to assess vegetation.",
+        "Remote sensing measures energy reflected by Earth's surfaces.\nSensors record visible light, as well as wavelengths our eyes cannot see.\nSome of these invisible wavelengths, like infrared, can be extremely useful to measure.",
         "Explore light bands"],
       cluster: ["Where Did the Cluster Go?",
-        "John Snow mapped cholera deaths near a London water pump in 1854.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
+        "In 1854, Dr. John Snow mapped cholera deaths around the Broad Street water pump in London.\nIf the data were mapped differently (grouped into wards), perhaps the cluster would not have been so obvious.\nCompare the same 489 deaths in four hypothetical ward plans.\nWatch the darkest area shift or fade as boundaries and ward sizes change.",
         "Explore the pattern"],
       projection: ["Make the World Flat",
-        "A map projection places Earth's curved surface on a flat map.\nChoose a projection and watch the globe unfold.\nAim at land. Hold GRIP and drag it north or south on the map.",
+        "A map projection flattens the Earth's curved surface onto a 2D map.\nChoose a projection and watch the globe unfold.\nTo compare how projections distort size and/or shape, examine Tissot circles, or drag continents from the globe to the map with the GRIP button.",
         "Flatten the globe"],
       change: ["What Changed?",
-        "Landsat revisits places, measuring visible and infrared light.\nSome pairs use false color to reveal patterns; Joplin uses natural color.\nUse the slider or spotlight to compare dates, then choose what changed most.",
+        "The only constant is change. Examine Landsat satellite images of the same location collected on different days.\nUse the slider or spotlight to compare dates, then identify the most notable change.",
         "Compare images"],
       interpolation: ["Between the Rain Gauges",
-        "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare surfaces, then estimate rain at a new spot.",
+        "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare different interpolated surfaces, then estimate rain at an unmeasured location.",
         "Fit the surfaces"],
       suitability: ["Where Should It Go?",
         "A town needs a new clinic. GIS suitability analysis combines several spatial criteria.\nInspect three sites using a 450 m distance buffer, road proximity, and flood exposure.\nChange the priorities to see how the preferred site changes.",
@@ -1355,15 +1355,15 @@ function drawShowcaseUI() {
   }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
     lessonCard(`${exhibit.sceneInfo.name} · takeaways`,
-      `A spectral signature is a surface's response across bands.\nIn false color, healthy vegetation often appears red.\n${exhibit.sceneInfo.observation}`, -0.02);
-    label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI often marks vigorous green vegetation.",
+      `A spectral signature is the unique response across different spectral bands (visible, NIR, etc.) of a particular surface.\nFalse color composites can make invisible spectral bands visible, like a NIR photo where healthy vegetation appears red.\n${exhibit.sceneInfo.observation}`, -0.02);
+    label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI generally indicates healthy vegetation.",
       0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
     takeawayActions(-0.72);
     return;
   }
   if (exhibit.kind === "change" && exhibit.finished) {
     lessonCard("Images turn change into evidence",
-      "Change detection compares images of the same ground over time.\nMatch the view and consider season, sensor, and color bands.\nGround records help explain the changes you can see.", -0.05);
+      "Change detection compares images of the same ground over time.\nAutomated change detection algorithms can identify and classify many different types of changes, greatly assisting researchers' efforts to monitor and study Earth's ever-changing landscapes.", -0.05);
     label("USGS Landsat views · flood, fire, growth, eruption, and tornado",
       0, -0.43, 2.4, 0.13, 25, "#b6d1d9", "#0b2430");
     takeawayActions(-0.64);
@@ -1372,11 +1372,11 @@ function drawShowcaseUI() {
   if (exhibit.finished) {
     const takeaways = {
       cluster: ["Same deaths, new boundaries",
-        "The same 489 deaths can look concentrated or nearly uniform.\nPlans A–C change six ward boundaries; Plan D uses four broad wards.\nThis is MAUP: the modifiable areal unit problem."],
+        "The same 489 deaths can look concentrated (i.e., clustered), or nearly uniform.\nAll of the maps use the same real data; the only thing that changed was how they were aggregated into zones.\nIf the areal units can change, the spatial patterns (and indeed even statistical tests) can also change with them. This is an example of the MAUP: the modifiable areal unit problem. Don't trust every map you see. You may need to explore more carefully."],
       projection: ["Every flat map makes a choice",
-        "Flattening Earth changes shape, area, or both.\nTissot circles show distortion through their size and shape.\nEqual-area, conformal, and compromise projections serve different map goals."],
+        "Flattening Earth's surface onto a map changes shape, distance/area, or both.\nTissot circles help visualize distortions.\nEqual-area projections preserve area, conformal preserve shape, and compromise projections allow both to be distorted.\nThere is no single optimum projection."],
       interpolation: ["Spatial interpolation fills the gaps",
-        "Spatial interpolation estimates values between gauges.\nIDW favors nearby readings; a smooth trend may miss points.\nNearest-gauge zones make steps. Check held-out gauges."],
+        "Spatial interpolation estimates values between locations with known measurements.\nDifferent interpolation techniques will create different surfaces. Nearest-gauge zones created abrupt steps. Smooth trends may over-simplify and miss local variations. IDW is a common technique that favors nearby readings, but it too is only an estimate.\nSpatial interpolation allows researchers to fill in data gaps and generate continuous surface maps that help visualize and analyze patterns."],
       suitability: ["The chosen site depends on priorities",
         "A buffer shows places within a set straight-line distance.\nSuitability analysis puts each criterion on a common scale and combines weighted scores.\nChanging the weights can change which site ranks first."],
     };
@@ -1655,14 +1655,14 @@ function drawRainUI() {
   if (r.kind === "erosion") {
     copy[4] = [
       "Plants help hold soil in place.",
-      "Fast runoff cuts bare soil and carries sediment downhill.\nVegetation slows soil detachment and stabilizes wet banks; water still flows across it.\nCompare green and bare patches. This short simulation speeds up erosion.",
+      "Fast runoff cuts bare soil and carries sediment downhill.\nVegetation slows soil detachment and stabilizes wet banks.\nCompare green and bare patches. This short simulation speeds up erosion.",
     ];
   }
   const [title, body] = copy[r.stage];
   if (r.stage === 1)
     label(
       `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"}\nGrip: move/size · Grip + stick: turn 45°\n${r.kind === "erosion"
-        ? r.replayTime >= 0 ? "Replay shows saved bed shapes; Live resumes water." : "Green cover protects soil; bare patches erode faster."
+        ? r.replayTime >= 0 ? "Replay shows saved bed shapes." : "Green cover protects soil; bare patches erode faster."
         : r.overlay
           ? `${basinLabels.A} and ${basinLabels.B} mark the two drainage basins.`
           : "Runoff follows slope; ridges divide basins."}`,
@@ -2499,7 +2499,7 @@ function drawScene() {
       39,
     );
     label(
-      "Known beacons stand in for satellites.\nWe know each beacon's distance; direction remains unknown.\nCombine distances to narrow down your location.",
+      "Known beacons stand in for GNSS satellites.\nWe know the distance to the beacon, but direction remains unknown.\nCombine distances to narrow down your location.",
       0,
       -0.3,
       2.15,
