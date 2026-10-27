@@ -1213,7 +1213,7 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 1 m, 10 m, and 30 m pixels.",
+      "Satellites, aircraft, and drones image Earth at different levels of detail.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 2 m, 10 m, and 30 m pixels.",
       0.13,
     );
     button("Meet the sensors", 0, -0.43, () => p.begin(), 1.5);
@@ -1251,11 +1251,8 @@ function drawPixelsUI() {
 
     return;
   }
-  const flightHint = p.size === 0.5 ? "Drone · illustrated at ~100 ft"
-    : p.size === 1 ? "Aircraft · illustrated at ~200 ft"
-    : "Satellite marker · illustrated at ~200 ft; real orbit is much higher";
   label(
-    `Look up for the flyover · ${flightHint}\nLeft stick: walk · Right stick: turn or teleport`,
+    "Left stick: walk · Right stick: turn or teleport",
     0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430",
   );
   for (const [index, size] of PIXEL_SIZES.entries())

@@ -8,8 +8,10 @@ import { landscapeHeight } from "../src/layers/experience.js";
 
 test("pixel size changes ground area while retaining the same source landscape", () => {
   const model = new PixelModel();
-  assert.deepEqual(PIXEL_SIZES, [0.5, 1, 10, 30]);
+  assert.deepEqual(PIXEL_SIZES, [0.5, 2, 10, 30]);
   assert.equal(pixelSizeLabel(0.5), "50 cm");
+  assert.equal(pixelSizeLabel(2), "2 m");
+  assert.equal(flyoverForSize(2).kind, "aircraft");
   for (const size of PIXEL_SIZES) {
     const raster = model.raster(size);
     assert.equal(raster.cells, Math.ceil((PIXEL_EXTENT * 2) / size));

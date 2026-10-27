@@ -5,7 +5,7 @@ import { makePlatformModel } from "../showcase/remote-platforms.js";
 const FEET_TO_METERS = 0.3048;
 export const flyoverForSize = (size) => size === 0.5
   ? { kind: "drone", feet: 100 }
-  : size === 1
+  : size === 2
   ? { kind: "aircraft", feet: 200 }
   : { kind: "satellite", feet: 200 };
 

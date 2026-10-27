@@ -6,7 +6,7 @@ import {
 } from "../layers/experience.js";
 
 export const PIXEL_EXTENT = 72;
-export const PIXEL_SIZES = [0.5, 1, 10, 30];
+export const PIXEL_SIZES = [0.5, 2, 10, 30];
 export const pixelSizeLabel = (size) => size === 0.5 ? "50 cm" : `${size} m`;
 export const COVER_NAMES = ["Other ground", "Forest", "Water", "Road"];
 const METERS = PIXEL_EXTENT * 2;
