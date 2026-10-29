@@ -181,7 +181,7 @@ function makeTrees(group, raised) {
   const deciduous = TREE_POSITIONS.filter((p) => !p.evergreen);
   const evergreen = TREE_POSITIONS.filter((p) => p.evergreen);
   const trunk = new THREE.InstancedMesh(
-    // Continue the trunk inside the foliage so climbing remains grounded in the model.
+    // Bury the visible trunk end inside the foliage; climbing still reaches the canopy.
     new THREE.CylinderGeometry(0.11, 0.18, 1, 6),
     new THREE.MeshStandardMaterial({ color: 0x705b45, roughness: 1 }),
     TREE_POSITIONS.length,
@@ -197,9 +197,9 @@ function makeTrees(group, raised) {
     evergreen.length,
   );
   const temp = new THREE.Object3D();
-  TREE_POSITIONS.forEach(({ x, z, scale, evergreen: isPine }, i) => {
+  TREE_POSITIONS.forEach(({ x, z, scale }, i) => {
     const y = landscapeHeight(x, z, raised);
-    const trunkHeight = (isPine ? 4.2 : 3.7) * scale;
+    const trunkHeight = 3.3 * scale;
     temp.position.set(x, y + trunkHeight / 2, z);
     temp.scale.set(scale, trunkHeight, scale);
     temp.updateMatrix();

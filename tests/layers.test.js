@@ -163,12 +163,18 @@ test("tree trunks stop walking and teleport while grip pulls the visitor above t
   const tree = TREE_POSITIONS[0];
   const trunk = l.variants.flat.vegetation.children[0];
   const matrix = new THREE.Matrix4();
-  trunk.getMatrixAt(0, matrix);
   const trunkCenter = new THREE.Vector3();
   const trunkScale = new THREE.Vector3();
-  matrix.decompose(trunkCenter, new THREE.Quaternion(), trunkScale);
-  assert.ok(Math.abs(trunkCenter.y + trunkScale.y / 2 -
-    (tree.evergreen ? 4.2 : 3.7) * tree.scale) < 1e-6);
+  for (const evergreen of [false, true]) {
+    const index = TREE_POSITIONS.findIndex((candidate) => candidate.evergreen === evergreen);
+    const candidate = TREE_POSITIONS[index];
+    trunk.getMatrixAt(index, matrix);
+    matrix.decompose(trunkCenter, new THREE.Quaternion(), trunkScale);
+    const trunkTop = trunkCenter.y + trunkScale.y / 2;
+    const canopyTop = (evergreen ? 4.3 : 3.8) * candidate.scale;
+    assert.ok(trunkTop < canopyTop - 0.45 * candidate.scale,
+      `${evergreen ? "pine" : "broadleaf"} trunk ends inside the canopy`);
+  }
   const startX = tree.x + 0.7;
   l.group.rotation.y = 0;
   l.group.position.set(-startX, 0, -tree.z);
