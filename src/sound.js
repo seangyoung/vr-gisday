@@ -205,6 +205,7 @@ export class LabSound {
     if (!active) {
       this.stopFlyover();
       this.stopScanner();
+      this.stopZipline();
       this.setRunoff(0);
     }
     if (!this.master) return;
@@ -261,6 +262,7 @@ export class LabSound {
       if (!enabled) {
         this.stopFlyover();
         this.stopScanner();
+        this.stopZipline();
       }
     }
   }
@@ -383,6 +385,65 @@ export class LabSound {
     envelope.gain.setTargetAtTime(0, this.context.currentTime, 0.025);
     for (const source of sources) source.stop(this.context.currentTime + 0.12);
     this.scannerSound = null;
+  }
+  stopZipline() {
+    if (!this.ziplineSound) return;
+    const { envelope, sources } = this.ziplineSound;
+    const now = this.context.currentTime;
+    envelope.gain.setTargetAtTime(0, now, 0.025);
+    for (const source of sources) source.stop(now + 0.15);
+    this.ziplineSound = null;
+  }
+  setZipline(active, speed = 0) {
+    if (!active || !this.active || this.muted || !this.effectsEnabled ||
+        this.volume === 0) {
+      this.stopZipline();
+      return;
+    }
+    this.unlock();
+    if (!this.context || this.context.state !== "running") return;
+    if (!this.ziplineSound) {
+      const ctx = this.context;
+      const envelope = ctx.createGain();
+      envelope.gain.value = 0;
+      envelope.connect(this.effectsBus);
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.effectNoise;
+      noise.loop = true;
+      const friction = ctx.createBiquadFilter();
+      friction.type = "bandpass";
+      friction.Q.value = 0.8;
+      const rasp = ctx.createGain();
+      rasp.gain.value = 0.13;
+      noise.connect(friction);
+      friction.connect(rasp);
+      rasp.connect(envelope);
+      const whine = ctx.createOscillator();
+      whine.type = "triangle";
+      const whineGain = ctx.createGain();
+      whineGain.gain.value = 0.035;
+      whine.connect(whineGain);
+      whineGain.connect(envelope);
+      noise.start();
+      whine.start();
+      const sources = [noise, whine];
+      let remaining = sources.length;
+      for (const source of sources) source.onended = () => {
+        source.disconnect();
+        if (--remaining === 0) envelope.disconnect();
+      };
+      this.ziplineSound = { envelope, friction, whine, sources };
+    }
+    const s = Math.max(0, Math.min(1, speed));
+    const now = this.context.currentTime;
+    this.ziplineSound.friction.frequency.setTargetAtTime(620 + 1150 * s, now, 0.09);
+    this.ziplineSound.whine.frequency.setTargetAtTime(270 + 260 * s, now, 0.09);
+    this.ziplineSound.envelope.gain.setTargetAtTime(0.16 + 0.18 * s, now, 0.08);
+  }
+  ziplineLand() {
+    this.stopZipline();
+    this.noiseBurst(0.18, 260, 90, 0.075);
+    this.tone(145, 0.14, 0.065);
   }
   setScanner(active, position = null, progress = 0) {
     if (!active || !this.context || this.context.state !== "running" ||

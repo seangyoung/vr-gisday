@@ -225,6 +225,28 @@ test("drone and plane flyovers follow the pass and stop with effects or visibili
   }
 });
 
+test("zipline cable sound grows with speed and stops cleanly", () => {
+  const old = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  try {
+    const sound = new LabSound();
+    sound.setZipline(true, 0.1);
+    assert.equal(sound.ziplineSound.sources.length, 2);
+    const lowPitch = sound.ziplineSound.whine.frequency.value;
+    const lowLevel = sound.ziplineSound.envelope.gain.value;
+    sound.setZipline(true, 0.9);
+    assert.ok(sound.ziplineSound.whine.frequency.value > lowPitch);
+    assert.ok(sound.ziplineSound.envelope.gain.value > lowLevel);
+    sound.setZipline(false);
+    assert.equal(sound.ziplineSound, null);
+    sound.setZipline(true, 0.4);
+    sound.setCategory("effects", false);
+    assert.equal(sound.ziplineSound, null);
+  } finally {
+    globalThis.AudioContext = old;
+  }
+});
+
 test("world sounds follow moving sources and the listener; rain flow and tower wind respond", () => {
   const old = globalThis.AudioContext;
   globalThis.AudioContext = Context;

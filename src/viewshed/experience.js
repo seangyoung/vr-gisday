@@ -17,6 +17,8 @@ const MAX_LOOKOUT_SHIFT = 0.65;
 const LOOKOUT_PULL_SECONDS = 0.85;
 const LOOKOUT_RETURN_SECONDS = 0.7;
 const RETURN_RUNG_DROP = 0.55;
+const ZIPLINE_HANG_BELOW = 0.48;
+const ZIPLINE_SPEED_CAP = 18;
 
 const visibleColor = new THREE.Color(0x55e5a9);
 const hiddenColor = new THREE.Color(0x9176bd);
@@ -206,6 +208,8 @@ export class ViewshedExperience extends LayerExperience {
     this.lookoutTransition = null;
     this.lookoutSlide = new THREE.Vector2();
     this.lookoutGoal = new THREE.Vector2();
+    this.ziplineGrips = new Map();
+    this.zipline = null;
     this.revealAge = 1;
     this.marker = observationMarker();
     this.marker.visible = false;
@@ -356,8 +360,11 @@ export class ViewshedExperience extends LayerExperience {
   get isAtTop() {
     return this.topLocked;
   }
+  get isZiplining() {
+    return this.zipline !== null;
+  }
   get isClimbing() {
-    return this.lookoutTransition !== null || this.climbHands.size > 0 ||
+    return this.isZiplining || this.lookoutTransition !== null || this.climbHands.size > 0 ||
       (this.climbHeight > 0 && !this.topLocked);
   }
   begin() {
@@ -376,6 +383,7 @@ export class ViewshedExperience extends LayerExperience {
     return movement;
   }
   teleportCandidate(raycaster, uiHit = null) {
+    if (this.isZiplining) return null;
     if (this.started && !this.finished && this.marker.visible &&
         this.marker.userData.lookout.visible && this.visualHeight >= TOWER_HEIGHT - 0.5) {
       this.marker.updateWorldMatrix(true, true);
@@ -398,6 +406,7 @@ export class ViewshedExperience extends LayerExperience {
     return super.teleportCandidate(raycaster, uiHit);
   }
   teleportTo(candidate, camera) {
+    if (this.isZiplining) return false;
     if (!candidate?.platform) return super.teleportTo(candidate, camera);
     if (!this.marker.userData.lookout.visible ||
         this.visualHeight < TOWER_HEIGHT - 0.5 || this.isClimbing || this.isAtTop)
@@ -444,7 +453,8 @@ export class ViewshedExperience extends LayerExperience {
       Math.hypot(local.x, local.z) < 0.42;
   }
   gripRung(id, handWorld) {
-    if (!this.started || this.finished || this.observer.height !== TOWER_HEIGHT ||
+    if (!this.started || this.finished || this.isZiplining ||
+        this.observer.height !== TOWER_HEIGHT ||
         this.lookoutTransition) return false;
     if (this.topLocked) {
       if (!this.nearTowerPole(handWorld) && !this.nearestRung(handWorld)) return false;
@@ -473,6 +483,110 @@ export class ViewshedExperience extends LayerExperience {
       this.lookoutTransition.released = true;
     this.climbHands.delete(id);
     if (!this.climbHands.size && this.climbHeight > 0) this.fallSpeed = 0;
+  }
+  ziplineEndpoints() {
+    return {
+      start: new THREE.Vector3(this.observer.x,
+        this.sceneChoice.heightAt(this.observer.x, this.observer.z) + this.observer.height,
+        this.observer.z),
+      end: new THREE.Vector3(this.trace.end.x, this.trace.end.y, this.trace.end.z),
+    };
+  }
+  nearZipline(handWorld) {
+    if (!handWorld?.isVector3) return false;
+    const { start, end } = this.ziplineEndpoints();
+    const local = this.group.worldToLocal(handWorld.clone());
+    const span = end.sub(start);
+    const lengthSq = span.lengthSq();
+    if (lengthSq < 4) return false;
+    const t = THREE.MathUtils.clamp(local.clone().sub(start).dot(span) / lengthSq, 0, 1);
+    return t <= Math.min(0.16, 6 / Math.sqrt(lengthSq)) &&
+      local.distanceTo(start.addScaledVector(span, t)) < 0.38;
+  }
+  gripZipline(id, handWorld, handPositions, camera) {
+    if (!this.started || this.finished || !this.topLocked || this.isZiplining ||
+        this.lookoutTransition || this.revealAge < 0.95 ||
+        this.visualHeight < TOWER_HEIGHT - 0.3 || !this.nearZipline(handWorld))
+      return false;
+    this.ziplineGrips.set(id, handWorld.clone());
+    if (this.ziplineGrips.size < 2) return true;
+    const bothNear = [...this.ziplineGrips].every(([handId, previous]) =>
+      this.nearZipline(handPositions.get(handId) ?? previous));
+    if (!bothNear) {
+      this.ziplineGrips.clear();
+      this.ziplineGrips.set(id, handWorld.clone());
+      return true;
+    }
+    const { start, end } = this.ziplineEndpoints();
+    const delta = end.clone().sub(start);
+    this.zipline = {
+      start, end, direction: delta.clone().normalize(), length: delta.length(),
+      distance: 0, speed: 1.6, age: 0,
+      attachFrom: this.group.worldToLocal(camera.getWorldPosition(new THREE.Vector3())),
+    };
+    this.ziplineGrips.clear();
+    this.climbHands.clear();
+    this.lookoutTransition = null;
+    this.topLocked = false;
+    this.climbHeight = 0;
+    this.lookoutSlide.set(0, 0);
+    this.lookoutGoal.set(0, 0);
+    this.clipboard.visible = false;
+    this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
+    this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
+    this.onChange();
+    return true;
+  }
+  releaseZiplineGrip(id) {
+    this.ziplineGrips.delete(id);
+  }
+  updateZipline(dt, camera) {
+    const ride = this.zipline;
+    if (!ride || !camera || dt <= 0) return;
+    ride.age += dt;
+    const previousDistance = ride.distance;
+    ride.speed = Math.min(ZIPLINE_SPEED_CAP, ride.speed + 5.2 * dt);
+    const nextDistance = Math.min(ride.length,
+      previousDistance + ride.speed * dt);
+    let landed = false;
+    let nextEye = null;
+    const samples = Math.max(1, Math.ceil((nextDistance - previousDistance) / 0.45));
+    for (let i = 1; i <= samples; i++) {
+      const distance = THREE.MathUtils.lerp(previousDistance, nextDistance, i / samples);
+      const eye = ride.start.clone().addScaledVector(ride.direction, distance);
+      eye.y -= ZIPLINE_HANG_BELOW;
+      const ground = this.sceneChoice.heightAt(eye.x, eye.z);
+      if (eye.y - this.eyeHeight <= ground + 0.04 || distance >= ride.length) {
+        eye.y = ground + this.eyeHeight;
+        nextEye = eye;
+        ride.distance = distance;
+        landed = true;
+        break;
+      }
+      nextEye = eye;
+      ride.distance = distance;
+    }
+    if (!nextEye) return;
+    // Ease the initial handoff from the platform into a hanging pose.
+    if (!landed && ride.age < 0.45) {
+      const u = ride.age / 0.45;
+      const eased = u * u * (3 - 2 * u);
+      nextEye.lerpVectors(ride.attachFrom, nextEye, eased);
+    }
+    const eyeWorld = camera.getWorldPosition(new THREE.Vector3());
+    const desiredWorld = this.group.localToWorld(nextEye.clone());
+    this.group.position.add(eyeWorld.sub(desiredWorld));
+    this.visitor.set(nextEye.x, nextEye.z);
+    ride.heightAboveGround = Math.max(0, nextEye.y -
+      this.sceneChoice.heightAt(nextEye.x, nextEye.z));
+    this.updateVisitorMarkers();
+    if (landed) {
+      this.zipline = null;
+      this.climbGroundY = this.group.position.y;
+      this.fallSpeed = 0;
+      this.onEvent("zipline-land");
+      this.onChange();
+    }
   }
   lookoutTarget() {
     const step = new THREE.Vector2(
@@ -561,6 +675,7 @@ export class ViewshedExperience extends LayerExperience {
     this.onChange();
   }
   updateClimb(poses, dt) {
+    if (this.isZiplining) return;
     if (!this.started || this.finished) {
       this.cancelClimb();
       return;
@@ -603,6 +718,22 @@ export class ViewshedExperience extends LayerExperience {
     this.updateLookout(dt);
   }
   cancelClimb() {
+    if (this.isZiplining) {
+      this.zipline = null;
+      this.ziplineGrips.clear();
+      this.group.position.y = this.floorY -
+        this.sceneChoice.heightAt(this.visitor.x, this.visitor.y);
+      this.climbGroundY = this.group.position.y;
+      this.climbHands.clear();
+      this.climbHeight = 0;
+      this.topLocked = false;
+      this.lookoutSlide.set(0, 0);
+      this.lookoutGoal.set(0, 0);
+      this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
+      this.marker.userData.lookoutEdge.emissive.setHex(0x3d3215);
+      return;
+    }
+    this.ziplineGrips.clear();
     const angle = this.group.rotation.y;
     this.group.position.x -= Math.cos(angle) * this.lookoutSlide.x +
       Math.sin(angle) * this.lookoutSlide.y;
@@ -667,7 +798,7 @@ export class ViewshedExperience extends LayerExperience {
     );
   }
   placeFromRay(raycaster) {
-    if (!this.started || this.finished || this.isAtTop) return false;
+    if (!this.started || this.finished || this.isAtTop || this.isZiplining) return false;
     const hit = this.hitTerrain(raycaster);
     if (!hit) return false;
     const local = this.group.worldToLocal(hit.point.clone());

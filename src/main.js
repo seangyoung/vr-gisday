@@ -537,7 +537,7 @@ function toggleSoundMenu() {
   stopRainInput();
   quiz?.pauseForAudio();
   grab?.cancel();
-  if (viewshed?.isClimbing) viewshed.cancelClimb();
+  if (viewshed?.isClimbing && !viewshed.isZiplining) viewshed.cancelClimb();
   if (layers?.isClimbingTree) layers.cancelTreeClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   const eye = cam.getWorldPosition(new THREE.Vector3());
@@ -792,6 +792,7 @@ function startViewshed() {
   viewshed?.dispose();
   viewshed = new ViewshedExperience(scene, draw, (event) => {
     if (["rung", "platform"].includes(event)) sound.climb(event);
+    else if (event === "zipline-land") sound.ziplineLand();
     else sound.cue(event);
   });
   viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -2370,6 +2371,7 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
+      viewshed.isZiplining ? null :
       viewshed.isAtTop ? "Grip pole" : "Grip rung / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
@@ -2762,7 +2764,7 @@ for (let i = 0; i < 2; i++) {
     if (quiz && !soundMenuOpen) return;
     if (leftHoldsClipboard(c)) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
-    if (viewshed?.isClimbing) return;
+    if (viewshed?.isClimbing && !soundMenuOpen) return;
     if (grab?.hands.size || rain?.grab.hands.size ||
         (scan?.grab.hands.size && !scan.station) ||
         showcase?.grab?.hands.size || showcase?.continentGripBy != null)
@@ -2857,11 +2859,19 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezestart", () => {
     if (quiz) return;
+    if (viewshed?.isZiplining) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (soundMenuOpen) return;
     if (viewshed?.started && grip.visible) {
       grip.updateWorldMatrix(true, false);
-      if (viewshed.gripRung(i, grip.getWorldPosition(new THREE.Vector3()))) {
+      const handWorld = grip.getWorldPosition(new THREE.Vector3());
+      const handPositions = new Map(controllers.filter(({ grip: other }) =>
+        other.visible).map(({ id, grip: other }) => {
+        other.updateWorldMatrix(true, false);
+        return [id, other.getWorldPosition(new THREE.Vector3())];
+      }));
+      if (viewshed.gripZipline(i, handWorld, handPositions,
+        renderer.xr.getCamera()) || viewshed.gripRung(i, handWorld)) {
         return;
       }
     }
@@ -2944,6 +2954,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezeend", () => {
     viewshed?.releaseRung(i);
+    viewshed?.releaseZiplineGrip(i);
     layers?.releaseTree(i);
     grab?.release(i);
     scan?.grab.release(i);
@@ -2955,6 +2966,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("disconnected", () => {
     if (c.userData.xrInput?.handedness === "right") teleport.cancel();
     viewshed?.releaseRung(i);
+    viewshed?.releaseZiplineGrip(i);
     layers?.releaseTree(i);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
@@ -3344,6 +3356,7 @@ renderer.setAnimationLoop((time, frame) => {
       }
     if (renderer.xr.getSession().visibilityState === "visible") {
       viewshed?.updateClimb(poses, dt);
+      if (!soundMenuOpen) viewshed?.updateZipline(dt, renderer.xr.getCamera());
       layers?.updateTreeClimb(poses, dt, renderer.xr.getCamera());
       grab?.update(poses, dt);
       rain?.grab.update(poses, dt);
@@ -3499,6 +3512,8 @@ renderer.setAnimationLoop((time, frame) => {
     !soundMenuOpen ? pixels.flyover : null;
   sound.setFlyover(audible ? overhead?.config?.kind : null, overhead?.progress,
     overhead?.group?.getWorldPosition(audioSource));
+  sound.setZipline(!!(audible && !soundMenuOpen && viewshed?.isZiplining),
+    (viewshed?.zipline?.speed ?? 0) / 18);
   const landscapeAudioDemo = (pixels?.phase === "pixels" ? pixels : null) ??
     viewshed ?? layers ?? (scan?.station ? scan : null);
   if (audible && !scan?.station && (scan?.records.length ?? 0) > previousSamples)
@@ -3522,7 +3537,8 @@ renderer.setAnimationLoop((time, frame) => {
     1 - Math.abs(landscapeAudioDemo.visitor.x - riverAt(z)) / 24, 0, 1) : 0;
   sound.setLandscape(!!(audible && landscapeAudioDemo), riverLevel,
     landscapeAudioDemo?.selected.has("vegetation") ? 1 : 0,
-    viewshed?.started ? viewshed.climbHeight / 12 : 0);
+    viewshed?.started ? (viewshed.zipline?.heightAboveGround ??
+      viewshed.climbHeight) / 12 : 0);
   renderer.render(scene, camera);
 });
 document.addEventListener("visibilitychange", () => {

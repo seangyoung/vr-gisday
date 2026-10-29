@@ -287,6 +287,52 @@ test("gripping the platform rim pulls the view onto it, and pole grip eases back
   demo.dispose();
 });
 
+test("two grips on the sightline launch a secret ride that accelerates and lands on terrain", () => {
+  const events = [];
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {},
+    (event) => events.push(event));
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
+  const perch = { platform: true, valid: true,
+    x: demo.observer.x, z: demo.observer.z - 0.65 };
+  assert.equal(demo.teleportTo(perch, camera), true);
+  const { start, end } = demo.ziplineEndpoints();
+  const forward = end.clone().sub(start).normalize();
+  const handA = demo.group.localToWorld(start.clone().addScaledVector(forward, 0.15));
+  const handB = demo.group.localToWorld(start.clone().addScaledVector(forward, 0.32));
+  assert.equal(demo.gripZipline(0, handA,
+    new Map([[0, handA]]), camera), true);
+  assert.equal(demo.isZiplining, false, "one grip is only an armed hold");
+  assert.equal(demo.gripZipline(1, handB,
+    new Map([[0, handA], [1, handB]]), camera), true);
+  assert.equal(demo.isZiplining, true);
+  assert.equal(demo.isClimbing, true);
+  assert.equal(demo.clipboard.visible, false);
+  assert.equal(demo.gripRung(0, handA), false);
+  assert.equal(demo.walk(0, -1, 0.2, camera).distance, 0);
+  assert.equal(demo.teleportCandidate(new THREE.Raycaster()), null);
+  demo.releaseZiplineGrip(0);
+  demo.releaseZiplineGrip(1);
+  assert.equal(demo.isZiplining, true, "releasing grips does not stop the ride");
+  const initialSpeed = demo.zipline.speed;
+  demo.updateZipline(0.05, camera);
+  assert.ok(demo.zipline.speed > initialSpeed);
+  assert.ok(demo.zipline.distance > 0);
+  for (let i = 0; i < 500 && demo.isZiplining; i++) demo.updateZipline(0.05, camera);
+  assert.equal(demo.isZiplining, false);
+  assert.ok(demo.visitor.distanceTo(new THREE.Vector2(
+    demo.observer.x, demo.observer.z)) > 2);
+  assert.ok(Math.abs(demo.group.position.y -
+    (demo.floorY - demo.sceneChoice.heightAt(demo.visitor.x, demo.visitor.y))) < 0.01);
+  assert.equal(events.at(-1), "zipline-land");
+  assert.equal(demo.isClimbing, false);
+  demo.dispose();
+});
+
 test("clipboard scene choices swap terrain, map target, walking height, and visibility analysis", () => {
   assert.deepEqual(VIEWSHED_SCENES.map((scene) => scene.id), ["valley", "redrock"]);
   const demo = new ViewshedExperience(new THREE.Scene(), () => {});
