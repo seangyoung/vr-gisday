@@ -1368,7 +1368,7 @@ function drawShowcaseUI() {
   if (exhibit.kind === "change" && exhibit.finished) {
     lessonCard("Images turn change into evidence",
       "Change detection compares images of the same ground over time.\nAutomated change detection algorithms can identify and classify many different types of changes, greatly assisting researchers' efforts to monitor and study Earth's ever-changing landscapes.", -0.05);
-    label("USGS Landsat views · flood, fire, growth, eruption, and tornado",
+    label("NASA/USGS Landsat views · flood, fire, growth, eruption, and tornado",
       0, -0.43, 2.4, 0.13, 25, "#b6d1d9", "#0b2430");
     takeawayActions(-0.64);
     return;
@@ -1460,7 +1460,8 @@ function drawShowcaseUI() {
     const caseInfo = exhibit.sceneInfo;
     label(`Case ${exhibit.sceneIndex + 1}/${CHANGE_SCENES.length} · ${caseInfo.place}`,
       0, 0.98, 2.45, 0.17, 43, "#e6f4f5", "#0b2430");
-    label(`${caseInfo.sensor} · USGS imagery`,
+    label(`${caseInfo.sensor} · ${caseInfo.id === "dallas"
+      ? "NASA Earth Observatory" : "USGS imagery"}`,
       0, 0.79, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
     label(exhibit.comparisonMode === "spotlight"
       ? "Aim at the image to reveal the later date"

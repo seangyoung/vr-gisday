@@ -18,11 +18,21 @@ test("every change case has two bundled Landsat frames and a complete interpreta
     }
     assert.ok(scene.answer >= 0 && scene.answer < scene.options.length);
     assert.ok(scene.explanation.length > 30);
-    assert.ok(scene.source.startsWith("https://eros.usgs.gov/"));
+    assert.ok(["eros.usgs.gov", "science.nasa.gov"]
+      .includes(new URL(scene.source).hostname));
     if (["flood", "fire"].includes(scene.id)) assert.equal(scene.focus, undefined);
     else for (const value of Object.values(scene.focus))
       assert.ok(value > 0 && value < 1, `${scene.id}: highlight must be on frame`);
   }
+});
+
+test("Dallas case uses the aligned, same-sensor 1984–2009 pair", () => {
+  const scene = CHANGE_SCENES.find(({ id }) => id === "dallas");
+  assert.equal(scene.beforeDate, "Aug. 31, 1984");
+  assert.equal(scene.afterDate, "Aug. 4, 2009");
+  assert.equal(scene.sensor, "Landsat 5 · natural color");
+  assert.equal(scene.height, 667);
+  assert.equal(scene.source, "https://science.nasa.gov/earth/earth-observatory/dallas-42551/");
 });
 
 test("a selected answer leaves the before-after slider draggable", () => {

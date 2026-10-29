@@ -1,5 +1,5 @@
-// Cropped JPEG encodings of USGS Landsat image pairs. Each pair covers the
-// same place; source scenes and processing notes are documented in SOURCES.md.
+// Landsat image pairs from USGS and NASA. Each pair covers the same place;
+// source scenes and processing notes are documented in SOURCES.md.
 export const CHANGE_SCENES = [
   {
     id: "flood",
@@ -35,20 +35,20 @@ export const CHANGE_SCENES = [
   },
   {
     id: "dallas",
-    place: "Northeast Dallas",
-    beforeDate: "Mar. 22, 1989",
-    afterDate: "Mar. 4, 2023",
-    sensor: "Landsat 5 → 8 · infrared false color",
+    place: "North Dallas suburbs",
+    beforeDate: "Aug. 31, 1984",
+    afterDate: "Aug. 4, 2009",
+    sensor: "Landsat 5 · natural color",
     before: new URL("./data/dallas-before.jpg", import.meta.url).href,
     after: new URL("./data/dallas-after.jpg", import.meta.url).href,
-    width: 1000, height: 745,
+    width: 1000, height: 667,
     question: "What changed most?",
     options: ["A wildfire spread", "Rivers flooded", "Suburbs expanded"],
     answer: 2,
-    observation: "Street grids and developed areas spread into former fields.",
-    explanation: "Street grids spread into former fields.\nBoth sensors captured comparable bands.",
-    focus: { u: 0.29, v: 0.20, rx: 0.22, ry: 0.17 },
-    source: "https://eros.usgs.gov/earthshots/rapid-suburban-expansion",
+    observation: "Street grids spread across fields north and west of Dallas.",
+    explanation: "Suburbs filled former farmland.\nThe same sensor and similar season aid comparison.",
+    focus: { u: 0.33, v: 0.31, rx: 0.19, ry: 0.20 },
+    source: "https://science.nasa.gov/earth/earth-observatory/dallas-42551/",
   },
   {
     id: "helens",
