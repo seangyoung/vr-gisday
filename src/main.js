@@ -1164,7 +1164,7 @@ function drawViewshedUI() {
   if (v.finished) {
     label(
       "This viewshed traces sight lines across a bare-earth DEM: a grid of ground heights. Other models could add trees or buildings to the analysis.\nRaising the observation height may reveal a previously hidden target.\nMore variable terrain will generally shrink the viewshed.",
-      0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
+      0, 0.12, 2.35, 1.16, 48, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
     foregroundViewshedClipboard(v);
