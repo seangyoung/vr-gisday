@@ -1430,14 +1430,16 @@ function drawShowcaseUI() {
       smooth: "Smooth trend · amber: gauge above surface · cyan: below.",
       idw: "Inverse distance weighting (IDW) favors nearby gauges.",
     };
-    label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
-      "#e6f4f5", "#0b2430");
     if (exhibit.showWeights) {
-      label("The three nearest gauges contribute; move ? to change their weights.",
-        0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
-    } else label(`Point at the model to move ? · ${exhibit.mode === "smooth" ? "smooth" :
-      exhibit.mode === "zones" ? "nearest" : "IDW"} estimate ${exhibit.displayValue.toFixed(1)} mm`,
+      label("Move ? to update the IDW calculation →", -0.35, -0.57,
+        1.55, 0.14, 26, "#e6f4f5", "#0b2430");
+    } else {
+      label(explanations[exhibit.mode], 0, -0.48, 2.47, 0.13, 26,
+        "#e6f4f5", "#0b2430");
+      label(`Point at the model to move ? · ${exhibit.mode === "smooth" ? "smooth" :
+        exhibit.mode === "zones" ? "nearest" : "IDW"} estimate ${exhibit.displayValue.toFixed(1)} mm`,
       0, -0.64, 2.48, 0.13, 25, "#b6d1d9", "#0b2430");
+    }
     button("Readings", -0.91, -0.84, () => exhibit.setMode("samples"),
       0.55, exhibit.mode === "samples");
     button("Zones", -0.32, -0.84, () => exhibit.setMode("zones"),

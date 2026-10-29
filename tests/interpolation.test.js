@@ -10,7 +10,7 @@ globalThis.document = {
   createElement: () => ({
     width: 256, height: 80,
     getContext: () => ({ fillRect() {}, strokeRect() {}, fillText() {},
-      beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+      beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, arc() {}, fill() {},
       measureText: (text) => ({ width: text.length * 24 }) }),
   }),
 };
@@ -124,10 +124,18 @@ test("showing IDW math updates the selected neighbors and a new estimate", () =>
   demo.toggleWeights();
   assert.equal(events.at(-1), "reveal");
   assert.equal(demo.estimate.neighbors.length, 3);
+  assert.equal(demo.idwPanel.visible, true);
+  assert.equal(demo.idwPanel.parent, demo.group);
+  assert.ok(demo.probeGroup.children.some((child) => child.isSprite &&
+    child.scale.x < 0.5));
+  const panelVersion = demo.idwPanel.material.map.version;
   demo.placeProbe(0.4, -0.2);
   assert.equal(events.at(-1), "selection");
+  assert.equal(demo.idwPanel.visible, true);
+  assert.ok(demo.idwPanel.material.map.version > panelVersion);
   demo.toggleWeights();
   assert.equal(events.at(-1), "reveal");
+  assert.equal(demo.idwPanel.visible, false);
   demo.dispose();
 });
 

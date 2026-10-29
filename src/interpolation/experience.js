@@ -42,58 +42,131 @@ function makeText(text) {
   return sprite;
 }
 
-function makeIdwTag(estimate) {
+function paintIdwPanel(canvas, probe, estimate) {
   const work = idwWorkedFraction(estimate);
-  const canvas = document.createElement("canvas");
-  canvas.width = 1200;
-  canvas.height = 440;
   const ctx = canvas.getContext("2d");
+  const { width, height } = canvas;
   ctx.fillStyle = "#0b2430";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = "#ffdd91";
-  ctx.lineWidth = 5;
-  ctx.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
-  ctx.textAlign = "center";
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = "#80b8bc";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(4, 4, width - 8, height - 8);
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#ffdd91";
-  ctx.font = "bold 54px system-ui";
-  ctx.fillText(work.exact ? "Observed gauge reading" :
-    `IDW · ${work.count} nearest gauges · power ${work.power}`, 600, 58);
   ctx.fillStyle = "#f4f8ef";
-  ctx.font = "37px system-ui";
-  ctx.fillText(work.exact ? "At this location, distance to the gauge is zero." :
-    "d = horizontal distance across the model (model units)", 600, 116);
-  const formulaLine = (text, y) => {
-    let size = 48;
-    do {
-      ctx.font = `${size}px system-ui`;
-      if (ctx.measureText(text).width <= 1100) break;
+  ctx.font = "bold 70px system-ui";
+  ctx.fillText("How IDW estimates rainfall", 65, 95);
+  ctx.font = "42px system-ui";
+  ctx.fillStyle = "#b6d1d9";
+  ctx.fillText("Move the ? marker to change the three nearest gauges.", 65, 175);
+
+  const plot = { x: 125, y: 310, size: 650 };
+  ctx.fillStyle = "#123542";
+  ctx.fillRect(65, 255, 830, 775);
+  ctx.strokeStyle = "#477780";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(plot.x, plot.y, plot.size, plot.size);
+  ctx.font = "bold 43px system-ui";
+  ctx.fillStyle = "#e6f4f5";
+  ctx.fillText("Top-down view of gauge locations", 95, 1000);
+  const point = (x, z) => ({
+    x: plot.x + (x + 1) * plot.size / 2,
+    y: plot.y + (z + 1) * plot.size / 2,
+  });
+  const target = point(probe.x, probe.z);
+  const colors = ["#a6f5d9", "#ffcc82", "#a7c9ff"];
+  for (const [index, neighbor] of estimate.neighbors.entries()) {
+    const gauge = point(neighbor.station.x, neighbor.station.z);
+    ctx.strokeStyle = colors[index];
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(target.x, target.y);
+    ctx.lineTo(gauge.x, gauge.y);
+    ctx.stroke();
+    if (!work.exact) {
+      const dx = gauge.x - target.x;
+      const dy = gauge.y - target.y;
+      const length = Math.hypot(dx, dy) || 1;
+      ctx.font = "bold 34px system-ui";
+      ctx.fillStyle = "#f4f8ef";
+      ctx.textAlign = "center";
+      ctx.fillText(`d${index + 1} = ${neighbor.distance.toFixed(2)}`,
+        (target.x + gauge.x) / 2 - dy / length * 27,
+        (target.y + gauge.y) / 2 + dx / length * 27);
+      ctx.textAlign = "left";
+    }
+    ctx.fillStyle = colors[index];
+    ctx.beginPath();
+    ctx.arc(gauge.x, gauge.y, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.font = "bold 42px system-ui";
+    ctx.fillText(String(index + 1), gauge.x + 23, gauge.y - 22);
+  }
+  ctx.fillStyle = "#ffdd91";
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, 23, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.font = "bold 47px system-ui";
+  ctx.fillText("?", target.x + 27, target.y + 29);
+
+  ctx.fillStyle = "#b6d1d9";
+  ctx.font = "39px system-ui";
+  ctx.fillText("Nearest readings", 940, 315);
+  for (const [index, neighbor] of estimate.neighbors.entries()) {
+    const y = 410 + index * 160;
+    ctx.fillStyle = colors[index];
+    ctx.font = "bold 48px system-ui";
+    ctx.fillText(`${index + 1}  ${neighbor.station.value} mm`, 940, y);
+    ctx.fillStyle = "#dce9e9";
+    ctx.font = "37px system-ui";
+    ctx.fillText(work.exact ? "same location" :
+      `d = ${neighbor.distance.toFixed(2)} · weight ${(neighbor.weight * 100).toFixed(0)}%`,
+    940, y + 55);
+  }
+  ctx.fillStyle = "#b6d1d9";
+  ctx.font = "35px system-ui";
+  ctx.fillText("d = horizontal distance", 940, 900);
+  ctx.fillText("in model units", 940, 945);
+
+  ctx.strokeStyle = "#477780";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(65, 1075);
+  ctx.lineTo(1435, 1075);
+  ctx.stroke();
+  ctx.fillStyle = "#ffdd91";
+  ctx.font = "bold 49px system-ui";
+  ctx.fillText(work.exact ? "At a gauge: use its measured reading" :
+    "Inverse distance weighting · power 2", 70, 1145);
+  const fitted = (text, y, maxWidth = 1330, size = 43) => {
+    while (size > 28 && ctx.measureText(text).width > maxWidth) {
       size -= 2;
-    } while (size > 32);
-    ctx.fillText(text, 600, y);
+      ctx.font = `${size}px system-ui`;
+    }
+    ctx.fillText(text, 90, y);
   };
   if (work.exact) {
-    formulaLine("Use the measured value directly at a gauge.", 218);
+    ctx.fillStyle = "#f4f8ef";
+    ctx.font = "43px system-ui";
+    ctx.fillText("Distance is zero, so the reading is known exactly here.", 90, 1240);
   } else {
-    formulaLine(work.numerator, 199);
+    ctx.fillStyle = "#f4f8ef";
+    ctx.font = "43px system-ui";
+    ctx.fillText("Estimate = Σ (reading ÷ d²) / Σ (1 ÷ d²)", 90, 1220);
+    ctx.font = "43px system-ui";
+    fitted(work.numerator, 1300);
     ctx.strokeStyle = "#f4f8ef";
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(82, 240);
-    ctx.lineTo(1118, 240);
+    ctx.moveTo(85, 1340);
+    ctx.lineTo(1415, 1340);
     ctx.stroke();
-    formulaLine(work.denominator, 282);
+    ctx.font = "43px system-ui";
+    fitted(work.denominator, 1385);
   }
   ctx.fillStyle = "#ffdd91";
-  ctx.font = "bold 67px system-ui";
-  ctx.fillText(`${work.exact ? "=" : "≈"} ${work.value.toFixed(1)} mm`, 600, 369);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: texture, depthTest: false, transparent: true,
-  }));
-  sprite.scale.set(1.5, 0.53, 1);
-  return sprite;
+  ctx.font = "bold 66px system-ui";
+  ctx.fillText(`${work.exact ? "=" : "≈"} ${work.value.toFixed(1)} mm`, 90, 1515);
 }
 
 function makeProbeQuestion() {
@@ -208,6 +281,7 @@ export class InterpolationExperience extends TimedExhibit {
     this.kind = "interpolation";
     this.mode = "samples";
     this.showWeights = false;
+    this.idwPanel = null;
     this.probe = null;
     this.model = new THREE.Group();
     this.model.visible = false;
@@ -346,6 +420,7 @@ export class InterpolationExperience extends TimedExhibit {
 
   finish() {
     this.model.visible = false;
+    if (this.idwPanel) this.idwPanel.visible = false;
     this.grab.cancel();
     this.targets.forEach((target) => { target.visible = false; });
     this.hoveredGauges.clear();
@@ -382,6 +457,7 @@ export class InterpolationExperience extends TimedExhibit {
     if (!this.started || this.finished || !["samples", "idw", "smooth", "zones"].includes(mode)) return;
     this.mode = mode;
     this.showWeights = false;
+    if (this.idwPanel) this.idwPanel.visible = false;
     this.smoothResiduals.visible = mode === "smooth";
     for (const [name, surface] of Object.entries(this.surfaces))
       if (name === mode) surface.visible = true;
@@ -396,6 +472,7 @@ export class InterpolationExperience extends TimedExhibit {
       this.surfaces.idw.visible = true;
     }
     this.showWeights = !this.showWeights;
+    if (this.idwPanel) this.idwPanel.visible = this.showWeights;
     this.smoothResiduals.visible = false;
     this.placeProbe(this.probe.x, this.probe.z, false);
     this.onChange("reveal");
@@ -435,16 +512,32 @@ export class InterpolationExperience extends TimedExhibit {
       new THREE.Vector3(this.probe.x, 0, this.probe.z),
       new THREE.Vector3(this.probe.x, y, this.probe.z),
     ], 0xffd070));
-    const tag = this.showWeights
-      ? makeIdwTag(result)
-      : makeText(`${this.displayValue.toFixed(1)} mm`);
-    if (!this.showWeights) tag.scale.set(0.36, 0.09, 1);
-    tag.position.set(this.probe.x, y + (this.showWeights ? 0.51 : 0.13), this.probe.z);
+    const tag = makeText(`${this.displayValue.toFixed(1)} mm`);
+    tag.scale.set(0.36, 0.09, 1);
+    tag.position.set(this.probe.x, y + 0.13, this.probe.z);
     this.probeGroup.add(tag);
-    if (this.showWeights) this.probeGroup.add(gridLine([
-      new THREE.Vector3(this.probe.x, y + 0.05, this.probe.z),
-      new THREE.Vector3(this.probe.x, y + 0.26, this.probe.z),
-    ], 0xffdd91));
+    if (this.showWeights) {
+      if (!this.idwPanel) {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1500;
+        canvas.height = 1600;
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        const panel = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.55, 1.65),
+          new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide,
+            depthTest: false, depthWrite: false }),
+        );
+        panel.position.set(1.58, 0.07, 0.03);
+        panel.rotation.y = -0.27;
+        panel.renderOrder = 20;
+        this.group.add(panel);
+        this.idwPanel = panel;
+      }
+      paintIdwPanel(this.idwPanel.material.map.image, this.probe, result);
+      this.idwPanel.material.map.needsUpdate = true;
+      this.idwPanel.visible = true;
+    }
     if (showNeighbors) result.neighbors.forEach(({ station }) => {
       const h = heightForValue(station.value);
       this.probeGroup.add(gridLine([
