@@ -182,20 +182,37 @@ test("walking detects river water below a bridge and dry road on its deck", () =
 
 test("highway shoulders meet the ground while the bridge stays open underneath", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
-  const positions = l.variants.raised.roads.children[0].geometry.attributes.position;
+  const shoulder = l.variants.raised.roads.children[0].geometry;
+  const positions = shoulder.attributes.position;
+  const crossing = riverX(highwayZ(0));
   for (let i = 0; i < positions.count; i += 4) {
     const x = positions.getX(i);
     for (const edge of [i, i + 3]) {
       const z = positions.getZ(edge);
-      if (Math.abs(x - riverX(highwayZ(x))) > 17)
+      if (Math.abs(x - riverX(highwayZ(x))) > 26)
         assert.ok(positions.getY(edge) < landscapeHeight(x, z),
           `shoulder should enter the ground at x=${x}`);
     }
   }
-  const crossing = riverX(highwayZ(0));
+  for (let i = 0; i < shoulder.index.count; i += 3) {
+    const middleX = (positions.getX(shoulder.index.getX(i)) +
+      positions.getX(shoulder.index.getX(i + 1)) +
+      positions.getX(shoulder.index.getX(i + 2))) / 3;
+    assert.ok(Math.abs(middleX - crossing) > 15.5,
+      "earth shoulders stop at the bridge instead of continuing across it");
+  }
   const z = highwayZ(crossing);
-  assert.ok(highwayWalkingHeight(crossing, z) - landscapeHeight(crossing, z) > 1.5);
-  assert.equal(highwayWalkingHeight(crossing, z + 10), null);
+  assert.ok(highwayWalkingHeight(crossing, z) - landscapeHeight(crossing, z) > 2.5);
+  assert.ok(highwayDeckHeight(crossing) - riverWaterHeight(z) > 3);
+  assert.equal(highwayWalkingHeight(crossing, z + 8), null);
+  const west = [-22, -20, -18, -16, -14, -12, -10, -8, -6]
+    .map((x) => highwayDeckHeight(x));
+  const east = [14, 16, 18, 20, 22, 24, 26, 28, 30]
+    .map((x) => highwayDeckHeight(x));
+  assert.ok(west.every((height, i) => i === 0 || height <= west[i - 1] + 0.03),
+    "west approach descends smoothly onto the deck");
+  assert.ok(east.every((height, i) => i === 0 || height >= east[i - 1] - 0.03),
+    "east approach rises smoothly away from the deck");
   l.dispose();
 });
 
@@ -266,7 +283,7 @@ test("layers and pixel visitors briefly fall after walking off the bridge side",
     demo.applyVisibility();
     demo.group.rotation.y = 0;
     const x = riverX(highwayZ(0));
-    const z = highwayZ(x) + 8.75;
+    const z = highwayZ(x) + 5.9;
     demo.group.position.set(-x, 0, -z);
     demo.onRoad = true;
     demo.walk(0, 0, 0, camera);

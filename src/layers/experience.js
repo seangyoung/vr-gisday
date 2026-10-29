@@ -297,17 +297,26 @@ export function highwayDeckHeight(x, raised = true) {
     landscapeHeight(x, z + ROAD_EDGE, raised),
   ) + 0.09;
   const fromBridge = Math.abs(x - riverX(z));
-  const bridge = 1 - THREE.MathUtils.smoothstep(fromBridge, 7, 17);
-  return Math.max(ground, (raised ? riverWaterHeight(z) : 0) + 1.9 * bridge);
+  const bridge = 1 - THREE.MathUtils.smoothstep(fromBridge, 10, 34);
+  const bridgeTop = raised ? riverWaterHeight(z) + 3.2 : 3.2 * bridge;
+  // Blend the approach into the deck without a sharp low spot at either end.
+  const transition = 0.4;
+  const overlap = Math.max(0, transition - Math.abs(ground - bridgeTop));
+  return Math.max(ground, bridgeTop) + overlap * overlap / (4 * transition);
+}
+function shoulderWidthAt(x) {
+  const fromBridge = Math.abs(x - riverX(highwayZ(x)));
+  const t = THREE.MathUtils.smoothstep(fromBridge, 16, 26);
+  return THREE.MathUtils.lerp(ROAD_EDGE, SHOULDER_EDGE, t);
 }
 function shoulderOuterHeight(x, side, raised) {
-  const z = highwayZ(x) + side * SHOULDER_EDGE;
+  const z = highwayZ(x) + side * shoulderWidthAt(x);
   const fromBridge = Math.abs(x - riverX(highwayZ(x)));
-  const bridge = 1 - THREE.MathUtils.smoothstep(fromBridge, 7, 17);
+  const approach = THREE.MathUtils.smoothstep(fromBridge, 16, 26);
   return THREE.MathUtils.lerp(
+    highwayDeckHeight(x, raised) - 0.08,
     landscapeHeight(x, z, raised) - 0.06,
-    highwayDeckHeight(x, raised) - 0.12,
-    bridge,
+    approach,
   );
 }
 // Null outside the highway. A visitor below the bridge only adopts this
@@ -315,30 +324,33 @@ function shoulderOuterHeight(x, side, raised) {
 export function highwayWalkingHeight(x, z, raised = true) {
   const offset = z - highwayZ(x);
   const distance = Math.abs(offset);
-  if (distance > SHOULDER_EDGE) return null;
+  const shoulderWidth = shoulderWidthAt(x);
+  if (distance > shoulderWidth) return null;
   const deck = highwayDeckHeight(x, raised);
   if (distance <= ROAD_EDGE) return deck;
   const outer = shoulderOuterHeight(x, Math.sign(offset), raised);
-  const t = (distance - ROAD_EDGE) / (SHOULDER_EDGE - ROAD_EDGE);
+  const t = (distance - ROAD_EDGE) / (shoulderWidth - ROAD_EDGE);
   return Math.max(landscapeHeight(x, z, raised), THREE.MathUtils.lerp(deck, outer, t));
 }
 function roadShoulderRibbon(raised) {
   const vertices = [], indices = [];
   const segments = Math.ceil((2 * extent) / 0.65);
-  const offsets = [-SHOULDER_EDGE, -ROAD_EDGE, ROAD_EDGE, SHOULDER_EDGE];
+  const crossing = riverX(highwayZ(0));
   for (let i = 0; i <= segments; i++) {
     const x = -extent + (2 * extent * i) / segments;
     const centerZ = highwayZ(x);
     const deck = highwayDeckHeight(x, raised);
-    for (const offset of offsets)
+    const offsets = [-shoulderWidthAt(x), -ROAD_EDGE, ROAD_EDGE, shoulderWidthAt(x)];
+    for (const [cross, offset] of offsets.entries())
       vertices.push(
         x,
-        Math.abs(offset) === SHOULDER_EDGE
+        cross === 0 || cross === 3
           ? shoulderOuterHeight(x, Math.sign(offset), raised)
           : deck,
         centerZ + offset,
       );
-    if (i < segments)
+    const middleX = -extent + (2 * extent * (i + 0.5)) / segments;
+    if (i < segments && Math.abs(middleX - crossing) >= 16)
       for (let strip = 0; strip < offsets.length - 1; strip++) {
         const a = i * offsets.length + strip;
         const b = a + offsets.length;
@@ -378,6 +390,9 @@ function roadRibbon(raised, halfWidth, lift, color, start = -extent, end = exten
 function makeRoads(group, raised) {
   group.add(roadShoulderRibbon(raised));
   group.add(roadRibbon(raised, 5.2, 0.016, 0x353b3d));
+  const crossing = riverX(highwayZ(0));
+  group.add(roadRibbon(raised, ROAD_EDGE, -0.012, 0xa4a6a0,
+    crossing - 16, crossing + 16));
   const markings = { white: { vertices: [], indices: [] }, yellow: { vertices: [], indices: [] } };
   const addMark = (x0, x1, offset, width, kind) => {
     const { vertices, indices } = markings[kind];
@@ -411,7 +426,6 @@ function makeRoads(group, raised) {
       }),
     ));
   }
-  const crossing = riverX(highwayZ(0));
   for (const side of [-5.75, 5.75]) {
     const vertices = [], indices = [], railPoints = [];
     const segments = 45, start = crossing - 16, end = crossing + 16;
