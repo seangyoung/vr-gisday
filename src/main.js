@@ -1350,7 +1350,7 @@ function drawShowcaseUI() {
     const lesson = SPECTRAL_LESSON_STEPS[exhibit.lessonStep];
     label("See the Invisible · light to NDVI", 0, 1.06, 2.45, 0.18,
       43, "#e6f4f5", "#0b2430");
-    label(`${exhibit.lessonStep + 1}/4 · ${lesson.title}`,
+    label(lesson.title,
       0, 0.86, 2.4, 0.12, 30, "#b6d1d9", "#0b2430");
     label(lesson.copy, 0, -0.52, 2.43, 0.22, 27,
       "#e6f4f5", "#0b2430");
@@ -1358,8 +1358,8 @@ function drawShowcaseUI() {
     return;
   }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
-    lessonCard(`${exhibit.sceneInfo.name} · takeaways`,
-      `A spectral signature is the unique response across different spectral bands (visible, NIR, etc.) of a particular surface.\nFalse color composites can make invisible spectral bands visible, like a NIR photo where healthy vegetation appears red.\n${exhibit.sceneInfo.observation}`, -0.02);
+    lessonCard("Near infrared and NDVI · takeaways",
+      "A spectral signature describes how a surface reflects energy across measured bands.\nHealthy leaves typically reflect much near infrared (NIR) and absorb visible red light.\nFalse color displays NIR as a visible color; NDVI compares NIR and red to highlight vegetation differences.", -0.02);
     label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI generally indicates healthy vegetation.",
       0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
     takeawayActions(-0.72);
@@ -1513,8 +1513,7 @@ function drawShowcaseUI() {
       0.72, exhibit.mode === "false");
     button("NDVI", 0.78, -0.75, () => exhibit.setMode("index"),
       0.72, exhibit.mode === "index");
-    button("Next scene", -0.58, -1.0, () => exhibit.nextScene(), 1.0);
-    button("Takeaways", 0.58, -1.0, () => exhibit.showTakeaways(), 1.0);
+    button("Takeaways", 0, -1.0, () => exhibit.showTakeaways(), 1.0);
   } else if (exhibit.kind === "cluster") {
     label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
     clusterReadout = label(exhibit.selectedText, 0, -0.64, 2.35, 0.12,

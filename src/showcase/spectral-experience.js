@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { TimedExhibit, canvasPanel, replacePanelTexture } from "./exhibit.js";
 import { BAND_NAMES, displayedBandBrightness, displayIndexPixel, displayIndexValue,
   SPECTRAL_MODES } from "./spectral-model.js";
-import { SPECTRAL_SCENES, createSpectralSceneRotation } from "./spectral-scenes.js";
+import { createSpectralSceneRotation } from "./spectral-scenes.js";
 import { SPECTRAL_LESSON_STEPS, nextSpectralLessonStep,
   drawSpectralLesson } from "./spectral-lesson.js";
 import bayNaturalUrl from "./data/landsat-sf-natural.jpg";
@@ -17,6 +17,7 @@ const SCENE_URLS = {
   everglades: [evergladesNaturalUrl, evergladesFalseUrl],
   lilongwe: [lilongweNaturalUrl, lilongweFalseUrl],
 };
+const nextSpectralScene = createSpectralSceneRotation();
 
 function blankCanvas(width, height, message) {
   const canvas = document.createElement("canvas");
@@ -148,8 +149,7 @@ export class SpectralExperience extends TimedExhibit {
     this.kind = "spectral";
     this.phase = "spectrum";
     this.mode = "natural";
-    this.nextSceneInRotation = createSpectralSceneRotation();
-    this.sceneInfo = this.nextSceneInRotation();
+    this.sceneInfo = nextSpectralScene();
     this.sample = { ...this.sceneInfo.sample };
     this.takeawayOpen = false;
     this.ready = false;
@@ -172,8 +172,6 @@ export class SpectralExperience extends TimedExhibit {
     this.graph.visible = false;
     this.group.add(this.image, this.graph, this.spectrum);
     this.loadScene();
-    for (const scene of SPECTRAL_SCENES.slice(1))
-      this.getSceneData(scene).catch(() => {});
   }
   getSceneData(scene) {
     if (this.sceneCache.has(scene.id))
@@ -233,16 +231,6 @@ export class SpectralExperience extends TimedExhibit {
           blankCanvas(width, height, "Scene unavailable"));
         this.onChange();
       });
-  }
-  nextScene() {
-    if (!this.started || this.finished || this.phase !== "bands") return;
-    this.sceneInfo = this.nextSceneInRotation();
-    this.sample = { ...this.sceneInfo.sample };
-    this.takeawayOpen = false;
-    this.group.visible = true;
-    this.mode = "natural";
-    this.loadScene();
-    if (!this.ready) this.onChange();
   }
   showTakeaways() {
     if (!this.started || this.finished || this.phase !== "bands") return;

@@ -106,13 +106,18 @@ test("the moved platform scene still supports selection and inertial trigger spi
 test("real spectral scenes rotate without an immediate repeat", () => {
   const next = createSpectralSceneRotation(() => 0.4);
   const firstCycle = [next(), next(), next()];
-  assert.equal(firstCycle[0].id, "bay");
   assert.deepEqual(new Set(firstCycle.map((scene) => scene.id)),
     new Set(SPECTRAL_SCENES.map((scene) => scene.id)));
   const secondCycle = [next(), next(), next()];
   assert.notEqual(secondCycle[0].id, firstCycle.at(-1).id);
   assert.deepEqual(new Set(secondCycle.map((scene) => scene.id)),
     new Set(SPECTRAL_SCENES.map((scene) => scene.id)));
+});
+
+test("the first spectral scene is drawn from a shuffled set", () => {
+  const firstLow = createSpectralSceneRotation(() => 0)();
+  const firstHigh = createSpectralSceneRotation(() => 0.99)();
+  assert.notEqual(firstLow.id, firstHigh.id);
 });
 
 test("the spectral introduction teaches NIR reflection before NDVI and imagery", () => {

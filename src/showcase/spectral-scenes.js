@@ -22,11 +22,10 @@ export const SPECTRAL_SCENES = [
 ];
 
 export function createSpectralSceneRotation(random = Math.random) {
-  let bag = [SPECTRAL_SCENES[0]], previous, firstRefill = true;
+  let bag = [], previous;
   return () => {
     if (!bag.length) {
-      bag = firstRefill ? SPECTRAL_SCENES.slice(1) : [...SPECTRAL_SCENES];
-      firstRefill = false;
+      bag = [...SPECTRAL_SCENES];
       for (let i = bag.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1));
         [bag[i], bag[j]] = [bag[j], bag[i]];
