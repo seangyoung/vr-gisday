@@ -1095,10 +1095,10 @@ function drawLayersUI() {
     label(
       "GIS overlays datasets (called layers) at shared locations to reveal relationships.\nEach layer corresponds to some feature or attribute of the real world, even if it may not always be visible on the ground (e.g., floodplains or political boundaries).\nGIS let us explore how phenomena are arranged in space, and also examine how different layers relate to each other, like how hydrography is constrained by topography.",
       0,
-      0.48,
+      0.12,
       2.35,
-      0.39,
-      35,
+      1.16,
+      48,
       "#e6f4f5",
       "#0b2430",
     );
