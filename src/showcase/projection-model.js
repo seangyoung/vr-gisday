@@ -1,35 +1,30 @@
 import {
-  geoBonne, geoInterruptedHomolosine, geoMollweide, geoSinusoidal,
+  geoAugust, geoBonne, geoInterruptedHomolosine, geoMollweide, geoSinusoidal,
   geoWinkel3,
 } from "d3-geo-projection";
 
 export const PROJECTIONS = Object.freeze({
   equirectangular: "Plate Carrée",
   mercator: "Mercator",
+  august: "August Epicycloidal",
   equalArea: "Cylindrical equal-area",
-  sinusoidal: "Sinusoidal",
   bonne: "Bonne",
   mollweide: "Mollweide",
   goode: "Interrupted Goode Homolosine",
   winkel: "Winkel Tripel",
 });
 
-export const PROJECTION_GROUPS = Object.freeze({
-  equirectangular: "equidistant grid",
-  mercator: "conformal",
-  equalArea: "equal-area",
-  sinusoidal: "equal-area",
-  bonne: "equal-area",
-  mollweide: "equal-area",
-  goode: "interrupted · equal-area",
-  winkel: "compromise",
-});
+export const PROJECTION_PICKER_GROUPS = Object.freeze([
+  { heading: "Conformal · local shapes", keys: ["mercator", "august"] },
+  { heading: "Equal area · relative size", keys: ["equalArea", "bonne", "mollweide", "goode"] },
+  { heading: "Compromise & equidistant", keys: ["winkel", "equirectangular"] },
+]);
 
 export const PROJECTION_NOTES = Object.freeze({
   equirectangular: "Straight grid; high latitudes widen",
   mercator: "Local angles stay true; polar areas grow",
+  august: "Local angles stay true; outer areas swell",
   equalArea: "Relative land area stays true; shapes flatten",
-  sinusoidal: "Area stays true; meridians curve toward the poles",
   bonne: "Area stays true; parallels bend around 45° N",
   mollweide: "An equal-area ellipse for the full world",
   goode: "Ocean cuts separate lobes while land area stays true",
@@ -69,6 +64,7 @@ const deg = Math.PI / 180;
 const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + latitude / 2));
 const mercatorLimit = mercatorY(85 * deg);
 const d3Projections = {
+  august: geoAugust,
   sinusoidal: geoSinusoidal,
   bonne: geoBonne,
   mollweide: geoMollweide,
@@ -200,7 +196,8 @@ export function tissotDistortion(projection, latitudeDegrees,
     const major = Math.sqrt(Math.max(0, (a + b + delta) / 2));
     const minor = Math.sqrt(Math.max(1e-12, (a + b - delta) / 2));
     return { shapeRatio: major / minor,
-      longerAxis: Math.abs(cross) > 0.1 ? "oblique" :
+      longerAxis: major / minor < 1.01 ? null :
+        Math.abs(cross) > 0.1 ? "oblique" :
         a > b ? "east-west" : b > a ? "north-south" : null,
       relativeArea: relativeAreaScale(projection, latitudeDegrees,
         longitudeDegrees) };

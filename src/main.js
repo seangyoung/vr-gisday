@@ -53,7 +53,7 @@ import { ClusterExperience } from "./showcase/cluster-experience.js";
 import { ChangeExperience } from "./change/experience.js";
 import { CHANGE_SCENES } from "./change/scenes.js";
 import { ProjectionExperience } from "./showcase/projection-experience.js";
-import { PROJECTIONS, PROJECTION_GROUPS, PROJECTION_NOTES } from "./showcase/projection-model.js";
+import { PROJECTIONS, PROJECTION_PICKER_GROUPS, PROJECTION_NOTES } from "./showcase/projection-model.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
 import { QuizExperience } from "./quiz/experience.js";
@@ -1542,26 +1542,30 @@ function drawShowcaseUI() {
       : "GRIP land on globe → drag north or south on map. Drag the map to recenter.",
     0, -0.36, 2.45, 0.14, 35, "#e6f4f5", "#0b2430");
     if (exhibit.projectionPickerOpen) {
-      label("Choose a projection · point and press trigger", 0, -0.35,
-        2.45, 0.14, 32, "#e6f4f5", "#0b2430");
-      const choices = Object.keys(PROJECTIONS);
-      choices.forEach((projection, index) => {
-        const x = -0.9 + (index % 4) * 0.6;
-        const y = -0.59 - Math.floor(index / 4) * 0.25;
-        const name = projection === "equalArea" ? "Cyl. equal-area" :
-          projection === "goode" ? "Goode Homolosine" : PROJECTIONS[projection];
-        const selected = exhibit.projection === projection;
-        const card = label(`${name}\n${PROJECTION_GROUPS[projection]}`,
-          x, y, 0.56, 0.22, 31, selected ? "#eafff9" : "#d1e6e7",
-          selected ? "#276b70" : "#173c48");
-        card.position.z = 0.08;
-        card.userData.action = () => { sound.click(); exhibit.setProjection(projection); };
-        card.userData.label = name;
-        card.userData.hoverColor = 0x3e7482;
-        buttons.push(card);
+      label("Choose a projection", -0.26, -0.35,
+        1.75, 0.13, 35, "#e6f4f5", "#0b2430");
+      button("Close", 0.99, -0.35, () => exhibit.toggleProjectionPicker(), 0.49);
+      PROJECTION_PICKER_GROUPS.forEach(({ heading, keys }, row) => {
+        const sectionY = -0.49 - row * 0.26;
+        label(heading, 0, sectionY, 2.35, 0.085, 29,
+          "#a6f5d9", "#0b2430");
+        keys.forEach((projection, index) => {
+          const x = (index - (keys.length - 1) / 2) * 0.6;
+          const y = sectionY - 0.13;
+          const name = projection === "equalArea" ? "Cyl. equal-area" :
+            projection === "goode" ? "Goode Homolosine" : PROJECTIONS[projection];
+          const selected = exhibit.projection === projection;
+          const card = label(projection === "equirectangular"
+            ? `${name}\nEquidistant` : name,
+            x, y, 0.56, 0.18, 29, selected ? "#eafff9" : "#d1e6e7",
+            selected ? "#276b70" : "#173c48");
+          card.position.z = 0.08;
+          card.userData.action = () => { sound.click(); exhibit.setProjection(projection); };
+          card.userData.label = name;
+          card.userData.hoverColor = 0x3e7482;
+          buttons.push(card);
+        });
       });
-      button("Close choices", 0, -1.13,
-        () => exhibit.toggleProjectionPicker(), 1.2);
       return;
     }
     button(`Projection · ${PROJECTIONS[exhibit.projection]} ▾`, 0, -0.57,

@@ -14,7 +14,8 @@ import {
   aggregationFor, blockAt, wardFor, zoneBoundaryLines, zonePolygons,
 } from "../src/showcase/cluster-model.js";
 import {
-  GlobeSpin, PROJECTIONS, TISSOT_LONGITUDES, continentDistortionSummary,
+  GlobeSpin, PROJECTIONS, PROJECTION_PICKER_GROUPS, TISSOT_LONGITUDES,
+  continentDistortionSummary,
   nearestTissotCircle,
   indicatrixAxes, projectMetric, projectNormalized,
   projectionFitScale, relativeAreaScale, tissotDistortion,
@@ -254,6 +255,26 @@ test("projection examples preserve distinct distortion tradeoffs", () => {
   assert.ok(equal30.x < equal0.x && equal30.y > equal0.y);
 });
 
+test("projection picker groups every visible choice and distinguishes Plate Carrée", () => {
+  const keys = PROJECTION_PICKER_GROUPS.flatMap((group) => group.keys);
+  assert.deepEqual([...keys].sort(), Object.keys(PROJECTIONS).sort());
+  assert.equal(new Set(keys).size, keys.length);
+  assert.deepEqual(PROJECTION_PICKER_GROUPS.map((group) => group.keys.length), [2, 4, 2]);
+  assert.ok(PROJECTION_PICKER_GROUPS[0].keys.includes("august"));
+  assert.ok(PROJECTION_PICKER_GROUPS[2].heading.includes("equidistant"));
+  assert.ok(PROJECTION_PICKER_GROUPS[2].keys.includes("equirectangular"));
+  assert.equal(PROJECTIONS.sinusoidal, undefined);
+});
+
+test("August preserves local shape while area grows toward the map edge", () => {
+  for (const latitude of [-60, -30, 0, 30, 60]) {
+    const distortion = tissotDistortion("august", latitude);
+    assert.ok(Math.abs(distortion.shapeRatio - 1) < 0.001);
+    assert.equal(distortion.longerAxis, null);
+  }
+  assert.ok(relativeAreaScale("august", 60) > 2);
+});
+
 test("added world projections fit the same physical map space and keep their character", () => {
   for (const name of Object.keys(PROJECTIONS)) {
     const scale = projectionFitScale(name);
@@ -428,6 +449,9 @@ test("curved-projection continent overlays clip at the map seam", () => {
     "the landmass crossing the map seam should split into drawable pieces");
   assert.ok(Math.abs(projectedFootprintArea(moved) /
     projectedFootprintArea(home) - 1) < 0.01);
+  const august = projectedContinentRings(eurasia, eurasia.center, "august");
+  assert.ok(august.length > eurasia.rings.length);
+  assert.ok(august.every((ring) => ring.every((point) => point.every(Number.isFinite))));
   const australia = CONTINENTS.find((continent) => continent.name === "Australia");
   const goodeHome = projectedFootprintArea(projectedContinentRings(
     australia, australia.center, "goode"));
