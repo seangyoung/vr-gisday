@@ -538,6 +538,7 @@ function toggleSoundMenu() {
   quiz?.pauseForAudio();
   grab?.cancel();
   if (viewshed?.isClimbing) viewshed.cancelClimb();
+  if (layers?.isClimbingTree) layers.cancelTreeClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   const eye = cam.getWorldPosition(new THREE.Vector3());
   const forward = cam.getWorldDirection(new THREE.Vector3());
@@ -1130,6 +1131,8 @@ function drawLayersUI() {
     label(
       l.selected.has("floodplain")
         ? "Blue: low river land · flood studies also need water levels"
+        : l.selected.has("vegetation")
+        ? "Grip a trunk, pull down to climb, and release to drop"
         : "Synthetic place · Map north is an arbitrary model direction",
       0, -0.83, 2.3, 0.1, 24, "#b6d1d9", "#0b2430",
     );
@@ -2373,7 +2376,9 @@ function controllerGuideContext(hand) {
     return ["Select / spin", null, onMenu, exitLabel];
   if ((layers?.started && !layers.finished) ||
       (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
-    return [hand === "left" ? null : "Select", null, onMenu, exitLabel, teleportHint];
+    return [hand === "left" ? null : "Select",
+      layers?.selected.has("vegetation") ? "Climb trunk" : null,
+      onMenu, exitLabel, layers?.isClimbingTree ? null : teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     showcase.kind === "projection" ? "Grab land" :
@@ -2860,6 +2865,13 @@ for (let i = 0; i < 2; i++) {
         return;
       }
     }
+    if (layers?.started && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      if (layers.gripTree(i, grip.getWorldPosition(new THREE.Vector3()))) {
+        sound.climb("tree");
+        return;
+      }
+    }
     if (scan?.station && scan.stage === 1 && grip.visible) {
       intersect(c);
       if (scan.gripTripod(i, grip, raycaster, c.userData.xrInput?.handedness)) sound.click();
@@ -2932,6 +2944,7 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("squeezeend", () => {
     viewshed?.releaseRung(i);
+    layers?.releaseTree(i);
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -2942,6 +2955,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("disconnected", () => {
     if (c.userData.xrInput?.handedness === "right") teleport.cancel();
     viewshed?.releaseRung(i);
+    layers?.releaseTree(i);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
     guide.setHandedness("none");
@@ -3210,6 +3224,7 @@ renderer.setAnimationLoop((time, frame) => {
       const rightY = gamepad?.mapping === "xr-standard" ? gamepad.axes[3] ?? 0 : 0;
       const canTeleport = visible && !soundMenuOpen && landscapeDemo.started &&
         !landscapeDemo.finished && !viewshed?.isClimbing && !viewshed?.isAtTop &&
+        !layers?.isClimbingTree &&
         right?.c.visible && right?.grip.visible && gamepad?.mapping === "xr-standard";
       if (teleport.active && (!canTeleport || teleport.demo !== landscapeDemo)) {
         teleport.cancel();
@@ -3242,7 +3257,7 @@ renderer.setAnimationLoop((time, frame) => {
           teleportHandled = true;
         }
       }
-      if (viewshed?.isClimbing) rightTurnReady = false;
+      if (viewshed?.isClimbing || layers?.isClimbingTree) rightTurnReady = false;
       else if (!teleportHandled && !teleport.active) {
         if (Math.abs(rightX) < 0.3) rightTurnReady = true;
         else if (rightTurnReady && Math.abs(rightX) > 0.7) {
@@ -3329,6 +3344,7 @@ renderer.setAnimationLoop((time, frame) => {
       }
     if (renderer.xr.getSession().visibilityState === "visible") {
       viewshed?.updateClimb(poses, dt);
+      layers?.updateTreeClimb(poses, dt, renderer.xr.getCamera());
       grab?.update(poses, dt);
       rain?.grab.update(poses, dt);
       scan?.grab.update(poses, dt);
@@ -3352,6 +3368,7 @@ renderer.setAnimationLoop((time, frame) => {
             renderer.xr.getCamera());
         }
     } else {
+      layers?.cancelTreeClimb();
       grab?.cancel();
       rain?.grab.cancel();
       scan?.grab.cancel();

@@ -152,6 +152,73 @@ test("left-stick walking follows the view, terrain, bounds, and clipboard locati
   map.geometry.dispose();
 });
 
+test("tree trunks stop walking and teleport while grip pulls the visitor above the canopy", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  l.place(camera);
+  l.begin();
+  l.toggle("vegetation");
+  l.update(1);
+  const tree = TREE_POSITIONS[0];
+  const trunk = l.variants.flat.vegetation.children[0];
+  const matrix = new THREE.Matrix4();
+  trunk.getMatrixAt(0, matrix);
+  const trunkCenter = new THREE.Vector3();
+  const trunkScale = new THREE.Vector3();
+  matrix.decompose(trunkCenter, new THREE.Quaternion(), trunkScale);
+  assert.ok(Math.abs(trunkCenter.y + trunkScale.y / 2 -
+    (tree.evergreen ? 4.2 : 3.7) * tree.scale) < 1e-6);
+  const startX = tree.x + 0.7;
+  l.group.rotation.y = 0;
+  l.group.position.set(-startX, 0, -tree.z);
+  l.visitor.set(startX, tree.z);
+  camera.position.x = -1.3;
+  l.walk(0, 0, 0.05, camera);
+  assert.ok(l.visitor.x > tree.x,
+    "room-scale movement cannot pass through the trunk");
+  assert.ok(l.visitor.x - tree.x >= 0.22 + 0.18 * tree.scale - 0.02);
+  camera.position.x = 0;
+  const otherSide = tree.x - 0.7;
+  l.group.position.x = -otherSide;
+  l.visitor.set(otherSide, tree.z);
+  l.walk(1, 0, 0.5, camera);
+  assert.ok(l.visitor.x < tree.x,
+    "stick movement cannot cross the trunk either");
+  const ground = l.group.localToWorld(new THREE.Vector3(tree.x, 2.5, tree.z));
+  const candidate = l.teleportCandidate(new THREE.Raycaster(ground,
+    new THREE.Vector3(0, -1, 0)));
+  assert.equal(candidate?.valid, false);
+
+  const hand = l.group.localToWorld(new THREE.Vector3(tree.x, 1.15, tree.z + 0.25));
+  assert.equal(l.gripTree(0, hand), true);
+  assert.equal(l.isClimbingTree, true);
+  assert.ok(l.treeClimbLimit + l.eyeHeight >
+    (tree.evergreen ? 4.3 : 3.8) * tree.scale,
+  "the climb reaches above the canopy");
+  assert.equal(l.teleportCandidate(new THREE.Raycaster(ground,
+    new THREE.Vector3(0, -1, 0))), null);
+  const before = l.group.position.clone();
+  const pose = new THREE.Matrix4().makeTranslation(hand.x, hand.y - 0.2, hand.z);
+  l.updateTreeClimb(new Map([[0, pose]]), 0.016, camera);
+  assert.ok(l.treeClimbHeight > 0.15);
+  assert.ok(l.group.position.y < before.y);
+  assert.equal(l.walk(0, -1, 0.1, camera).distance, 0);
+  assert.equal(l.clipboard.visible, false);
+  const secondHand = hand.clone().add(new THREE.Vector3(0.02, 0, 0));
+  assert.equal(l.gripTree(1, secondHand), true);
+  l.releaseTree(0);
+  l.updateTreeClimb(new Map([[1, new THREE.Matrix4().makeTranslation(
+    secondHand.x, secondHand.y - 0.2, secondHand.z)]]), 0.016, camera);
+  assert.ok(l.treeClimbHeight > 0.3,
+    "the second hand keeps climbing after the first releases");
+  l.releaseTree(1);
+  for (let i = 0; i < 30; i++) l.updateTreeClimb(new Map(), 0.05, camera);
+  assert.equal(l.treeClimbHeight, 0);
+  assert.equal(l.isClimbingTree, false);
+  l.dispose();
+});
+
 test("walking detects river water below a bridge and dry road on its deck", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();

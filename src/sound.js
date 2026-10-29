@@ -450,6 +450,8 @@ export class LabSound {
     if (kind === "rung") {
       this.noiseBurst(0.065, 680, 310, 0.05);
       this.tone(290, 0.07, 0.055);
+    } else if (kind === "tree") {
+      this.noiseBurst(0.11, 380, 150, 0.045);
     } else if (kind === "platform") {
       this.noiseBurst(0.16, 470, 170, 0.09);
       this.tone(490, 0.17, 0.07);

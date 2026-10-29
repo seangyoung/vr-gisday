@@ -161,11 +161,28 @@ export const TREE_POSITIONS = Array.from({ length: 3600 }, (_, i) => ({
     Math.abs(x - riverX(z)) > 5.5 &&
     Math.abs(z - highwayZ(x)) > 9.5,
   );
+const TREE_CELL_SIZE = 6;
+const VISITOR_TREE_RADIUS = 0.22;
+const treeCells = new Map();
+for (const tree of TREE_POSITIONS) {
+  const key = `${Math.floor(tree.x / TREE_CELL_SIZE)},${Math.floor(tree.z / TREE_CELL_SIZE)}`;
+  if (!treeCells.has(key)) treeCells.set(key, []);
+  treeCells.get(key).push(tree);
+}
+function treesNear(x, z) {
+  const cx = Math.floor(x / TREE_CELL_SIZE);
+  const cz = Math.floor(z / TREE_CELL_SIZE);
+  const result = [];
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++)
+    result.push(...(treeCells.get(`${cx + dx},${cz + dz}`) ?? []));
+  return result;
+}
 function makeTrees(group, raised) {
   const deciduous = TREE_POSITIONS.filter((p) => !p.evergreen);
   const evergreen = TREE_POSITIONS.filter((p) => p.evergreen);
   const trunk = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.11, 0.18, 1.8, 6),
+    // Continue the trunk inside the foliage so climbing remains grounded in the model.
+    new THREE.CylinderGeometry(0.11, 0.18, 1, 6),
     new THREE.MeshStandardMaterial({ color: 0x705b45, roughness: 1 }),
     TREE_POSITIONS.length,
   );
@@ -180,10 +197,11 @@ function makeTrees(group, raised) {
     evergreen.length,
   );
   const temp = new THREE.Object3D();
-  TREE_POSITIONS.forEach(({ x, z, scale }, i) => {
+  TREE_POSITIONS.forEach(({ x, z, scale, evergreen: isPine }, i) => {
     const y = landscapeHeight(x, z, raised);
-    temp.position.set(x, y + 0.9 * scale, z);
-    temp.scale.set(scale, scale, scale);
+    const trunkHeight = (isPine ? 4.2 : 3.7) * scale;
+    temp.position.set(x, y + trunkHeight / 2, z);
+    temp.scale.set(scale, trunkHeight, scale);
     temp.updateMatrix();
     trunk.setMatrixAt(i, temp.matrix);
   });
@@ -638,6 +656,14 @@ export class LayerExperience {
     this.lastLayer = null;
     this.reveal = null;
     this.view = "map";
+    // The pixel and viewshed demos inherit this landscape but keep their own interactions.
+    this.treeInteractions = this.constructor === LayerExperience;
+    this.treeClimbHands = new Map();
+    this.treeClimbTree = null;
+    this.treeClimbHeight = 0;
+    this.treeClimbGroundY = 0;
+    this.treeClimbLimit = 0;
+    this.treeFallSpeed = 0;
     this.visitor = new THREE.Vector2();
     this.onRoad = false;
     this.fallingFromRoad = false;
@@ -719,6 +745,7 @@ export class LayerExperience {
     this.applyVisibility();
   }
   place(camera) {
+    this.cancelTreeClimb();
     const p = new THREE.Vector3();
     camera.getWorldPosition(p);
     this.floorY = p.y - 1.6;
@@ -746,8 +773,113 @@ export class LayerExperience {
   walkHeightAt(x, z, raised) {
     return landscapeHeight(x, z, raised);
   }
+  treePointClear(x, z, fromX = null, fromZ = null) {
+    if (!this.treeInteractions || !this.selected.has("vegetation")) return true;
+    for (const tree of treesNear(x, z)) {
+      const radius = VISITOR_TREE_RADIUS + 0.18 * tree.scale;
+      const distance = Math.hypot(x - tree.x, z - tree.z);
+      if (distance >= radius) continue;
+      // If a layer is switched on around the visitor, let them walk out.
+      if (fromX !== null && distance >=
+          Math.hypot(fromX - tree.x, fromZ - tree.z) - 1e-6) continue;
+      return false;
+    }
+    return true;
+  }
+  resolveTreeWalk(startX, startZ, desiredX, desiredZ) {
+    if (!this.treeInteractions || !this.selected.has("vegetation"))
+      return { x: desiredX, z: desiredZ };
+    const steps = Math.max(1, Math.ceil(Math.hypot(desiredX - startX,
+      desiredZ - startZ) / 0.1));
+    const dx = (desiredX - startX) / steps;
+    const dz = (desiredZ - startZ) / steps;
+    let x = startX, z = startZ;
+    for (let step = 0; step < steps; step++) {
+      if (this.treePointClear(x + dx, z + dz, x, z)) {
+        x += dx;
+        z += dz;
+      } else if (this.treePointClear(x + dx, z, x, z)) x += dx;
+      else if (this.treePointClear(x, z + dz, x, z)) z += dz;
+    }
+    return { x, z };
+  }
+  get isClimbingTree() {
+    return this.treeInteractions &&
+      (this.treeClimbHands.size > 0 || this.treeClimbHeight > 0);
+  }
+  gripTree(id, handWorld) {
+    if (!this.treeInteractions || !this.started || this.finished ||
+        !this.selected.has("vegetation")) return false;
+    const local = this.group.worldToLocal(handWorld.clone());
+    const raised = this.selected.has("topography");
+    const scaleY = (raised ? this.variants.raised : this.variants.flat).world.scale.y;
+    const candidates = this.treeClimbTree ? [this.treeClimbTree] : treesNear(local.x, local.z);
+    const tree = candidates.find((candidate) => {
+      const ground = landscapeHeight(candidate.x, candidate.z, raised) * scaleY;
+      const canopy = (candidate.evergreen ? 4.3 : 3.8) * candidate.scale * scaleY;
+      return Math.hypot(local.x - candidate.x, local.z - candidate.z) <=
+        0.18 * candidate.scale + 0.25 &&
+        local.y >= ground - 0.15 && local.y <= ground + canopy + 0.2;
+    });
+    if (!tree) return false;
+    const startingClimb = !this.isClimbingTree;
+    if (!this.treeClimbTree) {
+      this.treeClimbTree = tree;
+      this.treeClimbGroundY = this.group.position.y;
+      const canopyTop = (tree.evergreen ? 4.3 : 3.8) * tree.scale * scaleY;
+      this.treeClimbLimit = Math.max(0.5, canopyTop - this.eyeHeight + 0.35);
+    }
+    this.treeClimbHands.set(id, handWorld.y);
+    this.treeFallSpeed = 0;
+    this.clipboard.visible = false;
+    if (startingClimb) this.onChange();
+    return true;
+  }
+  releaseTree(id) {
+    this.treeClimbHands.delete(id);
+    if (!this.treeClimbHands.size) this.treeFallSpeed = 0;
+  }
+  updateTreeClimb(poses, dt, camera) {
+    if (!this.treeInteractions || !this.isClimbingTree) return;
+    if (!this.started || this.finished || !this.selected.has("vegetation")) {
+      this.cancelTreeClimb();
+      return;
+    }
+    const pulls = [];
+    for (const [id, lastY] of this.treeClimbHands) {
+      const matrix = poses.get(id);
+      if (!matrix) { this.treeClimbHands.delete(id); continue; }
+      const y = new THREE.Vector3().setFromMatrixPosition(matrix).y;
+      pulls.push(THREE.MathUtils.clamp(lastY - y, -0.22, 0.22));
+      this.treeClimbHands.set(id, y);
+    }
+    if (pulls.length) {
+      const pull = pulls.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
+      this.treeClimbHeight = THREE.MathUtils.clamp(
+        this.treeClimbHeight + pull, 0, this.treeClimbLimit);
+      this.treeFallSpeed = 0;
+    } else if (this.treeClimbHeight > 0) {
+      this.treeFallSpeed = Math.min(14, this.treeFallSpeed + 13 * dt);
+      this.treeClimbHeight = Math.max(0,
+        this.treeClimbHeight - this.treeFallSpeed * dt);
+    }
+    this.group.position.y = this.treeClimbGroundY - this.treeClimbHeight;
+    if (!this.treeClimbHands.size && this.treeClimbHeight === 0) {
+      this.treeClimbTree = null;
+      this.treeFallSpeed = 0;
+      this.walk(0, 0, 0, camera);
+      this.onChange();
+    }
+  }
+  cancelTreeClimb() {
+    if (this.treeClimbTree) this.group.position.y = this.treeClimbGroundY;
+    this.treeClimbHands.clear();
+    this.treeClimbTree = null;
+    this.treeClimbHeight = 0;
+    this.treeFallSpeed = 0;
+  }
   teleportCandidate(raycaster, uiHit = null) {
-    if (!this.started || this.finished) return null;
+    if (!this.started || this.finished || this.isClimbingTree) return null;
     const raised = this.selected.has("topography");
     const variant = raised ? this.variants.raised : this.variants.flat;
     const pick = raised ? this.pickGround : this.pickFlatGround;
@@ -786,11 +918,13 @@ export class LayerExperience {
       this.eyeHeight, raised, scaleY);
     return {
       x: local.x, z: local.z, point, distance: hit.distance,
-      onRoad, valid: Number.isFinite(surface) && slope <= 1.2 && clearBelow,
+      onRoad, valid: Number.isFinite(surface) && slope <= 1.2 && clearBelow &&
+        this.treePointClear(local.x, local.z),
     };
   }
   teleportTo(candidate, camera) {
-    if (!this.started || this.finished || !candidate?.valid) return false;
+    if (!this.started || this.finished || this.isClimbingTree || !candidate?.valid)
+      return false;
     if (!Number.isFinite(candidate.x) || !Number.isFinite(candidate.z)) return false;
     const limit = LANDSCAPE_EXTENT - 4;
     if (Math.abs(candidate.x) > limit || Math.abs(candidate.z) > limit) return false;
@@ -805,6 +939,7 @@ export class LayerExperience {
     return true;
   }
   walk(stickX, stickY, dt, camera) {
+    if (this.isClimbingTree) return { distance: 0, wet: false };
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const local = this.group.worldToLocal(eye.clone());
     const startX = this.visitor.x, startZ = this.visitor.y;
@@ -841,6 +976,8 @@ export class LayerExperience {
       else if (zOnly) desiredX = startX;
       else { desiredX = startX; desiredZ = startZ; }
     }
+    ({ x: desiredX, z: desiredZ } = this.resolveTreeWalk(
+      startX, startZ, desiredX, desiredZ));
     const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
     const appliedX = desiredX - local.x, appliedZ = desiredZ - local.z;
     this.group.position.x -= c * appliedX + s * appliedZ;
@@ -917,7 +1054,7 @@ export class LayerExperience {
     }
   }
   updateClipboard(leftGrip, camera, preview = false, fallback = false) {
-    if (!this.started) {
+    if (!this.started || this.isClimbingTree) {
       this.clipboard.visible = false;
       return;
     }
@@ -974,6 +1111,8 @@ export class LayerExperience {
       this.selected.add(key);
       this.reveal = { key, elapsed: 0 };
     }
+    if (this.isClimbingTree && (key === "vegetation" || key === "topography"))
+      this.cancelTreeClimb();
     this.lastLayer = key;
     this.applyVisibility();
     this.onEvent("layer");
@@ -988,6 +1127,7 @@ export class LayerExperience {
     }
   }
   reset() {
+    this.cancelTreeClimb();
     this.selected.clear();
     this.lastLayer = null;
     this.reveal = null;
@@ -1006,6 +1146,7 @@ export class LayerExperience {
   }
   finish() {
     if (!this.started || this.finished) return;
+    this.cancelTreeClimb();
     this.finished = true;
     this.onChange();
   }
