@@ -9,13 +9,13 @@ import bayNaturalUrl from "./data/landsat-sf-natural.jpg";
 import bayFalseUrl from "./data/landsat-sf-false.jpg";
 import evergladesNaturalUrl from "./data/landsat-florida-natural.jpg";
 import evergladesFalseUrl from "./data/landsat-florida-false.jpg";
-import lilongweNaturalUrl from "./data/landsat-lilongwe-natural.jpg";
-import lilongweFalseUrl from "./data/landsat-lilongwe-false.jpg";
+import londonNaturalUrl from "./data/landsat-london-natural.jpg";
+import londonFalseUrl from "./data/landsat-london-false.jpg";
 
 const SCENE_URLS = {
   bay: [bayNaturalUrl, bayFalseUrl],
   everglades: [evergladesNaturalUrl, evergladesFalseUrl],
-  lilongwe: [lilongweNaturalUrl, lilongweFalseUrl],
+  london: [londonNaturalUrl, londonFalseUrl],
 };
 const nextSpectralScene = createSpectralSceneRotation();
 

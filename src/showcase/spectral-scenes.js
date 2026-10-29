@@ -14,10 +14,10 @@ export const SPECTRAL_SCENES = [
     observation: "Leafy fields turn red; open water and flooded areas look dark.",
   },
   {
-    id: "lilongwe", name: "Lilongwe, Malawi", sensor: "Landsat 8 · 2018",
-    width: 720, height: 900, sample: { u: 0.71, v: 0.44 },
-    prompt: "Sample trees beside streams, then built-up areas.",
-    observation: "NIR reveals trees along streams and within the city.",
+    id: "london", name: "London, England", sensor: "Landsat 7 · 2002",
+    width: 1200, height: 800, sample: { u: 0.49, v: 0.55 },
+    prompt: "Compare the city center with forests and fields around it.",
+    observation: "Vegetation brightens red in false color; the built-up center stays muted.",
   },
 ];
 
