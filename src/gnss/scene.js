@@ -235,6 +235,11 @@ export class GnssScene {
       .find((candidate) => candidate.object.userData.gnssPart);
     return hit ? { text: hit.object.userData.gnssPart, point: hit.point.clone() } : null;
   }
+  hitSatellite(raycaster) {
+    if (this.stage !== GNSS_SIGNAL) return null;
+    this.group.updateWorldMatrix(true, true);
+    return raycaster.intersectObject(this.craft, true)[0] ?? null;
+  }
   hitSurface(raycaster) {
     this.group.updateWorldMatrix(true, true);
     return raycaster.intersectObject(this.group, true).find((hit) =>

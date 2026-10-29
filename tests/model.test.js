@@ -87,6 +87,18 @@ test("GNSS pointer reaches spacecraft through the decorative radio halo", async 
   assert.ok(hit.object.userData.gnssPart);
 });
 
+test("the pulse-stage satellite can be selected without selecting the receiver", async () => {
+  const { Raycaster, Vector3 } = await import("three");
+  const { GnssScene } = await import("../src/gnss/scene.js");
+  const display = new GnssScene(GNSS_SIGNAL);
+  const satelliteRay = new Raycaster(new Vector3(-0.13, 0.3, 3),
+    new Vector3(0, 0, -1));
+  const receiverRay = new Raycaster(new Vector3(0.35, -0.43, 3),
+    new Vector3(0, 0, -1));
+  assert.ok(display.hitSatellite(satelliteRay));
+  assert.equal(display.hitSatellite(receiverRay), null);
+});
+
 test("clock correction introduces a fourth spacecraft and reflected route takes longer", async () => {
   const { GnssScene } = await import("../src/gnss/scene.js");
   const before = new GnssScene(GNSS_CLOCK);

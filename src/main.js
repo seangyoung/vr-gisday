@@ -2010,6 +2010,18 @@ function inspectGnssPart(ray) {
   sound.cue("measure");
   return true;
 }
+function sendGnssPulse() {
+  gnssPulseSent = true;
+  keepGnssPose();
+  draw();
+  gnssDisplay.fire();
+}
+function selectGnssSatellite(ray) {
+  if (step !== GNSS_SIGNAL || !gnssDisplay?.hitSatellite(ray)) return false;
+  sound.click();
+  sendGnssPulse();
+  return true;
+}
 function spatial() {
   const group = new THREE.Group();
   floatingModel = group;
@@ -2619,15 +2631,10 @@ function drawScene() {
     if (step === GNSS_SIGNAL) {
       label(gnssPulseSent
         ? `Example: 20,200 km takes about ${travelTimeMs(20200).toFixed(1)} ms. Animation slowed for viewing.`
-        : "Point to Send pulse. Grip the model to inspect it from another angle.",
+        : "Select the satellite or Send pulse. Grip the model to inspect it.",
       0, GUIDED_INFO_Y, 2.36, 0.13, 28, "#b6d1d9", "#0b2430");
       button(gnssPulseSent ? "Send again" : "Send pulse", gnssPulseSent ? -0.55 : 0,
-        GUIDED_ACTION_Y, () => {
-          gnssPulseSent = true;
-          keepGnssPose();
-          draw();
-          gnssDisplay.fire();
-        }, gnssPulseSent ? 1.0 : 1.25);
+        GUIDED_ACTION_Y, sendGnssPulse, gnssPulseSent ? 1.0 : 1.25);
       if (gnssPulseSent) button("Clock bias", 0.55, GUIDED_ACTION_Y, next, 1.0);
     }
     if (step === GNSS_CLOCK) {
@@ -2798,6 +2805,7 @@ for (let i = 0; i < 2; i++) {
     }
     if (soundMenuOpen) return;
     if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
+    if (selectGnssSatellite(raycaster)) return;
     if (viewshed) {
       if (viewshed.placeFromRay(raycaster)) sound.click();
       return;
@@ -3581,6 +3589,7 @@ if (
     if (ui) ui.object.userData.action?.(ui);
     else if (soundMenuOpen) return;
     else if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
+    else if (selectGnssSatellite(raycaster)) return;
     else if (viewshed) viewshed.placeFromRay(raycaster);
     else if (pixels) {
       if (pixels.phase === "platforms") {
