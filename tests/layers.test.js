@@ -13,6 +13,7 @@ import {
   highwayZ,
   highwayDeckHeight,
   highwayWalkingHeight,
+  canWalkBelowRoad,
   floodplainAt,
   boundaryX,
   boundaryZ,
@@ -213,6 +214,49 @@ test("highway shoulders meet the ground while the bridge stays open underneath",
     "west approach descends smoothly onto the deck");
   assert.ok(east.every((height, i) => i === 0 || height >= east[i - 1] - 0.03),
     "east approach rises smoothly away from the deck");
+  l.dispose();
+});
+
+test("concrete slab and bank embankments match the open underpass boundary", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const roads = l.variants.raised.roads;
+  for (const role of ["bridge-slab", "bridge-embankment", "bridge-abutment"])
+    assert.ok(roads.children.some((mesh) => mesh.userData.role === role), role);
+  const slab = roads.children.find((mesh) => mesh.userData.role === "bridge-slab");
+  const positions = slab.geometry.attributes.position;
+  const crossing = riverX(highwayZ(0));
+  const underside = Array.from({ length: positions.count }, (_, i) => i)
+    .filter((i) => Math.abs(positions.getX(i) - crossing) < 0.5)
+    .some((i) => positions.getY(i) < highwayDeckHeight(positions.getX(i)) - 0.45);
+  assert.equal(underside, true, "the concrete has a visible lower face");
+  assert.equal(canWalkBelowRoad(crossing, highwayZ(crossing), 1.6), true);
+  assert.equal(canWalkBelowRoad(crossing + 14, highwayZ(crossing + 14), 1.6), false);
+  assert.equal(canWalkBelowRoad(crossing, highwayZ(crossing) + 9, 1.6), true);
+  l.dispose();
+});
+
+test("walking and room-scale movement stop at the solid approach from below", () => {
+  const l = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  l.place(camera);
+  l.begin();
+  l.selected = new Set(["topography", "roads"]);
+  l.applyVisibility();
+  l.update(1);
+  l.group.rotation.y = 0;
+  const crossing = riverX(highwayZ(0));
+  const startX = crossing + 7;
+  l.group.position.set(-startX, 0, -highwayZ(startX));
+  l.walk(0, 0, 0.02, camera);
+  for (let i = 0; i < 60; i++) l.walk(1, 0, 0.05, camera);
+  assert.ok(l.visitor.x < crossing + 12);
+  assert.equal(l.onRoad, false);
+  const stoppedAt = l.visitor.x;
+  camera.position.x += 1;
+  l.walk(0, 0, 0.05, camera);
+  assert.ok(Math.abs(l.visitor.x - stoppedAt) < 0.01,
+    "physical movement should be constrained like stick movement");
   l.dispose();
 });
 

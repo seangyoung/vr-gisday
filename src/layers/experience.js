@@ -35,6 +35,9 @@ export const highwayZ = (x) =>
 const ROAD_EDGE = 6.1;
 const SHOULDER_EDGE = 9;
 const BRIDGE_ACCESS_STEP = 0.55;
+const BRIDGE_HALF_LENGTH = 16;
+const BRIDGE_SLAB_DEPTH = 0.48;
+const BRIDGE_HEAD_CLEARANCE = 0.12;
 const topographicHeight = (x, z) => {
   const fromRiver = Math.abs(x - riverX(z));
   const floor = riverWaterHeight(z) - 0.26;
@@ -332,6 +335,21 @@ export function highwayWalkingHeight(x, z, raised = true) {
   const t = (distance - ROAD_EDGE) / (shoulderWidth - ROAD_EDGE);
   return Math.max(landscapeHeight(x, z, raised), THREE.MathUtils.lerp(deck, outer, t));
 }
+// Below the deck, the river span is open; the road approaches are solid fill.
+// Keep an avatar's head clear of the concrete slab before allowing movement.
+export function canWalkBelowRoad(x, z, eyeHeight, raised = true, scaleY = 1) {
+  const offset = z - highwayZ(x);
+  const shoulder = shoulderWidthAt(x);
+  if (Math.abs(offset) > shoulder + 0.25) return true;
+  const roadZ = highwayZ(x) + Math.sign(offset) * Math.min(Math.abs(offset), shoulder);
+  const road = highwayWalkingHeight(x, roadZ, raised) * scaleY;
+  const ground = landscapeHeight(x, z, raised) * scaleY;
+  if (road - ground <= BRIDGE_ACCESS_STEP) return true;
+  const crossing = riverX(highwayZ(0));
+  if (Math.abs(x - crossing) >= BRIDGE_HALF_LENGTH) return false;
+  const underside = (highwayDeckHeight(x, raised) - BRIDGE_SLAB_DEPTH) * scaleY;
+  return ground + eyeHeight + BRIDGE_HEAD_CLEARANCE <= underside;
+}
 function roadShoulderRibbon(raised) {
   const vertices = [], indices = [];
   const segments = Math.ceil((2 * extent) / 0.65);
@@ -387,12 +405,94 @@ function roadRibbon(raised, halfWidth, lift, color, start = -extent, end = exten
     new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide }),
   );
 }
+function concreteQuad(vertices, indices, a, b, c, d) {
+  const first = vertices.length / 3;
+  vertices.push(...a, ...b, ...c, ...d);
+  indices.push(first, first + 1, first + 2,
+    first + 1, first + 3, first + 2);
+}
+function concreteMesh(vertices, indices, role) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    color: 0xa4a6a0, roughness: 0.94, side: THREE.DoubleSide,
+  }));
+  mesh.userData.role = role;
+  return mesh;
+}
+function bridgeConcrete(raised, crossing) {
+  const slabVertices = [], slabIndices = [];
+  const start = crossing - BRIDGE_HALF_LENGTH;
+  const end = crossing + BRIDGE_HALF_LENGTH;
+  const segments = Math.ceil((end - start) / 0.65);
+  for (let i = 0; i < segments; i++) {
+    const x0 = start + (end - start) * i / segments;
+    const x1 = start + (end - start) * (i + 1) / segments;
+    const crossSection = (x) => {
+      const z = highwayZ(x), deck = highwayDeckHeight(x, raised);
+      return {
+        topLeft: [x, deck - 0.012, z - ROAD_EDGE],
+        topRight: [x, deck - 0.012, z + ROAD_EDGE],
+        bottomLeft: [x, deck - BRIDGE_SLAB_DEPTH, z - ROAD_EDGE],
+        bottomRight: [x, deck - BRIDGE_SLAB_DEPTH, z + ROAD_EDGE],
+      };
+    };
+    const a = crossSection(x0), b = crossSection(x1);
+    concreteQuad(slabVertices, slabIndices,
+      a.bottomLeft, a.bottomRight, b.bottomLeft, b.bottomRight);
+    concreteQuad(slabVertices, slabIndices,
+      a.topLeft, a.bottomLeft, b.topLeft, b.bottomLeft);
+    concreteQuad(slabVertices, slabIndices,
+      a.bottomRight, a.topRight, b.bottomRight, b.topRight);
+  }
+  const embankmentVertices = [], embankmentIndices = [];
+  for (const bank of [-1, 1])
+    for (const side of [-1, 1]) {
+      const sections = 32;
+      const at = (i) => {
+        const distance = BRIDGE_HALF_LENGTH + (36 - BRIDGE_HALF_LENGTH) * i / sections;
+        const x = crossing + bank * distance;
+        const fade = 1 - THREE.MathUtils.smoothstep(distance, BRIDGE_HALF_LENGTH, 36);
+        const z = highwayZ(x);
+        const top = highwayDeckHeight(x, raised) - 0.018;
+        const outerZ = z + side * (ROAD_EDGE + 0.95 * fade);
+        const ground = landscapeHeight(x, outerZ, raised) - 0.06;
+        return { top: [x, top, z + side * ROAD_EDGE],
+          bottom: [x, THREE.MathUtils.lerp(top, ground, fade), outerZ] };
+      };
+      for (let i = 0; i < sections; i++) {
+        const a = at(i), b = at(i + 1);
+        concreteQuad(embankmentVertices, embankmentIndices,
+          a.top, a.bottom, b.top, b.bottom);
+      }
+    }
+  const abutmentVertices = [], abutmentIndices = [];
+  for (const x of [start, end]) {
+    const sections = 24;
+    const at = (i) => {
+      const z = highwayZ(x) - ROAD_EDGE + 2 * ROAD_EDGE * i / sections;
+      return { top: [x, highwayDeckHeight(x, raised) - BRIDGE_SLAB_DEPTH, z],
+        bottom: [x, landscapeHeight(x, z, raised) - 0.08, z] };
+    };
+    for (let i = 0; i < sections; i++) {
+      const a = at(i), b = at(i + 1);
+      concreteQuad(abutmentVertices, abutmentIndices,
+        a.top, a.bottom, b.top, b.bottom);
+    }
+  }
+  return [concreteMesh(slabVertices, slabIndices, "bridge-slab"),
+    concreteMesh(embankmentVertices, embankmentIndices, "bridge-embankment"),
+    concreteMesh(abutmentVertices, abutmentIndices, "bridge-abutment")];
+}
 function makeRoads(group, raised) {
   group.add(roadShoulderRibbon(raised));
   group.add(roadRibbon(raised, 5.2, 0.016, 0x353b3d));
   const crossing = riverX(highwayZ(0));
   group.add(roadRibbon(raised, ROAD_EDGE, -0.012, 0xa4a6a0,
-    crossing - 16, crossing + 16));
+    crossing - BRIDGE_HALF_LENGTH, crossing + BRIDGE_HALF_LENGTH));
+  group.add(...bridgeConcrete(raised, crossing));
   const markings = { white: { vertices: [], indices: [] }, yellow: { vertices: [], indices: [] } };
   const addMark = (x0, x1, offset, width, kind) => {
     const { vertices, indices } = markings[kind];
@@ -542,6 +642,7 @@ export class LayerExperience {
     this.onRoad = false;
     this.fallingFromRoad = false;
     this.fallVelocity = 0;
+    this.eyeHeight = 1.6;
     this.visitorMarkers = [];
     this.floorY = 0;
     this.walkForward = new THREE.Vector3();
@@ -630,6 +731,7 @@ export class LayerExperience {
     this.onRoad = false;
     this.fallingFromRoad = false;
     this.fallVelocity = 0;
+    this.eyeHeight = 1.6;
     this.updateVisitorMarkers();
   }
   turn(angle, camera) {
@@ -680,9 +782,11 @@ export class LayerExperience {
       Math.abs(groundAt(local.x, local.z - 1) - surface),
     );
     const point = this.group.localToWorld(new THREE.Vector3(local.x, surface + 0.42, local.z));
+    const clearBelow = onRoad || !roadMesh || canWalkBelowRoad(local.x, local.z,
+      this.eyeHeight, raised, scaleY);
     return {
       x: local.x, z: local.z, point, distance: hit.distance,
-      onRoad, valid: Number.isFinite(surface) && slope <= 1.2,
+      onRoad, valid: Number.isFinite(surface) && slope <= 1.2 && clearBelow,
     };
   }
   teleportTo(candidate, camera) {
@@ -704,6 +808,13 @@ export class LayerExperience {
     const eye = camera.getWorldPosition(new THREE.Vector3());
     const local = this.group.worldToLocal(eye.clone());
     const startX = this.visitor.x, startZ = this.visitor.y;
+    const raised = this.selected.has("topography");
+    const variant = raised ? this.variants.raised : this.variants.flat;
+    const scaleY = variant.world.scale.y;
+    const roadsReady = this.selected.has("roads") && variant.roads.scale.y > 0.95;
+    const previousHeight = this.floorY - this.group.position.y;
+    this.eyeHeight = THREE.MathUtils.clamp(local.y - previousHeight, 0.7, 2.2);
+    let desiredX = local.x, desiredZ = local.z;
     const magnitude = Math.hypot(stickX, stickY);
     if (Number.isFinite(magnitude) && magnitude > 0.18 && dt > 0) {
       const strength = Math.min(1, (magnitude - 0.18) / 0.82);
@@ -718,25 +829,30 @@ export class LayerExperience {
       const dx = c * worldX - s * worldZ;
       const dz = s * worldX + c * worldZ;
       const limit = LANDSCAPE_EXTENT - 4;
-      const nextX = THREE.MathUtils.clamp(local.x + dx, -limit, limit);
-      const nextZ = THREE.MathUtils.clamp(local.z + dz, -limit, limit);
-      const appliedX = nextX - local.x;
-      const appliedZ = nextZ - local.z;
-      this.group.position.x -= c * appliedX + s * appliedZ;
-      this.group.position.z -= -s * appliedX + c * appliedZ;
-      local.x = nextX;
-      local.z = nextZ;
+      desiredX = THREE.MathUtils.clamp(local.x + dx, -limit, limit);
+      desiredZ = THREE.MathUtils.clamp(local.z + dz, -limit, limit);
     }
+    if (roadsReady && !this.onRoad &&
+        !canWalkBelowRoad(desiredX, desiredZ, this.eyeHeight, raised, scaleY)) {
+      const xOnly = canWalkBelowRoad(desiredX, startZ, this.eyeHeight, raised, scaleY);
+      const zOnly = canWalkBelowRoad(startX, desiredZ, this.eyeHeight, raised, scaleY);
+      if (xOnly && (!zOnly || Math.abs(desiredX - startX) >= Math.abs(desiredZ - startZ)))
+        desiredZ = startZ;
+      else if (zOnly) desiredX = startX;
+      else { desiredX = startX; desiredZ = startZ; }
+    }
+    const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
+    const appliedX = desiredX - local.x, appliedZ = desiredZ - local.z;
+    this.group.position.x -= c * appliedX + s * appliedZ;
+    this.group.position.z -= -s * appliedX + c * appliedZ;
+    local.x = desiredX;
+    local.z = desiredZ;
     this.visitor.set(local.x, local.z);
-    const raised = this.selected.has("topography");
-    const variant = raised ? this.variants.raised : this.variants.flat;
-    const scaleY = variant.world.scale.y;
     const ground = this.walkHeightAt(local.x, local.z, raised) * scaleY;
-    const roadLocal = this.selected.has("roads") && variant.roads.scale.y > 0.95
+    const roadLocal = roadsReady
       ? highwayWalkingHeight(local.x, local.z, raised)
       : null;
     const road = roadLocal === null ? null : roadLocal * scaleY;
-    const previousHeight = this.floorY - this.group.position.y;
     const steppedOffRoad = Math.hypot(local.x - startX, local.z - startZ) > 0.01;
     if (this.onRoad && road === null && this.selected.has("roads") &&
         steppedOffRoad && previousHeight - ground > 0.45 && dt > 0) {

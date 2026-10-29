@@ -81,6 +81,14 @@ test("teleport lands on an exposed bridge deck and retains its walking height", 
   assert.equal(demo.teleportTo(candidate, camera), true);
   assert.equal(demo.onRoad, true);
   assert.ok(Math.abs(demo.group.position.y + highwayWalkingHeight(candidate.x, candidate.z)) < 1e-6);
+  const approachX = x + 12;
+  const approachZ = highwayZ(approachX);
+  const belowRoad = demo.group.localToWorld(new THREE.Vector3(
+    approachX, highwayDeckHeight(approachX) - 0.6, approachZ));
+  const blocked = demo.teleportCandidate(new THREE.Raycaster(
+    belowRoad, new THREE.Vector3(0, -1, 0)));
+  assert.equal(blocked?.valid, false,
+    "teleport should not place the visitor inside the solid bank approach");
   demo.dispose();
 });
 
