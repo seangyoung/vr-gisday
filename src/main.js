@@ -1263,7 +1263,7 @@ function drawPixelsUI() {
   if (p.finished) {
     label(
       "Satellite, aircraft, and drone sensors make different trade-offs between coverage and ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nAt 30 m, narrow rivers and roads blend with nearby land inside mixed pixels.",
-      0, 0.39, 2.35, 0.48, 33, "#e6f4f5", "#0b2430",
+      0, 0.12, 2.35, 1.16, 48, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
 
