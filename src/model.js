@@ -73,8 +73,8 @@ export const stages = [
     action: null,
   },
   {
-    title: "A tiny clock error makes a big range error.",
-    body: "The receiver's clock may be 1 microsecond fast.\nThat adds about 300 meters to every measured range.\nUse a fourth satellite to solve position and clock bias.",
+    title: "Clock bias leaves several possible locations.",
+    body: "Just 1 microsecond of receiver clock error adds about 300 meters to every measured range.\nThe ghost receivers show different positions and clock offsets that fit three signals.\nA fourth satellite signal resolves both position and clock bias.",
     action: null,
   },
   {

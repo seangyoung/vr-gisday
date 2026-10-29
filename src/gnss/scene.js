@@ -100,10 +100,25 @@ function satellite(parent, position, size = 1) {
 }
 
 function receiver(parent, position) {
-  mesh(parent, new THREE.CylinderGeometry(0.07, 0.09, 0.12, 16), 0xc9ded7,
-    position);
-  mesh(parent, new THREE.SphereGeometry(0.028, 12, 8), teal,
-    position.clone().add(point(0, 0.08)));
+  return [
+    mesh(parent, new THREE.CylinderGeometry(0.07, 0.09, 0.12, 16), 0xc9ded7,
+      position),
+    mesh(parent, new THREE.SphereGeometry(0.028, 12, 8), teal,
+      position.clone().add(point(0, 0.08))),
+  ];
+}
+
+function ghostReceiver(parent, position) {
+  const body = mesh(parent, new THREE.CylinderGeometry(0.07, 0.09, 0.12, 12),
+    gold, position, { opacity: 0.48 });
+  body.material.wireframe = true;
+  const halo = mesh(parent, new THREE.TorusGeometry(0.105, 0.008, 6, 24),
+    gold, position.clone().add(point(0, 0.025, 0.01)), { opacity: 0.46 });
+  for (const piece of [body, halo]) {
+    piece.material.depthWrite = false;
+    piece.userData.rayIgnore = true;
+  }
+  return [body, halo];
 }
 
 export class GnssScene {
@@ -141,26 +156,57 @@ export class GnssScene {
     }
     if (stage === GNSS_CLOCK) {
       const destination = point(0.15, -0.43);
-      receiver(this.group, destination);
-      for (const position of [point(-0.68, 0.67, -0.25),
-        point(0.48, 0.65, -0.25)]) {
+      const satellites = [this.satellitePoint, point(-0.68, 0.67, -0.25),
+        point(0.48, 0.65, -0.25)];
+      this.clockSatellites = satellites;
+      for (const position of satellites.slice(1)) {
         satellite(this.group, position, 0.32);
-        path(this.group, [position, destination], teal, 0.36, true);
       }
       this.satelliteCount = clockCorrected ? 4 : 3;
-      path(this.group, [this.satellitePoint, destination], teal, 0.9);
-      if (!clockCorrected) {
-        const falseRange = destination.clone().add(point(0.34, -0.15));
-        mesh(this.group, new THREE.SphereGeometry(0.045, 12, 8), gold,
-          falseRange);
-        path(this.group, [this.satellitePoint, falseRange], gold, 0.88, true);
-        path(this.group, [destination, falseRange], gold, 0.75);
-      } else {
+      // Each sample has the same three pseudoranges once its own clock offset
+      // is included. Three signals leave a continuum of such 3D solutions.
+      this.clockCandidates = [
+        { position: point(0.070959647, 0.037073020, -0.16), bias: 0.484276329 },
+        { position: destination, bias: 0.07 },
+        { position: point(0.197091145, -0.657632382, 0.16), bias: -0.172666732 },
+      ];
+      this.clockGhosts = [];
+      this.clockGhostRays = [];
+      const colors = [0x8dded9, 0xb3b8f3, 0xffd88b];
+      for (const { position } of this.clockCandidates) {
+        for (const piece of ghostReceiver(this.group, position))
+          this.clockGhosts.push({ piece, opacity: piece.material.opacity });
+        for (const [index, source] of satellites.entries()) {
+          const beyond = position.clone().addScaledVector(
+            position.clone().sub(source).normalize(), 0.22);
+          const line = path(this.group, [source, beyond], colors[index], 0.34, true);
+          line.material.depthWrite = false;
+          this.clockGhostRays.push(line);
+        }
+      }
+      if (clockCorrected) {
         const fourthPosition = point(0.65, 0.1, -0.32);
         this.fourth = satellite(this.group, fourthPosition, 0.32);
-        path(this.group, [fourthPosition, destination], 0xa6f5d9, 0.95);
-        mesh(this.group, new THREE.SphereGeometry(0.1, 20, 12), teal,
-          destination, { opacity: 0.22 });
+        this.fourthRay = path(this.group, [fourthPosition, fourthPosition.clone()],
+          0xa6f5d9, 0);
+        this.fourthRay.material.depthWrite = false;
+        this.fourthRay.frustumCulled = false;
+        this.fourthSource = fourthPosition;
+        this.fourthDestination = destination;
+        this.clockResolvedRays = satellites.map((source) => {
+          const line = path(this.group, [source, destination], teal, 0);
+          line.material.depthWrite = false;
+          return line;
+        });
+        this.clockReceiver = receiver(this.group, destination);
+        for (const piece of this.clockReceiver) {
+          piece.material.transparent = true;
+          piece.material.opacity = 0;
+          piece.material.depthWrite = false;
+        }
+        this.clockGlow = mesh(this.group, new THREE.SphereGeometry(0.1, 20, 12),
+          teal, destination, { opacity: 0 });
+        this.clockGlow.material.depthWrite = false;
       }
     }
     if (stage === GNSS_MULTIPATH) {
@@ -227,6 +273,7 @@ export class GnssScene {
     if (!this.fourth) return;
     this.fourthAge = 0;
     this.fourth.scale.setScalar(0.001);
+    this.fourthRay.material.opacity = 0;
   }
   pickPart(raycaster) {
     if (this.stage !== GNSS_SATELLITE) return null;
@@ -279,9 +326,25 @@ export class GnssScene {
     }
     if (this.fourthAge >= 0 && this.fourth) {
       this.fourthAge += dt;
-      const progress = Math.min(1, this.fourthAge / 0.8);
-      this.fourth.scale.setScalar(0.32 * (1 - (1 - progress) ** 3));
-      if (progress === 1) this.fourthAge = -1;
+      const arrival = THREE.MathUtils.smoothstep(this.fourthAge, 0.18, 0.85);
+      const resolved = THREE.MathUtils.smoothstep(this.fourthAge, 0.65, 1.55);
+      const grown = THREE.MathUtils.smoothstep(this.fourthAge, 0, 0.45);
+      this.fourth.scale.setScalar(0.32 * (1 - (1 - grown) ** 3));
+      const signalTip = this.fourthSource.clone().lerp(this.fourthDestination, arrival);
+      const positions = this.fourthRay.geometry.attributes.position;
+      positions.setXYZ(1, signalTip.x, signalTip.y, signalTip.z);
+      positions.needsUpdate = true;
+      this.fourthRay.material.opacity = 0.95 * arrival;
+      for (const { piece, opacity } of this.clockGhosts)
+        piece.material.opacity = opacity * (1 - resolved);
+      for (const line of this.clockGhostRays)
+        line.material.opacity = 0.34 * (1 - resolved);
+      for (const line of this.clockResolvedRays)
+        line.material.opacity = 0.9 * resolved;
+      for (const piece of this.clockReceiver)
+        piece.material.opacity = resolved;
+      this.clockGlow.material.opacity = 0.25 * resolved;
+      if (this.fourthAge >= 1.55) this.fourthAge = -1;
     }
     if (this.pulseAge >= 0 && this.pulseShell) {
       this.pulseAge += dt;

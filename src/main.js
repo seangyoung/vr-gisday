@@ -2624,7 +2624,11 @@ function drawScene() {
   const s = stages[step];
   if (isGnssObject()) {
     gnssObject();
-    lessonCard(s.title, s.body);
+    lessonCard(step === GNSS_CLOCK && gnssClockCorrected
+      ? "The fourth signal resolves the ambiguity." : s.title,
+    step === GNSS_CLOCK && gnssClockCorrected
+      ? "Only one position-and-clock combination fits all four signal times.\nThe extra paths fade as the receiver corrects its clock and calculates its 3D location."
+      : s.body);
     if (step === GNSS_SATELLITE) {
       button(s.action, 0, GUIDED_ACTION_Y, next, 1.55);
     }
@@ -2639,8 +2643,8 @@ function drawScene() {
     }
     if (step === GNSS_CLOCK) {
       label(gnssClockCorrected
-        ? "4 signals · solve receiver position and clock bias together"
-        : `3 signals · +1 μs clock bias adds ${Math.round(clockBiasMeters(1))} m to each pseudorange`,
+        ? "4 signals · one position and a corrected receiver clock"
+        : `3 signals · ghost positions fit different clock offsets (+1 μs ≈ ${Math.round(clockBiasMeters(1))} m)`,
       0, GUIDED_INFO_Y, 2.35, 0.13, 28,
       gnssClockCorrected ? "#a6f5d9" : "#ffdc83", "#0b2430");
       button(gnssClockCorrected ? "Test sky view" : "Use fourth signal",

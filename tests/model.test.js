@@ -105,10 +105,30 @@ test("clock correction introduces a fourth spacecraft and reflected route takes 
   const after = new GnssScene(GNSS_CLOCK, { clockCorrected: true });
   assert.equal(before.satelliteCount, 3);
   assert.equal(after.satelliteCount, 4);
+  assert.equal(before.clockGhostRays.length, 9);
+  assert.equal(before.clockCandidates.length, 3);
+  const reference = before.clockCandidates[1];
+  for (const candidate of before.clockCandidates)
+    for (const anchor of before.clockSatellites)
+      assert.ok(Math.abs(anchor.distanceTo(candidate.position) + candidate.bias -
+        (anchor.distanceTo(reference.position) + reference.bias)) < 1e-6,
+      "every ghost fits the same three timing measurements with a different clock bias");
+  const fourthRange = (candidate) => after.fourthSource.distanceTo(candidate.position) +
+    candidate.bias;
+  assert.ok(before.clockCandidates.every((candidate, index) =>
+    index === 1 || Math.abs(fourthRange(candidate) - fourthRange(reference)) > 0.02),
+  "the fourth signal distinguishes the resolved receiver from both ghosts");
   after.revealFourth();
   assert.ok(after.fourth.scale.x < 0.01);
   after.update(1);
   assert.ok(Math.abs(after.fourth.scale.x - 0.32) < 1e-12);
+  assert.ok(after.clockGhosts.some(({ piece }) => piece.material.opacity > 0),
+    "alternate positions remain visible while the fourth signal arrives");
+  after.update(0.6);
+  assert.ok(after.clockGhosts.every(({ piece }) => piece.material.opacity === 0));
+  assert.ok(after.clockGhostRays.every((line) => line.material.opacity === 0));
+  assert.ok(after.clockResolvedRays.every((line) => line.material.opacity > 0.8));
+  assert.ok(after.clockReceiver.every((piece) => piece.material.opacity === 1));
   const open = new GnssScene(GNSS_MULTIPATH, { environment: "open" });
   const canyon = new GnssScene(GNSS_MULTIPATH, { environment: "canyon" });
   assert.ok(canyon.pathRatio > 1.2);
