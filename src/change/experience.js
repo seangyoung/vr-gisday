@@ -203,7 +203,9 @@ export class ChangeExperience extends TimedExhibit {
         lensRadius * lensRadius - Math.min(farthestEdge, lensRadius) ** 2)) + 8;
       const innerTop = lensY - lensRadius + inset;
       const innerBottom = lensY + lensRadius - inset - badgeHeight;
-      const badgeY = innerTop >= 8 ? innerTop : Math.min(height - badgeHeight - 8, innerBottom);
+      const badgeY = innerTop >= 8 && innerTop + badgeHeight <= height - 8
+        ? innerTop
+        : Math.max(8, Math.min(height - badgeHeight - 8, innerBottom));
       ctx.save();
       ctx.beginPath();
       ctx.arc(lensX, lensY, lensRadius - 5, 0, Math.PI * 2);

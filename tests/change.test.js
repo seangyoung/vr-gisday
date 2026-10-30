@@ -144,6 +144,13 @@ test("date labels follow the active comparison mode", () => {
   assert.equal(labels[1].font, "bold 19px system-ui");
   assert.ok(Math.abs(labels[1].x - 300) < 1, JSON.stringify(labels));
   assert.ok(labels[1].y > 100 && labels[1].y < 267);
+  for (const v of [0, 1]) {
+    labels.length = 0;
+    exhibit.lens = { u: 0.02, v };
+    exhibit.refresh();
+    assert.ok(labels[1].y >= 8 && labels[1].y <= 667 - 8,
+      `spotlight date should stay on the image at lens v=${v}`);
+  }
 
   labels.length = 0;
   exhibit.comparisonMode = "head-tilt";
