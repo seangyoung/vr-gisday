@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { climbHand, climbPushOff, sampleClimbHand } from "../climb/fling.js";
 
 export const LAYER_KEYS = [
   "topography",
@@ -674,6 +675,8 @@ export class LayerExperience {
     this.treeInteractions = this.constructor === LayerExperience;
     this.treeClimbHands = new Map();
     this.treeClimbTree = null;
+    this.treeFlingVelocity = null;
+    this.treeFlingCandidate = null;
     this.treeClimbHeight = 0;
     this.treeClimbGroundY = 0;
     this.treeClimbLimit = 0;
@@ -841,11 +844,12 @@ export class LayerExperience {
   }
   get isClimbingTree() {
     return this.treeInteractions &&
-      (this.treeClimbHands.size > 0 || this.treeClimbHeight > 0);
+      (this.treeClimbHands.size > 0 || this.treeClimbHeight > 0 ||
+        this.treeFlingVelocity !== null);
   }
   gripTree(id, handWorld) {
     if (!this.treeInteractions || !this.started || this.finished ||
-        !this.selected.has("vegetation")) return false;
+        !this.selected.has("vegetation") || this.treeFlingVelocity) return false;
     const local = this.group.worldToLocal(handWorld.clone());
     const raised = this.selected.has("topography");
     const scaleY = (raised ? this.variants.raised : this.variants.flat).world.scale.y;
@@ -865,15 +869,31 @@ export class LayerExperience {
       const canopyTop = (tree.evergreen ? 4.3 : 3.8) * tree.scale * scaleY;
       this.treeClimbLimit = Math.max(0.5, canopyTop - this.eyeHeight + 0.35);
     }
-    this.treeClimbHands.set(id, handWorld.y);
+    this.treeClimbHands.set(id, climbHand(handWorld));
+    this.treeFlingCandidate = null;
     this.treeFallSpeed = 0;
     this.clipboard.visible = false;
     if (startingClimb) this.onChange();
     return true;
   }
-  releaseTree(id) {
+  releaseTree(id, handWorld = null, allowFling = true) {
+    const hand = this.treeClimbHands.get(id);
+    const anchor = this.treeClimbTree &&
+      new THREE.Vector2(this.treeClimbTree.x, this.treeClimbTree.z);
+    const impulse = allowFling && anchor &&
+      climbPushOff(hand, handWorld, this.group, anchor, this.visitor);
     this.treeClimbHands.delete(id);
-    if (!this.treeClimbHands.size) this.treeFallSpeed = 0;
+    if (impulse && (!this.treeFlingCandidate ||
+        impulse.strength > this.treeFlingCandidate.impulse.strength))
+      this.treeFlingCandidate = { impulse, time: this.elapsed };
+    if (this.treeClimbHands.size) return;
+    const candidate = this.treeFlingCandidate;
+    this.treeFlingCandidate = null;
+    if (allowFling && candidate && this.elapsed - candidate.time < 0.16) {
+      this.treeFlingVelocity = candidate.impulse.horizontal;
+      this.treeFallSpeed = -candidate.impulse.up;
+      this.onEvent("fling");
+    } else this.treeFallSpeed = 0;
   }
   updateTreeClimb(poses, dt, camera) {
     if (!this.treeInteractions || !this.isClimbingTree) return;
@@ -882,25 +902,53 @@ export class LayerExperience {
       return;
     }
     const pulls = [];
-    for (const [id, lastY] of this.treeClimbHands) {
+    for (const [id, hand] of this.treeClimbHands) {
       const matrix = poses.get(id);
       if (!matrix) { this.treeClimbHands.delete(id); continue; }
-      const y = new THREE.Vector3().setFromMatrixPosition(matrix).y;
-      pulls.push(THREE.MathUtils.clamp(lastY - y, -0.22, 0.22));
-      this.treeClimbHands.set(id, y);
+      const position = new THREE.Vector3().setFromMatrixPosition(matrix);
+      pulls.push(sampleClimbHand(hand, position, dt));
+    }
+    if (this.treeFlingVelocity) {
+      const raised = this.selected.has("topography");
+      const scaleY = (raised ? this.variants.raised : this.variants.flat).world.scale.y;
+      const oldGround = this.walkHeightAt(this.visitor.x, this.visitor.y, raised) * scaleY;
+      const desiredX = THREE.MathUtils.clamp(this.visitor.x + this.treeFlingVelocity.x * dt,
+        -extent + 4, extent - 4);
+      const desiredZ = THREE.MathUtils.clamp(this.visitor.y + this.treeFlingVelocity.y * dt,
+        -extent + 4, extent - 4);
+      const next = this.resolveObstacleWalk(this.visitor.x, this.visitor.y,
+        desiredX, desiredZ, raised, scaleY, this.selected.has("roads"));
+      const nextGround = this.walkHeightAt(next.x, next.z, raised) * scaleY;
+      if (nextGround > oldGround + this.treeClimbHeight) {
+        next.x = this.visitor.x;
+        next.z = this.visitor.y;
+        this.treeFlingVelocity.set(0, 0);
+      }
+      const dx = next.x - this.visitor.x, dz = next.z - this.visitor.y;
+      const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
+      this.group.position.x -= c * dx + s * dz;
+      this.group.position.z -= -s * dx + c * dz;
+      this.visitor.set(next.x, next.z);
+      const ground = this.walkHeightAt(next.x, next.z, raised) * scaleY;
+      this.treeClimbHeight = Math.max(0, this.treeClimbHeight + oldGround - ground);
+      this.treeClimbGroundY = this.floorY - ground;
+      this.treeFlingVelocity.multiplyScalar(Math.exp(-1.8 * dt));
+      this.updateVisitorMarkers();
     }
     if (pulls.length) {
       const pull = pulls.reduce((a, b) => Math.abs(b) > Math.abs(a) ? b : a, 0);
       this.treeClimbHeight = THREE.MathUtils.clamp(
         this.treeClimbHeight + pull, 0, this.treeClimbLimit);
       this.treeFallSpeed = 0;
-    } else if (this.treeClimbHeight > 0) {
+    } else if (this.treeClimbHeight > 0 || this.treeFlingVelocity) {
       this.treeFallSpeed = Math.min(14, this.treeFallSpeed + 13 * dt);
       this.treeClimbHeight = Math.max(0,
         this.treeClimbHeight - this.treeFallSpeed * dt);
     }
     this.group.position.y = this.treeClimbGroundY - this.treeClimbHeight;
     if (!this.treeClimbHands.size && this.treeClimbHeight === 0) {
+      this.treeFlingVelocity = null;
+      this.treeFlingCandidate = null;
       this.treeClimbTree = null;
       this.treeFallSpeed = 0;
       this.walk(0, 0, 0, camera);
@@ -910,6 +958,8 @@ export class LayerExperience {
   cancelTreeClimb() {
     if (this.treeClimbTree) this.group.position.y = this.treeClimbGroundY;
     this.treeClimbHands.clear();
+    this.treeFlingVelocity = null;
+    this.treeFlingCandidate = null;
     this.treeClimbTree = null;
     this.treeClimbHeight = 0;
     this.treeFallSpeed = 0;

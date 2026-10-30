@@ -145,6 +145,8 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   )]]), 0.016);
   assert.ok(demo.climbHeight > 0.29, "the second hand continues the climb");
   demo.releaseRung(1);
+  assert.equal(demo.climbFlingVelocity, null,
+    "a downward climb motion alone does not fling");
   for (let i = 0; i < 40; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);
   assert.equal(demo.isClimbing, false);
@@ -183,6 +185,37 @@ test("the tower pole accepts grips between rungs and farther up the climb", () =
   demo.releaseRung(1);
   for (let i = 0; i < 40; i++) demo.updateClimb(new Map(), 0.05);
   assert.equal(demo.climbHeight, 0);
+  demo.dispose();
+});
+
+test("pushing off the pole flings the visitor outward and lands them", () => {
+  const events = [];
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {},
+    (event) => events.push(event));
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
+  demo.group.rotation.y = 0;
+  demo.group.position.set(-(demo.observer.x + 0.7), 0, -demo.observer.z);
+  demo.visitor.set(demo.observer.x + 0.7, demo.observer.z);
+  demo.walk(0, 0, 0, camera);
+  const hand = demo.marker.localToWorld(new THREE.Vector3(0.2, 1.3, 0));
+  assert.equal(demo.gripRung(0, hand), true);
+  const push = hand.clone().add(new THREE.Vector3(-0.13, -0.12, 0));
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(push)]]), 0.016);
+  demo.releaseRung(0, push);
+  assert.ok(demo.climbFlingVelocity?.x > 1.25);
+  assert.ok(events.includes("fling"));
+  const startX = demo.visitor.x;
+  for (let i = 0; i < 120 && demo.isClimbing; i++)
+    demo.updateClimb(new Map(), 0.016);
+  assert.ok(demo.visitor.x > startX + 0.3);
+  assert.equal(demo.climbHeight, 0);
+  assert.equal(demo.isClimbing, false);
+  assert.equal(demo.isAtTop, false);
   demo.dispose();
 });
 

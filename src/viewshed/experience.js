@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { climbHand, climbPushOff, sampleClimbHand } from "../climb/fling.js";
 import {
   LANDSCAPE_EXTENT,
   LayerExperience,
@@ -200,6 +201,8 @@ export class ViewshedExperience extends LayerExperience {
     this.observer = { ...this.sceneChoice.start, height: 2 };
     this.visualHeight = 2;
     this.climbHands = new Map();
+    this.climbFlingVelocity = null;
+    this.climbFlingCandidate = null;
     this.climbHeight = 0;
     this.climbGroundY = 0;
     this.fallSpeed = 0;
@@ -365,7 +368,7 @@ export class ViewshedExperience extends LayerExperience {
   }
   get isClimbing() {
     return this.isZiplining || this.lookoutTransition !== null || this.climbHands.size > 0 ||
-      (this.climbHeight > 0 && !this.topLocked);
+      this.climbFlingVelocity !== null || (this.climbHeight > 0 && !this.topLocked);
   }
   begin() {
     this.marker.visible = true;
@@ -383,7 +386,7 @@ export class ViewshedExperience extends LayerExperience {
     return movement;
   }
   teleportCandidate(raycaster, uiHit = null) {
-    if (this.isZiplining) return null;
+    if (this.isZiplining || this.climbFlingVelocity) return null;
     if (this.started && !this.finished && this.marker.visible &&
         this.marker.userData.lookout.visible && this.visualHeight >= TOWER_HEIGHT - 0.5) {
       this.marker.updateWorldMatrix(true, true);
@@ -454,7 +457,7 @@ export class ViewshedExperience extends LayerExperience {
       Math.hypot(local.x, local.z) < 0.55;
   }
   gripRung(id, handWorld) {
-    if (!this.started || this.finished || this.isZiplining ||
+    if (!this.started || this.finished || this.isZiplining || this.climbFlingVelocity ||
         this.observer.height !== TOWER_HEIGHT ||
         this.lookoutTransition) return false;
     if (this.topLocked) {
@@ -471,19 +474,35 @@ export class ViewshedExperience extends LayerExperience {
     if (!this.nearTowerPole(handWorld) && !this.nearestRung(handWorld)) return false;
     const firstHand = !this.climbHands.size;
     this.topLocked = false;
-    this.climbHands.set(id, handWorld.y);
+    this.climbHands.set(id, climbHand(handWorld));
+    this.climbFlingCandidate = null;
     this.fallSpeed = 0;
     this.clipboard.visible = false;
     this.onEvent("rung");
     if (firstHand) this.onChange();
     return true;
   }
-  releaseRung(id) {
+  releaseRung(id, handWorld = null, allowFling = true) {
     if (this.lookoutTransition?.kind === "return" &&
         this.lookoutTransition.handId === id)
       this.lookoutTransition.released = true;
+    const hand = this.climbHands.get(id);
+    const impulse = allowFling && !this.topLocked && !this.lookoutTransition &&
+      climbPushOff(hand, handWorld, this.group,
+        new THREE.Vector2(this.observer.x, this.observer.z), this.visitor);
     this.climbHands.delete(id);
-    if (!this.climbHands.size && this.climbHeight > 0) this.fallSpeed = 0;
+    if (impulse && (!this.climbFlingCandidate ||
+        impulse.strength > this.climbFlingCandidate.impulse.strength))
+      this.climbFlingCandidate = { impulse, time: this.elapsed };
+    if (this.climbHands.size) return;
+    const candidate = this.climbFlingCandidate;
+    this.climbFlingCandidate = null;
+    if (allowFling && !this.topLocked && !this.lookoutTransition &&
+        candidate && this.elapsed - candidate.time < 0.16) {
+      this.climbFlingVelocity = candidate.impulse.horizontal;
+      this.fallSpeed = -candidate.impulse.up;
+      this.onEvent("fling");
+    } else if (this.climbHeight > 0) this.fallSpeed = 0;
   }
   ziplineEndpoints() {
     return {
@@ -603,6 +622,7 @@ export class ViewshedExperience extends LayerExperience {
       fromSlide: this.lookoutSlide.clone(), toSlide: this.lookoutTarget(),
     };
     this.climbHands.clear();
+    this.climbFlingCandidate = null;
     this.fallSpeed = 0;
     this.clipboard.visible = false;
     this.onChange();
@@ -617,6 +637,7 @@ export class ViewshedExperience extends LayerExperience {
     this.topLocked = false;
     this.topLockReady = false;
     this.climbHands.clear();
+    this.climbFlingCandidate = null;
     this.fallSpeed = 0;
     this.clipboard.visible = false;
     this.marker.userData.lookoutEdge.color.setHex(0xd9bd78);
@@ -627,6 +648,7 @@ export class ViewshedExperience extends LayerExperience {
     this.climbHeight = CLIMB_HEIGHT;
     this.topLocked = true;
     this.climbHands.clear();
+    this.climbFlingCandidate = null;
     this.lookoutGoal.copy(this.lookoutTarget());
     this.marker.userData.lookoutEdge.color.setHex(0x78e4c5);
     this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
@@ -669,9 +691,8 @@ export class ViewshedExperience extends LayerExperience {
       this.marker.userData.lookoutEdge.emissive.setHex(0x1c6654);
       this.onEvent("platform");
     } else if (!transition.released && poses.has(transition.handId)) {
-      const handY = new THREE.Vector3().setFromMatrixPosition(
-        poses.get(transition.handId)).y;
-      this.climbHands.set(transition.handId, handY);
+      this.climbHands.set(transition.handId, climbHand(
+        new THREE.Vector3().setFromMatrixPosition(poses.get(transition.handId))));
     }
     this.onChange();
   }
@@ -686,15 +707,36 @@ export class ViewshedExperience extends LayerExperience {
       return;
     }
     const deltas = [];
-    for (const [id, lastY] of this.climbHands) {
+    for (const [id, hand] of this.climbHands) {
       const matrix = poses.get(id);
       if (!matrix) {
         this.climbHands.delete(id);
         continue;
       }
-      const y = new THREE.Vector3().setFromMatrixPosition(matrix).y;
-      deltas.push(THREE.MathUtils.clamp(lastY - y, -0.22, 0.22));
-      this.climbHands.set(id, y);
+      const position = new THREE.Vector3().setFromMatrixPosition(matrix);
+      deltas.push(sampleClimbHand(hand, position, dt));
+    }
+    if (this.climbFlingVelocity) {
+      const oldGround = this.sceneChoice.heightAt(this.visitor.x, this.visitor.y);
+      let nextX = THREE.MathUtils.clamp(this.visitor.x + this.climbFlingVelocity.x * dt,
+        -LANDSCAPE_EXTENT + 4, LANDSCAPE_EXTENT - 4);
+      let nextZ = THREE.MathUtils.clamp(this.visitor.y + this.climbFlingVelocity.y * dt,
+        -LANDSCAPE_EXTENT + 4, LANDSCAPE_EXTENT - 4);
+      if (this.sceneChoice.heightAt(nextX, nextZ) > oldGround + this.climbHeight) {
+        nextX = this.visitor.x;
+        nextZ = this.visitor.y;
+        this.climbFlingVelocity.set(0, 0);
+      }
+      const dx = nextX - this.visitor.x, dz = nextZ - this.visitor.y;
+      const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
+      this.group.position.x -= c * dx + s * dz;
+      this.group.position.z -= -s * dx + c * dz;
+      this.visitor.set(nextX, nextZ);
+      const ground = this.sceneChoice.heightAt(nextX, nextZ);
+      this.climbHeight = Math.max(0, this.climbHeight + oldGround - ground);
+      this.climbGroundY = this.floorY - ground;
+      this.climbFlingVelocity.multiplyScalar(Math.exp(-1.8 * dt));
+      this.updateVisitorMarkers();
     }
     if (deltas.length) {
       // The hand with the strongest pull drives the climb; the other may hold steady.
@@ -707,10 +749,11 @@ export class ViewshedExperience extends LayerExperience {
         this.onEvent("platform");
         this.onChange();
       }
-    } else if (this.climbHeight > 0 && !this.topLocked) {
+    } else if ((this.climbHeight > 0 || this.climbFlingVelocity) && !this.topLocked) {
       this.fallSpeed = Math.min(14, this.fallSpeed + 13 * dt);
       this.climbHeight = Math.max(0, this.climbHeight - this.fallSpeed * dt);
       if (this.climbHeight === 0) {
+        this.climbFlingVelocity = null;
         this.fallSpeed = 0;
         this.onChange();
       }
@@ -719,6 +762,8 @@ export class ViewshedExperience extends LayerExperience {
     this.updateLookout(dt);
   }
   cancelClimb() {
+    this.climbFlingVelocity = null;
+    this.climbFlingCandidate = null;
     if (this.isZiplining) {
       this.zipline = null;
       this.ziplineGrips.clear();

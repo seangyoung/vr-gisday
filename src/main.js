@@ -776,7 +776,8 @@ function startLayers() {
   pixels?.dispose();
   pixels = null;
   layers?.dispose();
-  layers = new LayerExperience(scene, draw, (event) => sound.cue(event));
+  layers = new LayerExperience(scene, draw,
+    (event) => event === "fling" ? sound.whoosh() : sound.cue(event));
   layers.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -794,6 +795,7 @@ function startViewshed() {
   viewshed = new ViewshedExperience(scene, draw, (event) => {
     if (["rung", "platform"].includes(event)) sound.climb(event);
     else if (event === "zipline-land") sound.ziplineLand();
+    else if (event === "fling") sound.whoosh();
     else sound.cue(event);
   });
   viewshed.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
@@ -810,7 +812,8 @@ function startPixels() {
   viewshed?.dispose();
   viewshed = null;
   pixels?.dispose();
-  pixels = new PixelExperience(scene, draw, (event) => sound.cue(event), root);
+  pixels = new PixelExperience(scene, draw,
+    (event) => event === "fling" ? sound.whoosh() : sound.cue(event), root);
   pixels.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
@@ -2381,7 +2384,8 @@ function controllerGuideContext(hand) {
   if (viewshed?.started && !viewshed.finished)
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
       viewshed.isZiplining ? null :
-      viewshed.isAtTop ? "Grip pole" : "Grip pole / rim", onMenu,
+      viewshed.isAtTop ? "Grip pole" :
+      viewshed.climbHands.size ? "Push + release" : "Grip pole / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
     return ["Select / spin", null, onMenu, exitLabel];
@@ -2389,7 +2393,7 @@ function controllerGuideContext(hand) {
       (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
     return [hand === "left" ? null : "Select",
       treeLandscape()?.treeInteractions && treeLandscape().selected.has("vegetation")
-        ? "Climb trunk" : null,
+        ? treeLandscape().treeClimbHands.size ? "Push + release" : "Climb trunk" : null,
       onMenu, exitLabel, treeLandscape()?.isClimbingTree ? null : teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
@@ -2963,9 +2967,11 @@ for (let i = 0; i < 2; i++) {
     }
   });
   c.addEventListener("squeezeend", () => {
-    viewshed?.releaseRung(i);
+    if (grip.visible) grip.updateWorldMatrix(true, false);
+    const handWorld = grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null;
+    viewshed?.releaseRung(i, handWorld);
     viewshed?.releaseZiplineGrip(i);
-    treeLandscape()?.releaseTree(i);
+    treeLandscape()?.releaseTree(i, handWorld);
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -2975,9 +2981,9 @@ for (let i = 0; i < 2; i++) {
   });
   c.addEventListener("disconnected", () => {
     if (c.userData.xrInput?.handedness === "right") teleport.cancel();
-    viewshed?.releaseRung(i);
+    viewshed?.releaseRung(i, null, false);
     viewshed?.releaseZiplineGrip(i);
-    treeLandscape()?.releaseTree(i);
+    treeLandscape()?.releaseTree(i, null, false);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
     guide.setHandedness("none");

@@ -219,10 +219,79 @@ test("tree trunks stop walking and teleport while grip pulls the visitor above t
   assert.ok(l.treeClimbHeight > 0.3,
     "the second hand keeps climbing after the first releases");
   l.releaseTree(1);
+  assert.equal(l.treeFlingVelocity, null, "a downward climb motion alone does not fling");
   for (let i = 0; i < 30; i++) l.updateTreeClimb(new Map(), 0.05, camera);
   assert.equal(l.treeClimbHeight, 0);
   assert.equal(l.isClimbingTree, false);
   l.dispose();
+});
+
+test("a deliberate push from a tree launches both landscape visitors away", () => {
+  for (const Experience of [LayerExperience, PixelExperience]) {
+    const events = [];
+    const demo = new Experience(new THREE.Scene(), () => {},
+      (event) => events.push(event));
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.6, 0);
+    demo.place(camera);
+    demo.begin();
+    if (demo instanceof PixelExperience) demo.showPixels();
+    demo.selected = new Set(["topography", "vegetation"]);
+    demo.applyVisibility();
+    const tree = TREE_POSITIONS[0];
+    demo.group.rotation.y = 0;
+    demo.group.position.set(-(tree.x + 0.7), 0, -tree.z);
+    demo.visitor.set(tree.x + 0.7, tree.z);
+    demo.walk(0, 0, 0, camera);
+    const hand = demo.group.localToWorld(new THREE.Vector3(
+      tree.x + 0.2, landscapeHeight(tree.x, tree.z) + 1.2, tree.z));
+    assert.equal(demo.gripTree(0, hand), true);
+    const push = hand.clone().add(new THREE.Vector3(-0.13, -0.12, 0));
+    demo.updateTreeClimb(new Map([[0, new THREE.Matrix4().setPosition(push)]]),
+      0.016, camera);
+    demo.releaseTree(0, push);
+    assert.ok(demo.treeFlingVelocity?.x > 1.25,
+      `${Experience.name}: the push produces outward motion`);
+    assert.ok(events.includes("fling"));
+    const startX = demo.visitor.x;
+    for (let i = 0; i < 120 && demo.isClimbingTree; i++)
+      demo.updateTreeClimb(new Map(), 0.016, camera);
+    assert.ok(demo.visitor.x > startX + 0.3,
+      `${Experience.name}: the visitor travels away from the trunk`);
+    assert.equal(demo.isClimbingTree, false);
+    assert.equal(demo.treeClimbHeight, 0);
+    demo.dispose();
+  }
+});
+
+test("a two-hand tree push launches when the second grip releases", () => {
+  const demo = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  demo.selected = new Set(["topography", "vegetation"]);
+  demo.applyVisibility();
+  const tree = TREE_POSITIONS[0];
+  demo.group.rotation.y = 0;
+  demo.group.position.set(-(tree.x + 0.7), 0, -tree.z);
+  demo.visitor.set(tree.x + 0.7, tree.z);
+  demo.walk(0, 0, 0, camera);
+  const hand = demo.group.localToWorld(new THREE.Vector3(
+    tree.x + 0.2, landscapeHeight(tree.x, tree.z) + 1.2, tree.z));
+  assert.equal(demo.gripTree(0, hand), true);
+  assert.equal(demo.gripTree(1, hand.clone().add(new THREE.Vector3(0, 0.12, 0))), true);
+  const push = hand.clone().add(new THREE.Vector3(-0.13, -0.12, 0));
+  demo.updateTreeClimb(new Map([
+    [0, new THREE.Matrix4().setPosition(push)],
+    [1, new THREE.Matrix4().setPosition(hand.clone().add(new THREE.Vector3(0, 0.12, 0)))],
+  ]), 0.016, camera);
+  demo.releaseTree(0, push);
+  assert.equal(demo.treeFlingVelocity, null, "one held grip prevents launch");
+  demo.releaseTree(1);
+  assert.ok(demo.treeFlingVelocity?.x > 1.25);
+  demo.cancelTreeClimb();
+  demo.dispose();
 });
 
 test("walking detects river water below a bridge and dry road on its deck", () => {
