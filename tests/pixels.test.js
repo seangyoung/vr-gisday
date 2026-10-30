@@ -5,7 +5,7 @@ import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "../src/pi
 import { PixelExperience } from "../src/pixels/experience.js";
 import { PixelFlyover, flyoverForSize } from "../src/pixels/flyover.js";
 import { PIXEL_WORLD_EXTENT, pixelLandscapeTexture } from "../src/pixels/landscape.js";
-import { landscapeHeight } from "../src/layers/experience.js";
+import { TREE_POSITIONS, landscapeHeight } from "../src/layers/experience.js";
 
 test("pixel size changes ground area while retaining the same source landscape", () => {
   const model = new PixelModel();
@@ -144,6 +144,41 @@ test("clipboard view switch keeps flyovers and footprints in the detailed landsc
   assert.equal(demo.pixelWorld.visible, false);
   demo.dispose();
   assert.equal(scene.children.length, 0);
+});
+
+test("pixel landscape trees climb in detailed view and release to fall", () => {
+  const demo = new PixelExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  assert.equal(demo.treeInteractions, false, "platform introduction has no invisible trunks");
+  demo.showPixels();
+  assert.equal(demo.treeInteractions, true);
+  const tree = TREE_POSITIONS[0];
+  const ground = landscapeHeight(tree.x, tree.z);
+  const hand = demo.group.localToWorld(new THREE.Vector3(
+    tree.x, ground + 1.15, tree.z + 0.25));
+  assert.equal(demo.gripTree(0, hand), true);
+  const pose = new THREE.Matrix4().makeTranslation(hand.x, hand.y - 0.2, hand.z);
+  demo.updateTreeClimb(new Map([[0, pose]]), 0.016, camera);
+  assert.ok(demo.treeClimbHeight > 0.15);
+  assert.equal(demo.walk(0, -1, 0.1, camera).distance, 0);
+  demo.releaseTree(0);
+  for (let i = 0; i < 30; i++) demo.updateTreeClimb(new Map(), 0.05, camera);
+  assert.equal(demo.isClimbingTree, false);
+  assert.equal(demo.treeClimbHeight, 0);
+
+  assert.equal(demo.gripTree(0, hand), true);
+  demo.setViewMode("pixelated", camera);
+  assert.equal(demo.isClimbingTree, false);
+  assert.equal(demo.treeInteractions, false);
+  assert.equal(demo.gripTree(0, hand), false, "pixelated view has no visible trees");
+  demo.setViewMode("footprint", camera);
+  assert.equal(demo.gripTree(0, hand), true);
+  demo.reset();
+  assert.equal(demo.isClimbingTree, false);
+  demo.dispose();
 });
 
 test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {

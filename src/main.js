@@ -161,6 +161,7 @@ let soundBackgroundSaved = false;
 const isSpatial = () => step >= 4 && step < GNSS_SPATIAL_END;
 const isGnssObject = () => step >= GNSS_SATELLITE && step <= GNSS_MULTIPATH;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase && !quiz;
+const treeLandscape = () => layers ?? (pixels?.phase === "pixels" ? pixels : null);
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clearGnssPopup() {
   if (!gnssPopup) return;
@@ -538,7 +539,7 @@ function toggleSoundMenu() {
   quiz?.pauseForAudio();
   grab?.cancel();
   if (viewshed?.isClimbing && !viewshed.isZiplining) viewshed.cancelClimb();
-  if (layers?.isClimbingTree) layers.cancelTreeClimb();
+  if (treeLandscape()?.isClimbingTree) treeLandscape().cancelTreeClimb();
   const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
   const eye = cam.getWorldPosition(new THREE.Vector3());
   const forward = cam.getWorldDirection(new THREE.Vector3());
@@ -2387,8 +2388,9 @@ function controllerGuideContext(hand) {
   if ((layers?.started && !layers.finished) ||
       (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
     return [hand === "left" ? null : "Select",
-      layers?.selected.has("vegetation") ? "Climb trunk" : null,
-      onMenu, exitLabel, layers?.isClimbingTree ? null : teleportHint];
+      treeLandscape()?.treeInteractions && treeLandscape().selected.has("vegetation")
+        ? "Climb trunk" : null,
+      onMenu, exitLabel, treeLandscape()?.isClimbingTree ? null : teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     showcase.kind === "projection" ? "Grab land" :
@@ -2883,9 +2885,9 @@ for (let i = 0; i < 2; i++) {
         return;
       }
     }
-    if (layers?.started && grip.visible) {
+    if (treeLandscape()?.started && grip.visible) {
       grip.updateWorldMatrix(true, false);
-      if (layers.gripTree(i, grip.getWorldPosition(new THREE.Vector3()))) {
+      if (treeLandscape().gripTree(i, grip.getWorldPosition(new THREE.Vector3()))) {
         sound.climb("tree");
         return;
       }
@@ -2963,7 +2965,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("squeezeend", () => {
     viewshed?.releaseRung(i);
     viewshed?.releaseZiplineGrip(i);
-    layers?.releaseTree(i);
+    treeLandscape()?.releaseTree(i);
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
@@ -2975,7 +2977,7 @@ for (let i = 0; i < 2; i++) {
     if (c.userData.xrInput?.handedness === "right") teleport.cancel();
     viewshed?.releaseRung(i);
     viewshed?.releaseZiplineGrip(i);
-    layers?.releaseTree(i);
+    treeLandscape()?.releaseTree(i);
     if (scan?.room) scan.releaseInput(c.userData.xrInput);
     c.userData.xrInput = null;
     guide.setHandedness("none");
@@ -3245,7 +3247,7 @@ renderer.setAnimationLoop((time, frame) => {
       const rightY = gamepad?.mapping === "xr-standard" ? gamepad.axes[3] ?? 0 : 0;
       const canTeleport = visible && !soundMenuOpen && landscapeDemo.started &&
         !landscapeDemo.finished && !viewshed?.isClimbing && !viewshed?.isAtTop &&
-        !layers?.isClimbingTree &&
+        !treeLandscape()?.isClimbingTree &&
         right?.c.visible && right?.grip.visible && gamepad?.mapping === "xr-standard";
       if (teleport.active && (!canTeleport || teleport.demo !== landscapeDemo)) {
         teleport.cancel();
@@ -3278,7 +3280,7 @@ renderer.setAnimationLoop((time, frame) => {
           teleportHandled = true;
         }
       }
-      if (viewshed?.isClimbing || layers?.isClimbingTree) rightTurnReady = false;
+      if (viewshed?.isClimbing || treeLandscape()?.isClimbingTree) rightTurnReady = false;
       else if (!teleportHandled && !teleport.active) {
         if (Math.abs(rightX) < 0.3) rightTurnReady = true;
         else if (rightTurnReady && Math.abs(rightX) > 0.7) {
@@ -3366,7 +3368,7 @@ renderer.setAnimationLoop((time, frame) => {
     if (renderer.xr.getSession().visibilityState === "visible") {
       viewshed?.updateClimb(poses, dt);
       if (!soundMenuOpen) viewshed?.updateZipline(dt, renderer.xr.getCamera());
-      layers?.updateTreeClimb(poses, dt, renderer.xr.getCamera());
+      treeLandscape()?.updateTreeClimb(poses, dt, renderer.xr.getCamera());
       grab?.update(poses, dt);
       rain?.grab.update(poses, dt);
       scan?.grab.update(poses, dt);
@@ -3390,7 +3392,7 @@ renderer.setAnimationLoop((time, frame) => {
             renderer.xr.getCamera());
         }
     } else {
-      layers?.cancelTreeClimb();
+      treeLandscape()?.cancelTreeClimb();
       grab?.cancel();
       rain?.grab.cancel();
       scan?.grab.cancel();

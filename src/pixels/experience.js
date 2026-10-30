@@ -90,6 +90,8 @@ export class PixelExperience extends LayerExperience {
   constructor(scene, onChange, onEvent = () => {}, platformParent = scene) {
     super(scene, onChange);
     this.phase = "platforms";
+    // Trees are climbable only while the detailed landscape is visible.
+    this.treeInteractions = false;
     this.landscapeBackground = scene.background;
     this.landscapeFog = scene.fog;
     scene.background = this.previousBackground;
@@ -122,6 +124,7 @@ export class PixelExperience extends LayerExperience {
   showPixels() {
     if (!this.started || this.finished || this.phase !== "platforms") return;
     this.phase = "pixels";
+    this.treeInteractions = this.viewMode === "footprint";
     this.platformScene.hide();
     this.group.visible = true;
     this.scene.background = this.landscapeBackground;
@@ -190,8 +193,10 @@ export class PixelExperience extends LayerExperience {
   setViewMode(mode, camera = null) {
     if (!this.started || this.finished || this.phase !== "pixels" ||
         !["footprint", "pixelated"].includes(mode) || this.viewMode === mode) return;
+    if (mode === "pixelated") this.cancelTreeClimb();
     if (mode === "pixelated") this.showPixelTexture();
     this.viewMode = mode;
+    this.treeInteractions = mode === "footprint";
     this.selected = new Set(mode === "footprint"
       ? ["topography", "vegetation", "hydrology", "roads"]
       : ["topography"]);
@@ -264,12 +269,14 @@ export class PixelExperience extends LayerExperience {
     return true;
   }
   reset() {
+    this.cancelTreeClimb();
     this.elapsed = 0;
     this.finished = false;
     this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
     this.viewMode = "footprint";
+    this.treeInteractions = this.phase === "pixels";
     this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
     this.applyVisibility();
     this.ground.raised.visible = true;
