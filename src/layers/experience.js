@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { climbHand, climbPushOff, sampleClimbHand } from "../climb/fling.js";
+import { climbHand, climbPushOff, combineClimbPushOff,
+  sampleClimbHand } from "../climb/fling.js";
 
 export const LAYER_KEYS = [
   "topography",
@@ -876,16 +877,20 @@ export class LayerExperience {
     if (startingClimb) this.onChange();
     return true;
   }
-  releaseTree(id, handWorld = null, allowFling = true) {
+  releaseTree(id, handWorld = null, allowFling = true, eyeWorld = null) {
     const hand = this.treeClimbHands.get(id);
     const anchor = this.treeClimbTree &&
       new THREE.Vector2(this.treeClimbTree.x, this.treeClimbTree.z);
     const impulse = allowFling && anchor &&
-      climbPushOff(hand, handWorld, this.group, anchor, this.visitor);
+      climbPushOff(hand, handWorld, this.group, anchor, this.visitor, eyeWorld);
     this.treeClimbHands.delete(id);
-    if (impulse && (!this.treeFlingCandidate ||
-        impulse.strength > this.treeFlingCandidate.impulse.strength))
-      this.treeFlingCandidate = { impulse, time: this.elapsed };
+    if (impulse) this.treeFlingCandidate = {
+      impulse: this.treeFlingCandidate &&
+        this.elapsed - this.treeFlingCandidate.time < 0.16
+        ? combineClimbPushOff(this.treeFlingCandidate.impulse, impulse)
+        : impulse,
+      time: this.elapsed,
+    };
     if (this.treeClimbHands.size) return;
     const candidate = this.treeFlingCandidate;
     this.treeFlingCandidate = null;

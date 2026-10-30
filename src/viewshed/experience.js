@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { climbHand, climbPushOff, sampleClimbHand } from "../climb/fling.js";
+import { climbHand, climbPushOff, combineClimbPushOff,
+  sampleClimbHand } from "../climb/fling.js";
 import {
   LANDSCAPE_EXTENT,
   LayerExperience,
@@ -482,18 +483,22 @@ export class ViewshedExperience extends LayerExperience {
     if (firstHand) this.onChange();
     return true;
   }
-  releaseRung(id, handWorld = null, allowFling = true) {
+  releaseRung(id, handWorld = null, allowFling = true, eyeWorld = null) {
     if (this.lookoutTransition?.kind === "return" &&
         this.lookoutTransition.handId === id)
       this.lookoutTransition.released = true;
     const hand = this.climbHands.get(id);
     const impulse = allowFling && !this.topLocked && !this.lookoutTransition &&
       climbPushOff(hand, handWorld, this.group,
-        new THREE.Vector2(this.observer.x, this.observer.z), this.visitor);
+        new THREE.Vector2(this.observer.x, this.observer.z), this.visitor, eyeWorld);
     this.climbHands.delete(id);
-    if (impulse && (!this.climbFlingCandidate ||
-        impulse.strength > this.climbFlingCandidate.impulse.strength))
-      this.climbFlingCandidate = { impulse, time: this.elapsed };
+    if (impulse) this.climbFlingCandidate = {
+      impulse: this.climbFlingCandidate &&
+        this.elapsed - this.climbFlingCandidate.time < 0.16
+        ? combineClimbPushOff(this.climbFlingCandidate.impulse, impulse)
+        : impulse,
+      time: this.elapsed,
+    };
     if (this.climbHands.size) return;
     const candidate = this.climbFlingCandidate;
     this.climbFlingCandidate = null;

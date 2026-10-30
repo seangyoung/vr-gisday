@@ -2969,9 +2969,10 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("squeezeend", () => {
     if (grip.visible) grip.updateWorldMatrix(true, false);
     const handWorld = grip.visible ? grip.getWorldPosition(new THREE.Vector3()) : null;
-    viewshed?.releaseRung(i, handWorld);
+    const eyeWorld = renderer.xr.getCamera().getWorldPosition(new THREE.Vector3());
+    viewshed?.releaseRung(i, handWorld, true, eyeWorld);
     viewshed?.releaseZiplineGrip(i);
-    treeLandscape()?.releaseTree(i, handWorld);
+    treeLandscape()?.releaseTree(i, handWorld, true, eyeWorld);
     grab?.release(i);
     scan?.grab.release(i);
     rain?.grab.release(i);
