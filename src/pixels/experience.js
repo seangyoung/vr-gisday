@@ -14,6 +14,7 @@ import { PIXEL_WORLD_EXTENT, makePixelLandscape,
   pixelLandscapeTexture } from "./landscape.js";
 
 const gold = 0xffd36f;
+const START_PIXEL_SIZE = 2;
 const clamp = (value) => THREE.MathUtils.clamp(value, -PIXEL_EXTENT + 0.001, PIXEL_EXTENT - 0.001);
 
 function surfaceY(x, z) {
@@ -109,7 +110,7 @@ export class PixelExperience extends LayerExperience {
     this.pixelWorld = null;
     this.pixelWorldModel = null;
     this.pixelTextures = new Map();
-    this.size = 30;
+    this.size = START_PIXEL_SIZE;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
     this.footprintAge = 1;
@@ -272,7 +273,7 @@ export class PixelExperience extends LayerExperience {
     this.cancelTreeClimb();
     this.elapsed = 0;
     this.finished = false;
-    this.size = 30;
+    this.size = START_PIXEL_SIZE;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
     this.viewMode = "footprint";

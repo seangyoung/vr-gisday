@@ -192,7 +192,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.equal(demo.finished, false);
   assert.equal(demo.elapsed, 0);
   demo.setSize(0.5);
-  assert.equal(demo.size, 30);
+  assert.equal(demo.size, 2);
   demo.begin();
   assert.equal(demo.started, true);
   assert.equal(demo.phase, "platforms");
@@ -208,9 +208,9 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   assert.equal(demo.hidesWorldUI, false);
   demo.clipboard.visible = false;
   assert.equal(demo.group.visible, true);
-  assert.equal(demo.flyover.config.kind, "satellite");
+  assert.equal(demo.flyover.config.kind, "aircraft");
   assert.equal(demo.platformScene.group.visible, false);
-  assert.equal(demo.size, 30);
+  assert.equal(demo.size, 2);
   assert.equal(demo.selected.has("topography"), true);
   assert.equal(demo.selected.has("floodplain"), false);
   assert.ok(demo.pickGround.geometry.attributes.position.count < demo.ground.raised.geometry.attributes.position.count / 10);
@@ -242,7 +242,7 @@ test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
   demo.reset();
   assert.equal(demo.finished, false);
   assert.equal(demo.started, true);
-  assert.equal(demo.size, 30);
+  assert.equal(demo.size, 2);
   assert.deepEqual(demo.probe, { x: 0, z: -3 });
   assert.equal(demo.answer, null);
   demo.finish();
