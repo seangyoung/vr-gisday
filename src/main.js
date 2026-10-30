@@ -2385,7 +2385,7 @@ function controllerGuideContext(hand) {
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
       viewshed.isZiplining ? null :
       viewshed.isAtTop ? "Grip pole" :
-      viewshed.climbHands.size ? "Push + release" : "Grip pole / rim", onMenu,
+      viewshed.climbHands.size ? "Flick + release" : "Grip pole / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
     return ["Select / spin", null, onMenu, exitLabel];
@@ -2393,7 +2393,7 @@ function controllerGuideContext(hand) {
       (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
     return [hand === "left" ? null : "Select",
       treeLandscape()?.treeInteractions && treeLandscape().selected.has("vegetation")
-        ? treeLandscape().treeClimbHands.size ? "Push + release" : "Climb trunk" : null,
+        ? treeLandscape().treeClimbHands.size ? "Flick + release" : "Climb trunk" : null,
       onMenu, exitLabel, treeLandscape()?.isClimbingTree ? null : teleportHint];
   if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",

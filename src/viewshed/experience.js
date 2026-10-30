@@ -735,7 +735,7 @@ export class ViewshedExperience extends LayerExperience {
       const ground = this.sceneChoice.heightAt(nextX, nextZ);
       this.climbHeight = Math.max(0, this.climbHeight + oldGround - ground);
       this.climbGroundY = this.floorY - ground;
-      this.climbFlingVelocity.multiplyScalar(Math.exp(-1.8 * dt));
+      this.climbFlingVelocity.multiplyScalar(Math.exp(-1.3 * dt));
       this.updateVisitorMarkers();
     }
     if (deltas.length) {

@@ -246,7 +246,7 @@ test("a deliberate push from a tree launches both landscape visitors away", () =
     const hand = demo.group.localToWorld(new THREE.Vector3(
       tree.x + 0.2, landscapeHeight(tree.x, tree.z) + 1.2, tree.z));
     assert.equal(demo.gripTree(0, hand), true);
-    const push = hand.clone().add(new THREE.Vector3(-0.13, -0.12, 0));
+    const push = hand.clone().add(new THREE.Vector3(0.13, -0.12, 0));
     demo.updateTreeClimb(new Map([[0, new THREE.Matrix4().setPosition(push)]]),
       0.016, camera);
     demo.releaseTree(0, push);

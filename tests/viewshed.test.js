@@ -204,7 +204,7 @@ test("pushing off the pole flings the visitor outward and lands them", () => {
   demo.walk(0, 0, 0, camera);
   const hand = demo.marker.localToWorld(new THREE.Vector3(0.2, 1.3, 0));
   assert.equal(demo.gripRung(0, hand), true);
-  const push = hand.clone().add(new THREE.Vector3(-0.13, -0.12, 0));
+  const push = hand.clone().add(new THREE.Vector3(0.13, -0.12, 0));
   demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(push)]]), 0.016);
   demo.releaseRung(0, push);
   assert.ok(demo.climbFlingVelocity?.x > 1.25);

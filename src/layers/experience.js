@@ -932,7 +932,7 @@ export class LayerExperience {
       const ground = this.walkHeightAt(next.x, next.z, raised) * scaleY;
       this.treeClimbHeight = Math.max(0, this.treeClimbHeight + oldGround - ground);
       this.treeClimbGroundY = this.floorY - ground;
-      this.treeFlingVelocity.multiplyScalar(Math.exp(-1.8 * dt));
+      this.treeFlingVelocity.multiplyScalar(Math.exp(-1.3 * dt));
       this.updateVisitorMarkers();
     }
     if (pulls.length) {
