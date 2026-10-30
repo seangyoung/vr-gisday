@@ -333,6 +333,54 @@ test("walking and room-scale movement stop at the solid approach from below", ()
   l.dispose();
 });
 
+test("bridge supports block walking and ground teleport in layers and pixels", () => {
+  for (const Experience of [LayerExperience, PixelExperience]) {
+    const demo = new Experience(new THREE.Scene(), () => {});
+    const camera = new THREE.PerspectiveCamera();
+    camera.position.set(0, 1.6, 0);
+    demo.place(camera);
+    demo.begin();
+    if (demo instanceof PixelExperience) demo.showPixels();
+    demo.selected = new Set(["topography", "roads"]);
+    demo.applyVisibility();
+    demo.group.rotation.y = 0;
+    const supports = demo.variants.raised.roads.children.filter(
+      (mesh) => mesh.userData.role === "bridge-support");
+    assert.equal(supports.length, 6);
+    const support = supports.find(({ position }) =>
+      Math.abs(position.x - riverX(highwayZ(0))) < 0.01 &&
+      position.z > highwayZ(position.x));
+    assert.ok(support);
+    const x = support.position.x, z = support.position.z;
+    demo.group.position.set(-x, 0, -(z + 1.2));
+    demo.walk(0, 0, 0.02, camera);
+    for (let i = 0; i < 20; i++) demo.walk(0, -1, 0.05, camera);
+    assert.ok(demo.visitor.y >= z + 0.62,
+      `${Experience.name}: stick walking stopped before the pillar`);
+    const stopped = demo.visitor.y;
+    camera.position.z -= 1;
+    demo.walk(0, 0, 0.05, camera);
+    assert.ok(Math.abs(demo.visitor.y - stopped) < 0.02,
+      `${Experience.name}: room-scale movement also stops`);
+    camera.position.z = 0;
+
+    const ray = new THREE.Raycaster(
+      demo.group.localToWorld(new THREE.Vector3(x, 1.5, z)),
+      new THREE.Vector3(0, -1, 0));
+    assert.equal(demo.teleportCandidate(ray)?.valid, false,
+      `${Experience.name}: landing inside the pillar is rejected`);
+    assert.equal(demo.bridgeSupportPointClear(x, z + 1.2), true);
+
+    demo.onRoad = true;
+    demo.group.position.set(-x, 0, -z);
+    demo.walk(0, 0, 0, camera);
+    assert.equal(demo.onRoad, true);
+    assert.equal(demo.bridgeSupportPointClear(x, z), true,
+      "the support does not block the deck above it");
+    demo.dispose();
+  }
+});
+
 test("walking reaches the bridge from the road but stays below it from the river", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();
@@ -370,11 +418,13 @@ test("walking reaches the bridge from the road but stays below it from the river
   assert.equal(l.onRoad, true);
   l.place(camera);
   l.group.rotation.y = 0;
-  l.group.position.set(-crossing, 0, -(highwayZ(crossing) - 12));
+  // Pass through the open gap between the two rows of supports.
+  const underpassX = crossing + 3.5;
+  l.group.position.set(-underpassX, 0, -(highwayZ(underpassX) - 12));
   let passedUnder = false;
   for (let i = 0; i < 175; i++) {
     l.walk(0, 1, 0.05, camera);
-    if (!passedUnder && l.visitor.y >= highwayZ(crossing)) {
+    if (!passedUnder && l.visitor.y >= highwayZ(underpassX)) {
       passedUnder = true;
       assert.equal(l.onRoad, false);
       assert.ok(Math.abs(l.group.position.y +

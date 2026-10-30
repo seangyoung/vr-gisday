@@ -38,6 +38,8 @@ const BRIDGE_ACCESS_STEP = 0.55;
 const BRIDGE_HALF_LENGTH = 16;
 const BRIDGE_SLAB_DEPTH = 0.48;
 const BRIDGE_HEAD_CLEARANCE = 0.12;
+const BRIDGE_SUPPORT_RADIUS = 0.42;
+const VISITOR_SUPPORT_RADIUS = 0.22;
 const topographicHeight = (x, z) => {
   const fromRiver = Math.abs(x - riverX(z));
   const floor = riverWaterHeight(z) - 0.26;
@@ -325,6 +327,24 @@ export function highwayDeckHeight(x, raised = true) {
   const overlap = Math.max(0, transition - Math.abs(ground - bridgeTop));
   return Math.max(ground, bridgeTop) + overlap * overlap / (4 * transition);
 }
+const bridgeSupportCache = new Map();
+function bridgeSupports(raised) {
+  if (!bridgeSupportCache.has(raised)) {
+    const crossing = riverX(highwayZ(0));
+    const supports = [];
+    for (const offset of [-7, 0, 7]) {
+      const x = crossing + offset;
+      const deck = highwayDeckHeight(x, raised);
+      for (const side of [-4.5, 4.5]) {
+        const z = highwayZ(x) + side;
+        const ground = landscapeHeight(x, z, raised);
+        if (deck - ground >= 0.5) supports.push({ x, z, ground, deck });
+      }
+    }
+    bridgeSupportCache.set(raised, supports);
+  }
+  return bridgeSupportCache.get(raised);
+}
 function shoulderWidthAt(x) {
   const fromBridge = Math.abs(x - riverX(highwayZ(x)));
   const t = THREE.MathUtils.smoothstep(fromBridge, 16, 26);
@@ -571,20 +591,14 @@ function makeRoads(group, raised) {
       new THREE.MeshStandardMaterial({ color: 0xd1d7d5, metalness: 0.4, roughness: 0.48 }),
     ));
   }
-  for (const offset of [-7, 0, 7]) {
-    const x = crossing + offset;
-    const z = highwayZ(x);
-    const ground = landscapeHeight(x, z, raised);
-    const deck = highwayDeckHeight(x, raised);
-    if (deck - ground < 0.5) continue;
-    for (const side of [-4.5, 4.5]) {
-      const support = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.33, 0.42, deck - ground, 8),
-        new THREE.MeshStandardMaterial({ color: 0xa7a9a1, roughness: 0.95 }),
-      );
-      support.position.set(x, (ground + deck) / 2, z + side);
-      group.add(support);
-    }
+  for (const { x, z, ground, deck } of bridgeSupports(raised)) {
+    const support = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.33, BRIDGE_SUPPORT_RADIUS, deck - ground, 8),
+      new THREE.MeshStandardMaterial({ color: 0xa7a9a1, roughness: 0.95 }),
+    );
+    support.userData.role = "bridge-support";
+    support.position.set(x, (ground + deck) / 2, z);
+    group.add(support);
   }
 }
 function makeFloodplain(group, raised) {
@@ -786,8 +800,30 @@ export class LayerExperience {
     }
     return true;
   }
-  resolveTreeWalk(startX, startZ, desiredX, desiredZ) {
-    if (!this.treeInteractions || !this.selected.has("vegetation"))
+  bridgeSupportPointClear(x, z, fromX = null, fromZ = null,
+    raised = true, scaleY = 1, onRoad = this.onRoad) {
+    if (onRoad || !this.selected.has("roads")) return true;
+    const height = this.walkHeightAt(x, z, raised) * scaleY;
+    for (const support of bridgeSupports(raised)) {
+      if (height + this.eyeHeight < support.ground * scaleY ||
+          height > support.deck * scaleY) continue;
+      const radius = BRIDGE_SUPPORT_RADIUS + VISITOR_SUPPORT_RADIUS;
+      const distance = Math.hypot(x - support.x, z - support.z);
+      if (distance >= radius) continue;
+      // A visitor already overlapping a support can always move away from it.
+      if (fromX !== null && distance >=
+          Math.hypot(fromX - support.x, fromZ - support.z) - 1e-6) continue;
+      return false;
+    }
+    return true;
+  }
+  walkPointClear(x, z, fromX, fromZ, raised, scaleY, roadsReady) {
+    return this.treePointClear(x, z, fromX, fromZ) &&
+      (!roadsReady || this.bridgeSupportPointClear(
+        x, z, fromX, fromZ, raised, scaleY));
+  }
+  resolveObstacleWalk(startX, startZ, desiredX, desiredZ, raised, scaleY, roadsReady) {
+    if ((!this.treeInteractions || !this.selected.has("vegetation")) && !roadsReady)
       return { x: desiredX, z: desiredZ };
     const steps = Math.max(1, Math.ceil(Math.hypot(desiredX - startX,
       desiredZ - startZ) / 0.1));
@@ -795,11 +831,11 @@ export class LayerExperience {
     const dz = (desiredZ - startZ) / steps;
     let x = startX, z = startZ;
     for (let step = 0; step < steps; step++) {
-      if (this.treePointClear(x + dx, z + dz, x, z)) {
+      if (this.walkPointClear(x + dx, z + dz, x, z, raised, scaleY, roadsReady)) {
         x += dx;
         z += dz;
-      } else if (this.treePointClear(x + dx, z, x, z)) x += dx;
-      else if (this.treePointClear(x, z + dz, x, z)) z += dz;
+      } else if (this.walkPointClear(x + dx, z, x, z, raised, scaleY, roadsReady)) x += dx;
+      else if (this.walkPointClear(x, z + dz, x, z, raised, scaleY, roadsReady)) z += dz;
     }
     return { x, z };
   }
@@ -919,7 +955,9 @@ export class LayerExperience {
     return {
       x: local.x, z: local.z, point, distance: hit.distance,
       onRoad, valid: Number.isFinite(surface) && slope <= 1.2 && clearBelow &&
-        this.treePointClear(local.x, local.z),
+        this.treePointClear(local.x, local.z) &&
+        this.bridgeSupportPointClear(local.x, local.z, null, null,
+          raised, scaleY, onRoad),
     };
   }
   teleportTo(candidate, camera) {
@@ -976,8 +1014,8 @@ export class LayerExperience {
       else if (zOnly) desiredX = startX;
       else { desiredX = startX; desiredZ = startZ; }
     }
-    ({ x: desiredX, z: desiredZ } = this.resolveTreeWalk(
-      startX, startZ, desiredX, desiredZ));
+    ({ x: desiredX, z: desiredZ } = this.resolveObstacleWalk(
+      startX, startZ, desiredX, desiredZ, raised, scaleY, roadsReady));
     const c = Math.cos(this.group.rotation.y), s = Math.sin(this.group.rotation.y);
     const appliedX = desiredX - local.x, appliedZ = desiredZ - local.z;
     this.group.position.x -= c * appliedX + s * appliedZ;
