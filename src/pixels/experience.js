@@ -10,6 +10,8 @@ import {
 import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "./model.js";
 import { RemotePlatformScene } from "../showcase/remote-platforms.js";
 import { PixelFlyover } from "./flyover.js";
+import { PIXEL_WORLD_EXTENT, makePixelLandscape,
+  pixelLandscapeTexture } from "./landscape.js";
 
 const gold = 0xffd36f;
 const clamp = (value) => THREE.MathUtils.clamp(value, -PIXEL_EXTENT + 0.001, PIXEL_EXTENT - 0.001);
@@ -101,6 +103,10 @@ export class PixelExperience extends LayerExperience {
     this.applyVisibility();
     this.model = new PixelModel();
     this.flyover = new PixelFlyover(this.group);
+    this.viewMode = "footprint";
+    this.pixelWorld = null;
+    this.pixelWorldModel = null;
+    this.pixelTextures = new Map();
     this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
@@ -146,6 +152,7 @@ export class PixelExperience extends LayerExperience {
     this.footprint.position.set(-centerX, 0, -centerZ);
     pivot.add(this.footprint);
     this.footprint = pivot;
+    this.footprint.visible = this.viewMode === "footprint";
     this.footprintAge = previousSize ? 0 : 1;
     if (previousSize) {
       const start = THREE.MathUtils.clamp(previousSize / this.size, 0.35, 2);
@@ -158,15 +165,52 @@ export class PixelExperience extends LayerExperience {
         !PIXEL_SIZES.includes(size) || this.size === size) return;
     const previous = this.size;
     this.size = size;
-    this.refreshFootprint(previous);
-    this.flyover.begin(size);
+    this.refreshFootprint(this.viewMode === "footprint" ? previous : null);
+    if (this.viewMode === "footprint") this.flyover.begin(size);
+    else this.showPixelTexture();
     this.onEvent(size > previous ? "merge" : "reveal");
+    this.onChange();
+  }
+  showPixelTexture() {
+    if (!this.pixelWorldModel)
+      this.pixelWorldModel = new PixelModel(PIXEL_WORLD_EXTENT);
+    if (!this.pixelTextures.has(this.size))
+      this.pixelTextures.set(this.size,
+        pixelLandscapeTexture(this.pixelWorldModel, this.size));
+    const texture = this.pixelTextures.get(this.size);
+    if (!this.pixelWorld) {
+      this.pixelWorld = makePixelLandscape(this.pixelWorldModel,
+        this.ground.raised.geometry, texture);
+      this.variants.raised.world.add(this.pixelWorld);
+    } else {
+      this.pixelWorld.material.map = texture;
+      this.pixelWorld.material.needsUpdate = true;
+    }
+  }
+  setViewMode(mode, camera = null) {
+    if (!this.started || this.finished || this.phase !== "pixels" ||
+        !["footprint", "pixelated"].includes(mode) || this.viewMode === mode) return;
+    if (mode === "pixelated") this.showPixelTexture();
+    this.viewMode = mode;
+    this.selected = new Set(mode === "footprint"
+      ? ["topography", "vegetation", "hydrology", "roads"]
+      : ["topography"]);
+    this.applyVisibility();
+    this.ground.raised.visible = mode === "footprint";
+    if (this.pixelWorld) this.pixelWorld.visible = mode === "pixelated";
+    this.footprint.visible = mode === "footprint";
+    if (mode === "footprint") this.flyover.begin(this.size);
+    else this.flyover.clear();
+    this.onRoad = false;
+    this.fallingFromRoad = false;
+    if (camera) this.walk(0, 0, 0, camera);
     this.onChange();
   }
   update(dt) {
     if (!this.started) return;
     super.update(dt);
-    if (this.phase === "pixels" && !this.finished) this.flyover.update(dt);
+    if (this.phase === "pixels" && !this.finished &&
+        this.viewMode === "footprint") this.flyover.update(dt);
     if (this.phase === "platforms" && !this.finished)
       this.platformScene.update(dt, this.elapsed);
     if (!this.footprint || this.footprintAge >= 1) return;
@@ -225,6 +269,11 @@ export class PixelExperience extends LayerExperience {
     this.size = 30;
     this.probe = { x: 0, z: -3 };
     this.answer = null;
+    this.viewMode = "footprint";
+    this.selected = new Set(["topography", "vegetation", "hydrology", "roads"]);
+    this.applyVisibility();
+    this.ground.raised.visible = true;
+    if (this.pixelWorld) this.pixelWorld.visible = false;
     this.flyover.clear();
     this.refreshFootprint();
     this.onChange();
@@ -243,6 +292,8 @@ export class PixelExperience extends LayerExperience {
   dispose() {
     this.flyover.dispose();
     this.platformScene.dispose();
+    if (this.pixelWorld) this.pixelWorld.material.map = null;
+    for (const texture of this.pixelTextures.values()) texture.dispose();
     super.dispose();
   }
   renderMap(ctx, size = this.size) {

@@ -1231,7 +1231,7 @@ function drawPixelsUI() {
   if (!p.started) {
     lessonCard(
       "How Big Is a Pixel?",
-      "Satellites, aircraft, and drones image Earth at different levels of detail, or spatial resolutions.\nGround sample distance (GSD) is one pixel's width on the ground.\nMeet the sensors, then compare 50 cm, 2 m, 10 m, and 30 m pixels.",
+      "Satellites, aircraft, and drones image Earth at different levels of detail, or spatial resolutions.\nGround sample distance (GSD) is one pixel's width on the ground.\nCompare four pixel sizes as ground footprints or as a pixelated landscape.",
       0.13,
     );
     button("Meet the sensors", 0, -0.43, () => p.begin(), 1.5);
@@ -1262,17 +1262,21 @@ function drawPixelsUI() {
   );
   if (p.finished) {
     label(
-      "Satellite, aircraft, and drone sensors make different trade-offs between coverage and ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nAt 30 m, narrow rivers and roads blend with nearby land inside mixed pixels.",
+      "Satellite, aircraft, and drone sensors trade coverage for ground detail.\nGround sample distance (GSD) is a pixel's width on the ground.\nEach pixelated square shows one average color for the land inside it. At 30 m, narrow rivers and roads blend into mixed pixels.",
       0, 0.12, 2.35, 1.16, 48, "#e6f4f5", "#0b2430",
     );
     takeawayActions(-0.62);
 
     return;
   }
-  label(
-    "Left stick: walk · Right stick: turn or teleport",
-    0, 0.68, 2.3, 0.18, 27, "#b6d1d9", "#0b2430",
-  );
+  button("Ground footprint", -0.56, 0.70,
+    () => p.setViewMode("footprint",
+      renderer.xr.isPresenting ? renderer.xr.getCamera() : camera),
+    1.02, p.viewMode === "footprint");
+  button("Pixelated world", 0.56, 0.70,
+    () => p.setViewMode("pixelated",
+      renderer.xr.isPresenting ? renderer.xr.getCamera() : camera),
+    1.02, p.viewMode === "pixelated");
   for (const [index, size] of PIXEL_SIZES.entries())
     button(pixelSizeLabel(size), (index - 1.5) * 0.56, 0.5,
       () => p.setSize(size), 0.48)

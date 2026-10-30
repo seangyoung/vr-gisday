@@ -62,7 +62,7 @@ The expanded landscape and visibility overlay use original synthetic geometry an
 - USGS, *Landsat 10 — Finer Spatial Resolution*: https://www.usgs.gov/landsat-missions/landsat-10 — spatial resolution as the size of ground represented by an image pixel, and finer pixels revealing smaller features.
 - USGS, *Prevalence of pure versus mixed snow cover pixels across spatial resolutions*: https://www.usgs.gov/publications/prevalence-pure-versus-mixed-snow-cover-pixels-across-spatial-resolutions-alpine — real-world example of fractional land-cover mixtures in pixels at different sizes.
 
-The app uses original synthetic colors and known model categories, averaged over fixed square ground areas. It illustrates ground pixel size and mixing; it does not simulate a particular satellite, spectral response, image sharpness, or physical radiance measurement.
+The app uses original synthetic colors and known model categories, averaged over fixed square ground areas. The clipboard maps and pixelated landscape use the same 50 cm source samples; the latter extends the grid across the walkable terrain while leaving its height and navigation surface intact. It illustrates ground pixel size and mixing; it does not simulate a particular satellite, spectral response, image sharpness, or physical radiance measurement.
 
 ## What Changed? — checked 2026-10-15
 

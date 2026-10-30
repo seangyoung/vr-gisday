@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { PIXEL_EXTENT, PIXEL_SIZES, PixelModel, pixelSizeLabel } from "../src/pixels/model.js";
 import { PixelExperience } from "../src/pixels/experience.js";
 import { PixelFlyover, flyoverForSize } from "../src/pixels/flyover.js";
+import { PIXEL_WORLD_EXTENT, pixelLandscapeTexture } from "../src/pixels/landscape.js";
 import { landscapeHeight } from "../src/layers/experience.js";
 
 test("pixel size changes ground area while retaining the same source landscape", () => {
@@ -83,6 +84,66 @@ test("each ground sample distance starts the requested overhead sensor", () => {
   assert.equal(parent.children.length, 0);
   assert.equal(flyover.progress, 1);
   flyover.dispose();
+});
+
+test("pixelated landscape uses the same cell averages as the central map", () => {
+  const central = new PixelModel();
+  const world = new PixelModel(PIXEL_WORLD_EXTENT);
+  assert.equal(world.sampleWidth, 648);
+  for (const size of PIXEL_SIZES) {
+    for (const [x, z] of [[0, 0], [-33, 14], [42, -40]])
+      assert.deepEqual(world.cellAt(x, z, size).rgb,
+        central.cellAt(x, z, size).rgb);
+    const texture = pixelLandscapeTexture(world, size);
+    assert.equal(texture.image.width, world.sampleWidth);
+    assert.equal(texture.magFilter, THREE.NearestFilter);
+    const sample = (324 * world.sampleWidth + 324) * 4;
+    const color = world.cellAt(0, 0, size).rgb;
+    assert.deepEqual(Array.from(texture.image.data.subarray(sample, sample + 3)),
+      color);
+    texture.dispose();
+  }
+});
+
+test("clipboard view switch keeps flyovers and footprints in the detailed landscape", () => {
+  const scene = new THREE.Scene();
+  const demo = new PixelExperience(scene, () => {});
+  demo.begin();
+  demo.showPixels();
+  assert.equal(demo.viewMode, "footprint");
+  assert.ok(demo.flyover.group);
+  demo.setViewMode("pixelated");
+  assert.equal(demo.flyover.group, null);
+  assert.equal(demo.ground.raised.visible, false);
+  assert.equal(demo.pixelWorld.visible, true);
+  assert.equal(demo.pixelWorld.geometry.getAttribute("uv").count,
+    demo.ground.raised.geometry.getAttribute("position").count);
+  assert.equal(demo.footprint.visible, false);
+  assert.equal(demo.variants.raised.vegetation.visible, false);
+  assert.equal(demo.variants.raised.hydrology.visible, false);
+  assert.equal(demo.variants.raised.roads.visible, false);
+  const probeRay = new THREE.Raycaster(
+    new THREE.Vector3(9, 60, -18), new THREE.Vector3(0, -1, 0));
+  assert.equal(demo.placeFromRay(probeRay), true);
+  for (const size of PIXEL_SIZES) {
+    demo.setSize(size);
+    assert.equal(demo.flyover.group, null);
+    assert.equal(demo.pixelWorld.material.map,
+      demo.pixelTextures.get(size));
+  }
+  demo.setViewMode("footprint");
+  assert.equal(demo.ground.raised.visible, true);
+  assert.equal(demo.pixelWorld.visible, false);
+  assert.equal(demo.footprint.visible, true);
+  assert.equal(demo.variants.raised.roads.visible, true);
+  assert.ok(demo.flyover.group);
+  demo.setViewMode("pixelated");
+  demo.reset();
+  assert.equal(demo.viewMode, "footprint");
+  assert.equal(demo.footprint.visible, true);
+  assert.equal(demo.pixelWorld.visible, false);
+  demo.dispose();
+  assert.equal(scene.children.length, 0);
 });
 
 test("pixel footprint, map and terrain targeting, reset, and wrap-up", () => {
