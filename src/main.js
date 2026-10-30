@@ -1328,7 +1328,7 @@ function drawShowcaseUI() {
         "A map projection flattens the Earth's curved surface onto a 2D map.\nChoose a projection and watch the globe unfold.\nTo compare how projections distort size and/or shape, examine Tissot circles, or drag continents from the globe to the map with the GRIP button.",
         "Flatten the globe"],
       change: ["What Changed?",
-        "The only constant is change. Examine Landsat satellite images of the same location collected on different days.\nUse the slider or spotlight to compare dates, then identify the most notable change.",
+        "The only constant is change. Examine Landsat satellite images of the same location collected on different days.\nUse the slider, spotlight, or a gentle head tilt to compare dates, then identify the most notable change.",
         "Compare images"],
       interpolation: ["Between the Rain Gauges",
         "Spatial interpolation estimates values between measured places.\nEach post shows rainfall at one gauge in millimeters.\nCompare different interpolated surfaces, then estimate rain at an unmeasured location.",
@@ -1465,12 +1465,16 @@ function drawShowcaseUI() {
       0, 0.79, 2.35, 0.12, 27, "#b6d1d9", "#0b2430");
     label(exhibit.comparisonMode === "spotlight"
       ? "Aim at the image to reveal the later date"
-      : "Drag the white line to compare dates",
+      : exhibit.comparisonMode === "head-tilt"
+        ? "Tilt head left: before · right: after"
+        : "Drag the white line to compare dates",
     -0.47, -0.81, 1.7, 0.13, 23, "#e6f4f5", "#0b2430");
-    button("Slider", -0.86, -1.03, () => exhibit.setComparisonMode("slider"),
-      0.68, exhibit.comparisonMode === "slider");
-    button("Spotlight", -0.08, -1.03, () => exhibit.setComparisonMode("spotlight"),
-      0.68, exhibit.comparisonMode === "spotlight");
+    button("Slider", -1.01, -1.03, () => exhibit.setComparisonMode("slider"),
+      0.50, exhibit.comparisonMode === "slider");
+    button("Spotlight", -0.47, -1.03, () => exhibit.setComparisonMode("spotlight"),
+      0.50, exhibit.comparisonMode === "spotlight");
+    button("Head Tilt", 0.07, -1.03, () => exhibit.setComparisonMode("head-tilt"),
+      0.50, exhibit.comparisonMode === "head-tilt");
     label(caseInfo.question, 0.91, 0.67, 1.06, 0.16, 33,
       "#e6f4f5", "#0b2430");
     if (exhibit.error) {
@@ -3212,7 +3216,8 @@ renderer.setAnimationLoop((time, frame) => {
         showcase.dragContinentGrip(raycaster, active.id);
       }
     }
-    if (showcase && visibleSession && !soundMenuOpen) showcase.update(dt);
+    if (showcase && visibleSession && !soundMenuOpen)
+      showcase.update(dt, renderer.xr.getCamera());
     if (quiz && !quiz.session && visibleSession && !soundMenuOpen) {
       const right = controllers.find(({ c, grip }) =>
         c.userData.xrInput?.handedness === "right" && c.visible && grip.visible);
@@ -3473,7 +3478,7 @@ renderer.setAnimationLoop((time, frame) => {
     }
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
-    showcase.update(dt);
+    showcase.update(dt, camera);
   if (devPreview && quiz && !renderer.xr.isPresenting)
     quiz.update(dt, !soundMenuOpen);
   if (devPreview && rain && !renderer.xr.isPresenting && !soundMenuOpen) {

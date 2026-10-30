@@ -1,5 +1,14 @@
+import * as THREE from "three";
 import { TimedExhibit, canvasPanel, replacePanelTexture } from "../showcase/exhibit.js";
 import { CHANGE_SCENES } from "./scenes.js";
+
+const FULL_HEAD_TILT = 12 * Math.PI / 180;
+
+export function headTiltBlendFromRoll(roll) {
+  const position = Math.max(0, Math.min(1,
+    0.5 - roll / (2 * FULL_HEAD_TILT)));
+  return position * position * (3 - 2 * position);
+}
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -41,6 +50,11 @@ export class ChangeExperience extends TimedExhibit {
     this.comparisonMode = "slider";
     this.split = 0.5;
     this.lens = { u: 0.5, v: 0.5 };
+    this.tiltBlend = 0.5;
+    this.lastTiltDrawn = 0.5;
+    this.tiltRefreshTime = 0;
+    this.headQuaternion = new THREE.Quaternion();
+    this.headEuler = new THREE.Euler();
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -82,6 +96,9 @@ export class ChangeExperience extends TimedExhibit {
     this.draggingBy = null;
     this.split = 0.5;
     this.lens = { u: 0.5, v: 0.5 };
+    this.tiltBlend = 0.5;
+    this.lastTiltDrawn = 0.5;
+    this.tiltRefreshTime = 0;
     this.selectedOption = null;
     this.revealed = false;
     this.ready = false;
@@ -121,14 +138,18 @@ export class ChangeExperience extends TimedExhibit {
     if (crop) ctx.drawImage(this.pair[0], ...crop.before, 0, 0, width, height);
     else ctx.drawImage(this.pair[0], 0, 0, width, height);
     const spotlight = this.comparisonMode === "spotlight";
+    const headTilt = this.comparisonMode === "head-tilt";
     const lensX = (this.lens?.u ?? 0.5) * width;
     const lensY = (this.lens?.v ?? 0.5) * height;
     const lensRadius = Math.min(width, height) * 0.24;
     ctx.save();
-    ctx.beginPath();
-    if (spotlight) ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
-    else ctx.rect(this.split * width, 0, width * (1 - this.split), height);
-    ctx.clip();
+    if (headTilt) ctx.globalAlpha = this.tiltBlend;
+    else {
+      ctx.beginPath();
+      if (spotlight) ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
+      else ctx.rect(this.split * width, 0, width * (1 - this.split), height);
+      ctx.clip();
+    }
     if (crop) ctx.drawImage(this.pair[1], ...crop.after, 0, 0, width, height);
     else ctx.drawImage(this.pair[1], 0, 0, width, height);
     ctx.restore();
@@ -143,7 +164,7 @@ export class ChangeExperience extends TimedExhibit {
       ctx.beginPath();
       ctx.arc(lensX, lensY, lensRadius, 0, Math.PI * 2);
       ctx.stroke();
-    } else {
+    } else if (!headTilt) {
       const splitX = this.split * width;
       ctx.strokeStyle = "#ffffff";
       ctx.lineWidth = 5;
@@ -176,6 +197,7 @@ export class ChangeExperience extends TimedExhibit {
       ctx.setLineDash([]);
     }
     this.image.material.map.needsUpdate = true;
+    if (headTilt) this.lastTiltDrawn = this.tiltBlend;
   }
 
   imageHit(raycaster) {
@@ -185,9 +207,14 @@ export class ChangeExperience extends TimedExhibit {
   }
 
   setComparisonMode(mode) {
-    if (!this.started || this.finished || !["slider", "spotlight"].includes(mode)) return;
+    if (!this.started || this.finished ||
+        !["slider", "spotlight", "head-tilt"].includes(mode)) return;
     this.comparisonMode = mode;
     this.draggingBy = null;
+    if (mode === "head-tilt") {
+      this.tiltBlend = 0.5;
+      this.tiltRefreshTime = 0;
+    }
     this.refresh();
     this.onChange();
   }
@@ -211,6 +238,7 @@ export class ChangeExperience extends TimedExhibit {
   }
 
   beginInteraction(raycaster, id) {
+    if (this.comparisonMode === "head-tilt") return false;
     const hit = this.imageHit(raycaster);
     if (!hit?.uv) return false;
     this.draggingBy = id;
@@ -271,9 +299,22 @@ export class ChangeExperience extends TimedExhibit {
     super.finish();
   }
 
-  update(dt) {
+  update(dt, camera) {
     super.update(dt);
     if (this.finished) this.group.visible = false;
+    if (!this.started || this.finished || !this.ready ||
+        this.comparisonMode !== "head-tilt" || !camera) return;
+    camera.getWorldQuaternion(this.headQuaternion);
+    this.headEuler.setFromQuaternion(this.headQuaternion, "YXZ");
+    const target = headTiltBlendFromRoll(this.headEuler.z);
+    this.tiltBlend += (target - this.tiltBlend) * (1 - Math.exp(-dt * 14));
+    if (Math.abs(target - this.tiltBlend) < 0.001) this.tiltBlend = target;
+    this.tiltRefreshTime += dt;
+    if (this.tiltRefreshTime >= 1 / 30 &&
+        Math.abs(this.tiltBlend - this.lastTiltDrawn) >= 1 / 96) {
+      this.tiltRefreshTime = 0;
+      this.refresh();
+    }
   }
 
   dispose() {

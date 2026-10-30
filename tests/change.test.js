@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { ChangeExperience } from "../src/change/experience.js";
+import * as THREE from "three";
+import { ChangeExperience, headTiltBlendFromRoll } from "../src/change/experience.js";
 import { CHANGE_SCENES } from "../src/change/scenes.js";
 
 test("every change case has two bundled Landsat frames and a complete interpretation", () => {
@@ -104,6 +105,71 @@ test("spotlight clips the later image to a circular window using aligned crops",
   assert.deepEqual(draws[0].slice(1), [20, 0, 580, 500, 0, 0, 580, 500]);
   assert.deepEqual(draws[1].slice(1), [0, 0, 580, 500, 0, 0, 580, 500]);
   assert.deepEqual(arcs[0].slice(0, 3), [174, 200, 120]);
+});
+
+test("head tilt crossfades the whole image in the expected direction", () => {
+  const degrees = (value) => value * Math.PI / 180;
+  assert.equal(headTiltBlendFromRoll(degrees(12)), 0);
+  assert.equal(headTiltBlendFromRoll(0), 0.5);
+  assert.equal(headTiltBlendFromRoll(degrees(-12)), 1);
+
+  const exhibit = Object.create(ChangeExperience.prototype);
+  const draws = [];
+  let clips = 0;
+  const ctx = new Proxy({
+    globalAlpha: 1,
+    drawImage(image) { draws.push([image, this.globalAlpha]); },
+    clip() { clips++; },
+    save() { this.savedAlpha = this.globalAlpha; },
+    restore() { this.globalAlpha = this.savedAlpha; },
+    measureText: () => ({ width: 100 }),
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+  exhibit.sceneIndex = CHANGE_SCENES.findIndex((scene) => scene.id === "dallas");
+  exhibit.canvas = { width: 1000, height: 667, getContext: () => ctx };
+  exhibit.image = { material: { map: { needsUpdate: false } } };
+  exhibit.pair = [{ id: "before" }, { id: "after" }];
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.comparisonMode = "head-tilt";
+  exhibit.tiltBlend = 0.25;
+  assert.equal(exhibit.beginInteraction(null, "right"), false);
+  exhibit.refresh();
+  assert.deepEqual(draws.map(([image, alpha]) => [image.id, alpha]),
+    [["before", 1], ["after", 0.25]]);
+  assert.equal(clips, 0);
+  assert.equal(exhibit.lastTiltDrawn, 0.25);
+});
+
+test("headset roll drives the dissolve without changing when the head is still", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  exhibit.started = true;
+  exhibit.finished = false;
+  exhibit.elapsed = 0;
+  exhibit.ready = true;
+  exhibit.comparisonMode = "head-tilt";
+  exhibit.tiltBlend = 0.5;
+  exhibit.lastTiltDrawn = 0.5;
+  exhibit.tiltRefreshTime = 0;
+  exhibit.headQuaternion = new THREE.Quaternion();
+  exhibit.headEuler = new THREE.Euler();
+  let redraws = 0;
+  exhibit.refresh = () => {
+    redraws++;
+    exhibit.lastTiltDrawn = exhibit.tiltBlend;
+  };
+  let orientation = new THREE.Quaternion()
+    .setFromEuler(new THREE.Euler(0.2, 1.1, 0.2, "YXZ"));
+  const camera = { getWorldQuaternion: (target) => target.copy(orientation) };
+  for (let i = 0; i < 5; i++) exhibit.update(0.05, camera);
+  assert.ok(exhibit.tiltBlend < 0.1);
+  assert.ok(redraws > 0);
+  orientation = new THREE.Quaternion()
+    .setFromEuler(new THREE.Euler(0.2, 1.1, -0.2, "YXZ"));
+  for (let i = 0; i < 8; i++) exhibit.update(0.05, camera);
+  assert.ok(exhibit.tiltBlend > 0.9);
+  const redrawsAtRest = redraws;
+  for (let i = 0; i < 5; i++) exhibit.update(0.05, camera);
+  assert.equal(redraws, redrawsAtRest);
 });
 
 test("answer highlight is drawn for local changes but not flood or fire", () => {
