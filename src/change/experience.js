@@ -30,16 +30,21 @@ function blank(canvas, text) {
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
 }
 
-function dateBadge(ctx, text, x, y, align) {
-  ctx.font = "bold 27px system-ui";
-  const width = ctx.measureText(text).width + 30;
-  const left = align === "right" ? x - width : x;
+function dateBadge(ctx, text, x, y, align, { size = 27, height = 48, alpha = 1 } = {}) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = (ctx.globalAlpha ?? 1) * alpha;
+  ctx.font = `bold ${size}px system-ui`;
+  const padding = size <= 20 ? 10 : 15;
+  const width = ctx.measureText(text).width + padding * 2;
+  const left = align === "right" ? x - width : align === "center" ? x - width / 2 : x;
   ctx.fillStyle = "#071820de";
-  ctx.fillRect(left, y, width, 48);
+  ctx.fillRect(left, y, width, height);
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
-  ctx.fillText(text, x + (align === "right" ? -15 : 15), y + 24);
+  ctx.fillText(text, x + (align === "right" ? -padding : align === "center" ? 0 : padding), y + height / 2);
+  ctx.restore();
 }
 
 export class ChangeExperience extends TimedExhibit {
@@ -183,8 +188,38 @@ export class ChangeExperience extends TimedExhibit {
       ctx.lineTo(splitX + 10, height * 0.52);
       ctx.stroke();
     }
-    dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
-    dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right");
+    if (spotlight) {
+      dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
+      // Keep the later date with the moving window, tucked inside its rim.
+      const badgeHeight = 32;
+      const badgeWidth = (() => {
+        ctx.font = "bold 19px system-ui";
+        return ctx.measureText(this.sceneInfo.afterDate).width + 20;
+      })();
+      const badgeX = Math.max(badgeWidth / 2 + 8,
+        Math.min(width - badgeWidth / 2 - 8, lensX));
+      const farthestEdge = Math.abs(badgeX - lensX) + badgeWidth / 2;
+      const inset = lensRadius - Math.sqrt(Math.max(0,
+        lensRadius * lensRadius - Math.min(farthestEdge, lensRadius) ** 2)) + 8;
+      const innerTop = lensY - lensRadius + inset;
+      const innerBottom = lensY + lensRadius - inset - badgeHeight;
+      const badgeY = innerTop >= 8 ? innerTop : Math.min(height - badgeHeight - 8, innerBottom);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(lensX, lensY, lensRadius - 5, 0, Math.PI * 2);
+      ctx.clip();
+      dateBadge(ctx, this.sceneInfo.afterDate, badgeX, badgeY, "center",
+        { size: 19, height: badgeHeight });
+      ctx.restore();
+    } else if (headTilt) {
+      dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left",
+        { alpha: 1 - this.tiltBlend });
+      dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right",
+        { alpha: this.tiltBlend });
+    } else {
+      dateBadge(ctx, this.sceneInfo.beforeDate, 12, 12, "left");
+      dateBadge(ctx, this.sceneInfo.afterDate, width - 12, 12, "right");
+    }
     if (this.revealed && this.sceneInfo.focus) {
       const { u, v, rx, ry } = this.sceneInfo.focus;
       ctx.strokeStyle = "#fff9bb";

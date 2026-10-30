@@ -107,6 +107,59 @@ test("spotlight clips the later image to a circular window using aligned crops",
   assert.deepEqual(arcs[0].slice(0, 3), [174, 200, 120]);
 });
 
+test("date labels follow the active comparison mode", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  exhibit.sceneIndex = CHANGE_SCENES.findIndex((scene) => scene.id === "dallas");
+  const labels = [];
+  const alphaStack = [];
+  const ctx = new Proxy({
+    globalAlpha: 1,
+    measureText(text) { return { width: text.length * Number(this.font.match(/\d+/)[0]) * 0.55 }; },
+    fillText(text, x, y) {
+      labels.push({ text, x, y, alpha: this.globalAlpha, font: this.font });
+    },
+    save() { alphaStack.push(this.globalAlpha); },
+    restore() { this.globalAlpha = alphaStack.pop(); },
+  }, { get: (target, key) => target[key] ?? (() => {}) });
+  exhibit.canvas = { width: 1000, height: 667, getContext: () => ctx };
+  exhibit.image = { material: { map: { needsUpdate: false } } };
+  exhibit.pair = [{}, {}];
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.split = 0.5;
+  exhibit.lens = { u: 0.3, v: 0.4 };
+
+  exhibit.comparisonMode = "slider";
+  exhibit.refresh();
+  assert.deepEqual(labels.map(({ text, alpha, font }) => [text, alpha, font]), [
+    ["Aug. 31, 1984", 1, "bold 27px system-ui"],
+    ["Aug. 4, 2009", 1, "bold 27px system-ui"],
+  ]);
+  assert.ok(labels[1].x > 900);
+
+  labels.length = 0;
+  exhibit.comparisonMode = "spotlight";
+  exhibit.refresh();
+  assert.equal(labels[1].text, "Aug. 4, 2009");
+  assert.equal(labels[1].font, "bold 19px system-ui");
+  assert.ok(Math.abs(labels[1].x - 300) < 1, JSON.stringify(labels));
+  assert.ok(labels[1].y > 100 && labels[1].y < 267);
+
+  labels.length = 0;
+  exhibit.comparisonMode = "head-tilt";
+  exhibit.tiltBlend = 0.25;
+  exhibit.refresh();
+  assert.deepEqual(labels.map(({ alpha }) => alpha), [0.75, 0.25]);
+  labels.length = 0;
+  exhibit.tiltBlend = 0;
+  exhibit.refresh();
+  assert.deepEqual(labels.map(({ text }) => text), ["Aug. 31, 1984"]);
+  labels.length = 0;
+  exhibit.tiltBlend = 1;
+  exhibit.refresh();
+  assert.deepEqual(labels.map(({ text }) => text), ["Aug. 4, 2009"]);
+});
+
 test("head tilt crossfades the whole image in the expected direction", () => {
   const degrees = (value) => value * Math.PI / 180;
   assert.equal(headTiltBlendFromRoll(degrees(12)), 0);
