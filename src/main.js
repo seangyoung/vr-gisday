@@ -1214,10 +1214,10 @@ function drawViewshedUI() {
       : v.lookoutTransition?.kind === "return"
       ? "Moving back to the rungs · Keep holding the pole"
       : v.isClimbing
-      ? "Pull rungs down to climb · Release both grips to drop"
+      ? "Pull the tower down to climb · Release both grips to drop"
       : v.observer.height === 12
-      ? "Grip rungs to climb · Grip the rim or teleport onto the platform"
-      : "Choose Tower · 12 m to reveal the rungs and lookout platform",
+      ? "Grip the pole or rungs to climb · Grip the rim or teleport onto the platform"
+      : "Choose Tower · 12 m to reveal the climbable pole and lookout platform",
     0, -0.74, 2.3, 0.12, 25, "#b6d1d9", "#0b2430");
   }
   label(
@@ -2381,7 +2381,7 @@ function controllerGuideContext(hand) {
   if (viewshed?.started && !viewshed.finished)
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
       viewshed.isZiplining ? null :
-      viewshed.isAtTop ? "Grip pole" : "Grip rung / rim", onMenu,
+      viewshed.isAtTop ? "Grip pole" : "Grip pole / rim", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
     return ["Select / spin", null, onMenu, exitLabel];

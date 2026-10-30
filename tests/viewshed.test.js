@@ -152,6 +152,40 @@ test("rung grips pull the visitor upward, pause walking, and release into a retu
   demo.dispose();
 });
 
+test("the tower pole accepts grips between rungs and farther up the climb", () => {
+  const demo = new ViewshedExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  camera.position.set(0, 1.6, 0);
+  demo.place(camera);
+  demo.begin();
+  demo.setHeight(12);
+  demo.update(1);
+  const rungs = demo.marker.userData.rungs;
+  const between = (index) => demo.marker.localToWorld(new THREE.Vector3(
+    0, (rungs[index].position.y + rungs[index + 1].position.y) / 2, 0.25));
+  const lowerHand = between(2);
+  assert.equal(demo.nearestRung(lowerHand), null,
+    "the test hand is intentionally outside rung grip range");
+  assert.equal(demo.gripRung(0, lowerHand.clone().add(new THREE.Vector3(1, 0, 0))), false);
+  assert.equal(demo.gripRung(0, lowerHand), true);
+  const lowered = lowerHand.clone().add(new THREE.Vector3(0, -0.2, 0));
+  demo.updateClimb(new Map([[0, new THREE.Matrix4().setPosition(lowered)]]), 0.016);
+  assert.ok(demo.climbHeight > 0.19);
+  const upperHand = between(18);
+  assert.equal(demo.nearestRung(upperHand), null);
+  assert.equal(demo.gripRung(1, upperHand), true);
+  demo.releaseRung(0);
+  demo.updateClimb(new Map([[1, new THREE.Matrix4().setPosition(
+    upperHand.clone().add(new THREE.Vector3(0, -0.2, 0)),
+  )]]), 0.016);
+  assert.ok(demo.climbHeight > 0.39,
+    "a second pole grip continues the climb without finding a rung");
+  demo.releaseRung(1);
+  for (let i = 0; i < 40; i++) demo.updateClimb(new Map(), 0.05);
+  assert.equal(demo.climbHeight, 0);
+  demo.dispose();
+});
+
 test("the tower top locks, restores the clipboard, and allows regripping to descend or drop", () => {
   const sounds = [];
   const demo = new ViewshedExperience(new THREE.Scene(), () => {},

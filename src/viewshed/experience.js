@@ -446,11 +446,12 @@ export class ViewshedExperience extends LayerExperience {
       new THREE.Box3().setFromObject(rim).distanceToPoint(handWorld) < 0.42);
   }
   nearTowerPole(handWorld) {
-    if (!handWorld?.isVector3 || !this.marker.userData.steps.visible) return false;
+    if (!handWorld?.isVector3 || !this.marker.userData.steps.visible ||
+        this.visualHeight < TOWER_HEIGHT - 0.5) return false;
     this.marker.updateWorldMatrix(true, false);
     const local = this.marker.worldToLocal(handWorld.clone());
-    return local.y > 0.4 && local.y < TOWER_HEIGHT + 0.25 &&
-      Math.hypot(local.x, local.z) < 0.42;
+    return local.y > 0.2 && local.y < TOWER_HEIGHT + 0.25 &&
+      Math.hypot(local.x, local.z) < 0.55;
   }
   gripRung(id, handWorld) {
     if (!this.started || this.finished || this.isZiplining ||
@@ -467,7 +468,7 @@ export class ViewshedExperience extends LayerExperience {
       this.onEvent("rung");
       return true;
     }
-    if (!this.nearestRung(handWorld)) return false;
+    if (!this.nearTowerPole(handWorld) && !this.nearestRung(handWorld)) return false;
     const firstHand = !this.climbHands.size;
     this.topLocked = false;
     this.climbHands.set(id, handWorld.y);
