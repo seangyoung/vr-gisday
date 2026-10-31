@@ -904,9 +904,7 @@ function drawRoomUI() {
     label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
     label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
   } else if (s.stage === 2) {
-    lessonCard(title, body);
-    label(`${s.records.length} points · ${colorGuide}`,
-      0, GUIDED_INFO_Y, 2.3, 0.12, 27, "#d8eae8", "#0b2430");
+    lessonCard(title, body, -0.70);
     takeawayActions(GUIDED_ACTION_Y);
     foregroundTakeaway();
     return;
@@ -990,11 +988,7 @@ function drawScanUI() {
     return;
   }
   if (s.stage === 2) {
-    lessonCard(s.sceneInfo.takeaway.title, s.sceneInfo.takeaway.body);
-    label(
-      `${s.sceneInfo.name} · ${s.records.length.toLocaleString()} sampled points · First-hit model`,
-      0, GUIDED_INFO_Y, 2.3, 0.12, 27, "#d8eae8", "#0b2430",
-    );
+    lessonCard(s.sceneInfo.takeaway.title, s.sceneInfo.takeaway.body, -0.70);
     takeawayActions(GUIDED_ACTION_Y);
     foregroundTakeaway();
     return;
@@ -1367,17 +1361,13 @@ function drawShowcaseUI() {
   }
   if (exhibit.kind === "spectral" && (exhibit.finished || exhibit.takeawayOpen)) {
     lessonCard("Near infrared and NDVI · takeaways",
-      "A spectral signature describes how a surface reflects energy across measured bands.\nHealthy leaves typically reflect much near infrared (NIR) and absorb visible red light.\nFalse color displays NIR as a visible color; NDVI compares NIR and red to highlight vegetation differences.", -0.02);
-    label("NDVI = (NIR − red) / (NIR + red).\nHigher NDVI generally indicates healthy vegetation.",
-      0, -0.45, 2.4, 0.18, 24, "#b6d1d9", "#0b2430");
+      "A spectral signature describes how a surface reflects energy across measured bands.\nHealthy leaves typically reflect much near infrared (NIR) and absorb visible red light.\nFalse color displays NIR as a visible color; NDVI compares NIR and red to highlight vegetation differences.", -0.25);
     takeawayActions(-0.72);
     return;
   }
   if (exhibit.kind === "change" && exhibit.finished) {
     lessonCard("Images turn change into evidence",
-      "Change detection compares images of the same ground over time.\nAutomated change detection algorithms can identify and classify many different types of changes, greatly assisting researchers' efforts to monitor and study Earth's ever-changing landscapes.", -0.05);
-    label("NASA/USGS Landsat views · flood, fire, growth, eruption, and tornado",
-      0, -0.43, 2.4, 0.13, 25, "#b6d1d9", "#0b2430");
+      "Change detection compares images of the same ground over time.\nAutomated change detection algorithms can identify and classify many different types of changes, greatly assisting researchers' efforts to monitor and study Earth's ever-changing landscapes.", -0.18);
     takeawayActions(-0.64);
     return;
   }
@@ -1393,19 +1383,7 @@ function drawShowcaseUI() {
         "A buffer shows places within a set straight-line distance.\nSuitability analysis puts each criterion on a common scale and combines weighted scores.\nChanging the weights can change which site ranks first."],
     };
     const [title, body] = takeaways[exhibit.kind];
-    lessonCard(title, body, -0.05);
-    if (exhibit.kind === "cluster")
-      label("Colors show raw death counts. Broad wards cover more blocks;\npopulation data would support mortality-rate comparisons.",
-        0, -0.43, 2.4, 0.18, 26, "#b6d1d9", "#0b2430");
-    if (exhibit.kind === "projection")
-      label("Moving a landmass on the globe keeps its ground area. Its map footprint may grow or change shape.\nChoose a projection that supports what your map needs to compare.",
-        0, -0.43, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
-    if (exhibit.kind === "interpolation")
-      label("These rainfall readings are synthetic. Fewer gauges mean more uncertainty between them.",
-        0, -0.43, 2.4, 0.13, 26, "#b6d1d9", "#0b2430");
-    if (exhibit.kind === "suitability")
-      label("This town is schematic. A real clinic decision also weighs travel time,\nland and operating costs, local knowledge, and community priorities.",
-        0, -0.43, 2.4, 0.18, 25, "#b6d1d9", "#0b2430");
+    lessonCard(title, body, -0.18);
     takeawayActions(-0.62);
     return;
   }
@@ -1690,7 +1668,7 @@ function drawRainUI() {
           : "Runoff follows slope; ridges divide basins."}`,
       0, GUIDED_INFO_Y, 2.3, 0.22, 29, "#e6f4f5", "#0b2430",
     );
-  else lessonCard(title, body);
+  else lessonCard(title, body, r.stage === 4 ? -0.70 : GUIDED_CARD_Y);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
       button("Reset", -0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.42);
@@ -1730,18 +1708,6 @@ function drawRainUI() {
     button("Takeaways", 0.58, GUIDED_ACTION_Y, () => r.finish(), 1.02);
   }
   if (r.stage === 4) {
-    label(
-      r.kind === "erosion"
-        ? "Real slopes also vary in soil, roots, and rainfall.\nField measurements help estimate how fast erosion happens."
-        : "This model shows runoff and pond storage. Rain can\nalso soak into soil, evaporate, or collect in low spots.",
-      0,
-      GUIDED_INFO_Y,
-      2.3,
-      0.16,
-      28,
-      "#e6f4f5",
-      "#0b2430",
-    );
     if (r.kind === "erosion" && r.replayFrames.length > 1) {
       button("Replay", -0.78, GUIDED_ACTION_Y, () => r.startReplay(), 0.7);
       button("Restart", 0, GUIDED_ACTION_Y, start, 0.7);
@@ -2631,18 +2597,10 @@ function drawScene() {
     label(
       "Each distance narrows the possible locations.\nMore well-placed beacons resolve ambiguity.\nMeasurement error leaves an area of possible positions.",
       0,
-      0.18,
+      0.04,
       2,
-      0.5,
+      0.7,
       43,
-    );
-    label(
-      "Radio travel time gives a range; four or more signals\nlet a receiver solve 3D position and clock bias.\nOpen sky helps preserve a direct signal path.",
-      0,
-      -0.3,
-      2,
-      0.3,
-      33,
     );
     takeawayActions(-0.64);
 
