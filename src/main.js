@@ -3306,6 +3306,8 @@ renderer.setAnimationLoop((time, frame) => {
       const leftY = leftPad?.mapping === "xr-standard" ? leftPad.axes[3] ?? 0 : 0;
       if (visible && !soundMenuOpen && !teleportHandled && !teleport.active)
         landscapeDemo.walk(leftX, leftY, dt, renderer.xr.getCamera());
+      if (visible && !soundMenuOpen)
+        landscapeDemo.updateCanopyTransparency?.(renderer.xr.getCamera());
       if (!soundMenuOpen)
         landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera(), false,
           showFallbackControls);
@@ -3487,6 +3489,7 @@ renderer.setAnimationLoop((time, frame) => {
     else {
       const landscapeDemo = pixels ?? viewshed ?? layers ?? scan;
       if (!landscapeDemo.station) landscapeDemo.update(dt);
+      landscapeDemo.updateCanopyTransparency?.(camera);
       landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
     }
   }

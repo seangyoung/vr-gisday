@@ -184,6 +184,7 @@ function treesNear(x, z) {
 function makeTrees(group, raised) {
   const deciduous = TREE_POSITIONS.filter((p) => !p.evergreen);
   const evergreen = TREE_POSITIONS.filter((p) => p.evergreen);
+  const canopyInstances = new Map();
   const trunk = new THREE.InstancedMesh(
     // Bury the visible trunk end inside the foliage; climbing still reaches the canopy.
     new THREE.CylinderGeometry(0.11, 0.18, 1, 6),
@@ -209,7 +210,8 @@ function makeTrees(group, raised) {
     temp.updateMatrix();
     trunk.setMatrixAt(i, temp.matrix);
   });
-  deciduous.forEach(({ x, z, scale }, i) => {
+  deciduous.forEach((tree, i) => {
+    const { x, z, scale } = tree;
     temp.position.set(x, landscapeHeight(x, z, raised) + 2.65 * scale, z);
     temp.scale.setScalar(scale);
     temp.updateMatrix();
@@ -218,8 +220,10 @@ function makeTrees(group, raised) {
       i,
       new THREE.Color().setHSL(0.29 + seeded(i + 3100) * 0.09, 0.22, 0.28 + seeded(i + 3200) * 0.13),
     );
+    canopyInstances.set(tree, [{ mesh: broadleaf, index: i }]);
   });
-  evergreen.forEach(({ x, z, scale }, i) => {
+  evergreen.forEach((tree, i) => {
+    const { x, z, scale } = tree;
     temp.position.set(x, landscapeHeight(x, z, raised) + 2.65 * scale, z);
     temp.scale.setScalar(scale);
     temp.updateMatrix();
@@ -228,6 +232,7 @@ function makeTrees(group, raised) {
       i,
       new THREE.Color().setHSL(0.38 + seeded(i + 3400) * 0.04, 0.25, 0.23 + seeded(i + 3500) * 0.1),
     );
+    canopyInstances.set(tree, [{ mesh: pine, index: i }]);
   });
   group.add(trunk, broadleaf, pine);
   const nearLeaf = deciduous.filter(({ x, z }) => Math.hypot(x, z) < 58);
@@ -236,7 +241,8 @@ function makeTrees(group, raised) {
     new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1 }),
     nearLeaf.length * 3,
   );
-  nearLeaf.forEach(({ x, z, scale }, i) => {
+  nearLeaf.forEach((tree, i) => {
+    const { x, z, scale } = tree;
     for (let lobe = 0; lobe < 3; lobe++) {
       const angle = (lobe * Math.PI * 2) / 3 + seeded(i + 4500);
       temp.position.set(
@@ -250,6 +256,7 @@ function makeTrees(group, raised) {
       lobes.setColorAt(i * 3 + lobe, new THREE.Color().setHSL(
         0.29 + seeded(i + 3100) * 0.09, 0.22, 0.28 + seeded(i + 3200) * 0.13,
       ));
+      canopyInstances.get(tree).push({ mesh: lobes, index: i * 3 + lobe });
     }
   });
   group.add(lobes);
@@ -269,6 +276,53 @@ function makeTrees(group, raised) {
     shrubs.setMatrixAt(i, temp.matrix);
   }
   group.add(shrubs);
+  group.userData.canopyInstances = canopyInstances;
+  group.userData.fadedCanopies = new Map();
+}
+
+const hiddenCanopyMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+function setCanopyTransparency(group, tree, fade) {
+  const faded = group.userData.fadedCanopies;
+  if (fade === faded.has(tree)) return;
+  if (fade) {
+    const replacements = [];
+    for (const { mesh, index } of group.userData.canopyInstances.get(tree) ?? []) {
+      const matrix = new THREE.Matrix4();
+      const color = new THREE.Color();
+      mesh.getMatrixAt(index, matrix);
+      mesh.getColorAt(index, color);
+      mesh.setMatrixAt(index, hiddenCanopyMatrix);
+      mesh.instanceMatrix.needsUpdate = true;
+      const replacement = new THREE.Mesh(mesh.geometry, new THREE.MeshStandardMaterial({
+        color, roughness: 1, side: THREE.DoubleSide,
+        transparent: true, opacity: 0.35, depthWrite: false,
+      }));
+      replacement.matrix.copy(matrix);
+      replacement.matrixAutoUpdate = false;
+      group.add(replacement);
+      replacements.push({ mesh, index, matrix, replacement });
+    }
+    faded.set(tree, replacements);
+  } else {
+    for (const { mesh, index, matrix, replacement } of faded.get(tree)) {
+      mesh.setMatrixAt(index, matrix);
+      mesh.instanceMatrix.needsUpdate = true;
+      replacement.removeFromParent();
+      replacement.material.dispose();
+    }
+    faded.delete(tree);
+  }
+}
+
+function insideCanopy(tree, position, raised, margin = 0) {
+  const height = landscapeHeight(tree.x, tree.z, raised) + 2.65 * tree.scale;
+  const x = (position.x - tree.x) / tree.scale;
+  const y = (position.y - height) / tree.scale;
+  const z = (position.z - tree.z) / tree.scale;
+  const radial = Math.hypot(x, z);
+  if (!tree.evergreen) return radial * radial + y * y < (1.15 + margin) ** 2;
+  return y > -1.65 - margin && y < 1.65 + margin &&
+    radial < (1.65 - y) / 3.3 + margin;
 }
 function ribbonAlongZ(raised, halfWidth, yAt, color, crossSegments = 1) {
   const vertices = [], indices = [];
@@ -763,6 +817,7 @@ export class LayerExperience {
     this.applyVisibility();
   }
   place(camera) {
+    this.clearCanopyTransparency();
     this.cancelTreeClimb();
     const p = new THREE.Vector3();
     camera.getWorldPosition(p);
@@ -1193,6 +1248,7 @@ export class LayerExperience {
   }
   toggle(key) {
     if (!this.started || !LAYER_KEYS.includes(key) || this.finished) return;
+    if (key === "vegetation" || key === "topography") this.clearCanopyTransparency();
     if (this.reveal) {
       for (const variant of Object.values(this.variants))
         if (this.reveal.key !== "topography") variant[this.reveal.key].scale.y = 1;
@@ -1220,6 +1276,7 @@ export class LayerExperience {
     }
   }
   reset() {
+    this.clearCanopyTransparency();
     this.cancelTreeClimb();
     this.selected.clear();
     this.lastLayer = null;
@@ -1258,7 +1315,38 @@ export class LayerExperience {
     this.elapsed += dt;
     if (this.elapsed >= 240) this.finish();
   }
+  clearCanopyTransparency() {
+    for (const variant of Object.values(this.variants)) {
+      const vegetation = variant.vegetation;
+      for (const tree of [...vegetation.userData.fadedCanopies.keys()])
+        setCanopyTransparency(vegetation, tree, false);
+    }
+  }
+  updateCanopyTransparency(camera) {
+    const activeName = this.selected.has("topography") ? "raised" : "flat";
+    const active = this.started && !this.finished && this.treeInteractions &&
+      this.selected.has("vegetation") && this.group.visible;
+    for (const [name, variant] of Object.entries(this.variants)) {
+      const vegetation = variant.vegetation;
+      if (!active || name !== activeName) {
+        for (const tree of [...vegetation.userData.fadedCanopies.keys()])
+          setCanopyTransparency(vegetation, tree, false);
+        continue;
+      }
+      vegetation.updateWorldMatrix(true, false);
+      const head = vegetation.worldToLocal(camera.getWorldPosition(new THREE.Vector3()));
+      const nearby = new Set(treesNear(head.x, head.z));
+      for (const tree of [...vegetation.userData.fadedCanopies.keys()])
+        if (!nearby.has(tree) || !insideCanopy(tree, head, name === "raised", 0.12))
+          setCanopyTransparency(vegetation, tree, false);
+      for (const tree of nearby)
+        if (!vegetation.userData.fadedCanopies.has(tree) &&
+            insideCanopy(tree, head, name === "raised"))
+          setCanopyTransparency(vegetation, tree, true);
+    }
+  }
   dispose() {
+    this.clearCanopyTransparency();
     this.scene.background = this.previousBackground;
     this.scene.fog = this.previousFog;
     for (const group of [this.group, this.clipboard]) {

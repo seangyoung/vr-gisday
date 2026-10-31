@@ -152,6 +152,67 @@ test("left-stick walking follows the view, terrain, bounds, and clipboard locati
   map.geometry.dispose();
 });
 
+test("only canopies surrounding the visitor become transparent, then recover", () => {
+  const demo = new LayerExperience(new THREE.Scene(), () => {});
+  const camera = new THREE.PerspectiveCamera();
+  demo.begin();
+  demo.toggle("vegetation");
+  demo.update(1);
+  const vegetation = demo.variants.flat.vegetation;
+  const tree = TREE_POSITIONS.find((candidate) => !candidate.evergreen);
+  const [{ mesh, index }] = vegetation.userData.canopyInstances.get(tree);
+  const original = new THREE.Matrix4();
+  mesh.getMatrixAt(index, original);
+  vegetation.updateWorldMatrix(true, false);
+  camera.position.copy(vegetation.localToWorld(new THREE.Vector3(
+    tree.x, landscapeHeight(tree.x, tree.z, false) + 2.65 * tree.scale, tree.z,
+  )));
+  demo.updateCanopyTransparency(camera);
+  const faded = vegetation.userData.fadedCanopies.get(tree);
+  assert.ok(faded?.length);
+  assert.ok(faded.every(({ replacement }) => replacement.material.opacity < 1 &&
+    replacement.material.side === THREE.DoubleSide));
+  const hidden = new THREE.Matrix4();
+  mesh.getMatrixAt(index, hidden);
+  assert.equal(hidden.determinant(), 0);
+  assert.equal(vegetation.children[0].material.transparent, false,
+    "the trunk remains solid");
+  camera.position.y += 8;
+  demo.updateCanopyTransparency(camera);
+  assert.equal(vegetation.userData.fadedCanopies.size, 0);
+  const restored = new THREE.Matrix4();
+  mesh.getMatrixAt(index, restored);
+  assert.ok(restored.equals(original));
+  demo.toggle("topography");
+  demo.update(1);
+  const raised = demo.variants.raised.vegetation;
+  const pine = TREE_POSITIONS.find((candidate) => candidate.evergreen);
+  raised.updateWorldMatrix(true, false);
+  camera.position.copy(raised.localToWorld(new THREE.Vector3(
+    pine.x, landscapeHeight(pine.x, pine.z, true) + 2.65 * pine.scale, pine.z,
+  )));
+  demo.updateCanopyTransparency(camera);
+  assert.ok(raised.userData.fadedCanopies.has(pine));
+  demo.reset();
+  assert.equal(raised.userData.fadedCanopies.size, 0);
+  demo.dispose();
+
+  const pixelDemo = new PixelExperience(new THREE.Scene(), () => {});
+  pixelDemo.begin();
+  pixelDemo.showPixels();
+  const pixelTrees = pixelDemo.variants.raised.vegetation;
+  pixelTrees.updateWorldMatrix(true, false);
+  camera.position.copy(pixelTrees.localToWorld(new THREE.Vector3(
+    pine.x, landscapeHeight(pine.x, pine.z, true) + 2.65 * pine.scale, pine.z,
+  )));
+  pixelDemo.updateCanopyTransparency(camera);
+  assert.ok(pixelTrees.userData.fadedCanopies.has(pine));
+  pixelDemo.setViewMode("pixelated");
+  pixelDemo.updateCanopyTransparency(camera);
+  assert.equal(pixelTrees.userData.fadedCanopies.size, 0);
+  pixelDemo.dispose();
+});
+
 test("tree trunks stop walking and teleport while grip pulls the visitor above the canopy", () => {
   const l = new LayerExperience(new THREE.Scene(), () => {});
   const camera = new THREE.PerspectiveCamera();
