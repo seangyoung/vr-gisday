@@ -126,7 +126,17 @@ The third experience displays a slowly rotating globe beside the same public-dom
 
 The landmass experiment begins with Australia facing the visitor. Grip a landmass on the globe, then move its gold outline north or south over the flat map; grip the outline again to reposition it. A cyan outline marks its home latitude. The landmass is rotated on a virtual sphere before each projection, preserving ground distances and area. The tooltip compares the moved map footprint with the footprint at home latitude. Mercator enlarges high-latitude footprints; cylindrical equal-area keeps their map area while changing shape. Movement stops before any part of the landmass crosses the map's polar limit. A trigger click away clears the comparison and resumes the globe's spin. In development preview, mouse drag simulates the grip.
 
-Each of these experiences starts its four-minute timer only after its introduction button is pressed. **X** restarts it, **Y** recenters the display, **A** opens the existing sound menu, and **B** returns to the twelve-demo gallery. On Quest, check gallery readability and targeting as well as the demos' frame rate and transitions.
+Each of these experiences starts its four-minute timer only after its introduction button is pressed. **X** restarts it, **Y** recenters the display, **A** opens the existing sound menu, and **B** returns to the gallery. On Quest, check gallery readability and targeting as well as the demos' frame rate and transitions.
+
+## Experimental gallery page
+
+The VR menu now has **12 core demos** and **3 experimental** pages. The experiments keep the same intro, four-minute timer, takeaway, Restart, and Exit to Menu pattern. Development previews use `?preview&demo=outbreak`, `?preview&demo=photos`, and `?preview&demo=road`.
+
+- **One Change, Two Outbreaks:** two seeded, fictional 84-person neighborhoods share initial conditions and movement. The left-hand clipboard changes only the right-side contact distance or transmission chance, restarts the pair, and displays a chart; colored cells show infected-agent hotspots. Point at an agent to inspect recent contacts. Gripping with both hands in contact-distance mode and spreading them changes the contact ring; release restarts the pair at that setting. **Step inside** switches between street views and the tabletop.
+- **From Photos to Place:** select two overlapping source photographs from the March 22, 2024 USGS Marconi Beach survey. Grip to move a photo card. Step through camera locations, illustrative sparse/dense point previews derived from the published surface, and the aligned orthomosaic/DSM patch. **Step onto bluff** opens the real-scale surface; push and release the right stick while aiming at higher mapped ground to teleport. The reconstruction is preprocessed, with provenance and processing in [SOURCES.md](SOURCES.md).
+- **The Road Is Closed:** a tabletop graph shows an open north bridge as the fastest route. Grip and place the orange barricade on that bridge, or use its fallback button, to route over the slower south bridge. **Drive route** opens a seated ambulance view. Grip the wheel to steer; right trigger accelerates and left trigger brakes. The dashboard map tracks the vehicle and route. A missed turn can recalculate from the nearest road node. **Return to table** ends the drive early; reaching the patient or the time limit opens the comparison.
+
+The three experiments need a Quest 3S pass before they are considered finished. In particular, check controller reach, photo-scene frame rate, stereo text legibility, seated driving comfort, and the teleport landing.
 
 ## What Changed?
 

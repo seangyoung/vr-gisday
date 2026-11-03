@@ -34,6 +34,33 @@ export function drawMenuIcon(ctx, icon, color) {
   };
 
   switch (icon) {
+    case "outbreak": {
+      path([[0,-42],[0,40]]);
+      for (const [x,y] of [[-31,-25],[-19,-5],[-36,22],[-8,30],[20,-25],[32,-5],[11,15],[35,30]])
+        circle(x,y,5,true);
+      ctx.save(); ctx.globalAlpha=0.55;
+      circle(22,4,22); circle(-25,2,13);
+      ctx.restore();
+      break;
+    }
+    case "photos": {
+      ctx.strokeRect(-46,-35,58,51);
+      ctx.strokeRect(-12,-14,58,51);
+      circle(-24,-19,5,true); circle(10,2,5,true);
+      path([[-43,9],[-28,-4],[-15,11]]);
+      path([[-9,31],[8,16],[22,27],[42,7]]);
+      break;
+    }
+    case "road": {
+      path([[-45,-30],[-14,-30],[-14,-4],[15,-4],[15,31],[46,31]]);
+      path([[-44,3],[-27,3],[-27,31],[4,31]]);
+      ctx.save();ctx.setLineDash([3,7]);
+      path([[-44,-30],[-14,-30],[-14,-4],[15,-4],[15,31],[45,31]]);
+      ctx.restore();
+      path([[-17,-16],[17,-16]]);
+      circle(-44,-30,5,true);circle(45,31,5,true);
+      break;
+    }
     case "ranges": { // Three distance circles share one possible position.
       ctx.save();
       ctx.globalAlpha = 0.73;

@@ -207,6 +207,7 @@ export class LabSound {
       this.stopScanner();
       this.stopZipline();
       this.setRunoff(0);
+      this.setEngine(0);
     }
     if (!this.master) return;
     if (this.appliedActive === active && this.appliedMuted === this.muted &&
@@ -306,6 +307,27 @@ export class LabSound {
   }
   setRiverPosition(position) { placeAudioSource(this.riverPanner, position); }
   setRainPosition(position) { placeAudioSource(this.rainPanner, position); }
+  setEngine(speed = 0) {
+    if (!this.context || !this.effectsBus) return;
+    if (!this.engineOscillator && speed > 0) {
+      this.engineOscillator = this.context.createOscillator();
+      this.engineOscillator.type = "sawtooth";
+      const filter = this.context.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 170;
+      this.engineGain = this.context.createGain();
+      this.engineGain.gain.value = 0;
+      this.engineOscillator.connect(filter);
+      filter.connect(this.engineGain);
+      this.engineGain.connect(this.effectsBus);
+      this.engineOscillator.start();
+    }
+    if (!this.engineGain) return;
+    const now=this.context.currentTime;
+    this.engineOscillator.frequency.setTargetAtTime(48 + Math.max(0,speed)*8,now,0.08);
+    this.engineGain.gain.setTargetAtTime(speed > 0 ? 0.025 + Math.min(8,speed)*0.005 : 0,
+      now,0.09);
+  }
   setRunoff(level) {
     if (!this.runoff) return;
     const next = this.active ? Math.max(0, Math.min(1, level)) : 0;

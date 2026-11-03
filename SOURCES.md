@@ -119,3 +119,22 @@ The three original cylindrical formulas remain in `src/showcase/projection-model
 - Esri, [*How Spline works*](https://pro.arcgis.com/en/pro-app/3.4/tool-reference/3d-analyst/how-spline-works.htm) — a minimum-curvature spline also passes exactly through observations. The demo's deliberately non-exact broad trend is therefore labeled a Gaussian-smoothed average rather than a spline.
 
 All 12 rainfall readings, station positions, and surfaces are generated locally from original synthetic teaching data in `src/interpolation/model.js`. The two horizontal coordinates are dimensionless model positions; rainfall values are millimeters. Display heights are exaggerated for readability. Neither the synthetic gauges nor the surfaces represent an actual storm.
+
+## Experimental experiences — added 2026-11-02
+
+### One Change, Two Outbreaks
+
+- Northwestern University Center for Connected Learning and Computer-Based Modeling, [*Spread of Disease*](https://ccl.northwestern.edu/netlogo/models/SpreadofDisease) — teaching inspiration for showing how agent interaction assumptions influence aggregate patterns. The app's simulation, seed, geometry, and text are original; it does not copy NetLogo code or assets. The Northwestern model itself is CC BY-NC-SA 3.0.
+- The app uses 84 fictional agents per neighborhood, two initially infectious agents, deterministic shared movement draws, a 0.2-second fixed simulation step, and one changed right-side contact rule per paired run. It illustrates agent-based reasoning, not a disease forecast or fitted epidemiological model.
+
+### From Photos to Place
+
+- USGS Woods Hole Coastal and Marine Science Center, [March 2024 Marconi Beach structure-from-motion products](https://cmgds.marine.usgs.gov/catalog/whcmsc/SB_data_release/DR_P14VBPYC/2024-016-FA_Marconi_SfM_meta.html) and [source imagery metadata](https://cmgds.marine.usgs.gov/catalog/whcmsc/SB_data_release/DR_P14VBPYC/2024-016-FA_Marconi_imagery_meta.html). Survey date: March 22, 2024. Source photographs were collected by a camera on a Helikite; the published surface and orthomosaic were processed by USGS with structure-from-motion methods. The metadata identifies these USGS data as public domain/CC0. Credit: U.S. Geological Survey, 2024-016-FA Marconi Beach survey, DOI 10.5066/P14VBPYC.
+- Six adjacent source photographs, filenames ending `R0081404`, `R0081403`, `R0081402`, `R0081401`, `R0081400`, and `R0081399`, were downloaded from the [USGS imagery viewer](https://cmgds.marine.usgs.gov/idsviewer/data_release/10.5066-P14VBPYC/). `scripts/fetch-marconi-photos.py` records exact media URLs and makes 1200 × 900 JPEGs at quality 80. Their EXIF camera positions were estimated by Agisoft Metashape; the horizontally transformed positions in `src/experimental/marconi-cameras.js` are approximate NAD83/UTM zone 19N coordinates. EXIF ellipsoid heights were not used with the NAVD88 surface.
+- The source 5 cm DSM (`2024-016-FA_Marconi_DSM_UTM19N_NAVD88_5cm.tif`) and 5 cm orthomosaic (`2024-016-FA_Marconi_RGBavg_UTM19N_5cm.tif`) were downloaded from the [USGS ScienceBase release](https://www.sciencebase.gov/catalog/item/662a9b7cd34ea70bd5f0af25). `scripts/build-marconi-assets.py` crops both at source pixel rectangle `(1250, 5800, 4650, 9200)`. The DSM is sampled to 161 × 161 nearest-neighbor heights, preserving no-data holes; the matched orthomosaic becomes a 1024 × 1024 quality-83 JPEG. Its pixel window covers 170 × 170 m. The locally bundled assets total roughly 1.3 MB.
+- The sparse/dense point displays are **illustrative samples of the published DSM and orthomosaic**, not the original feature-match or dense SfM point-cloud files. Camera rays are schematic and only their horizontal origins use the EXIF estimates. The experience replays the workflow and does not run photogrammetry on Quest.
+
+### The Road Is Closed
+
+- Meta, [Locomotion in virtual environments](https://developers.meta.com/vr/design/locomotion-virtual-environments/) — comfort considerations behind the stable cockpit, low speed cap, short drive, and immediate return control.
+- Town, roads, buildings, barricade, routes, and costs are original fictional data. Edge travel time is road length divided by its assigned speed; closing the north bridge removes that edge before Dijkstra routing. The same graph is used for the table, dashboard, and drive. Travel times omit traffic, signals, and dispatch delay.

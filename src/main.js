@@ -56,6 +56,9 @@ import { ProjectionExperience } from "./showcase/projection-experience.js";
 import { PROJECTIONS, PROJECTION_PICKER_GROUPS, PROJECTION_NOTES } from "./showcase/projection-model.js";
 import { InterpolationExperience } from "./interpolation/experience.js";
 import { SuitabilityExperience } from "./suitability/experience.js";
+import { OutbreakExperience } from "./experimental/outbreak-experience.js";
+import { PhotoExperience } from "./experimental/photo-experience.js";
+import { RoadExperience } from "./experimental/road-experience.js";
 import { QuizExperience } from "./quiz/experience.js";
 import { QuizLeaderboard } from "./quiz/leaderboard.js";
 import { renderLandingLeaderboard } from "./quiz/landing-leaderboard.js";
@@ -124,6 +127,7 @@ let layers = null;
 let viewshed = null;
 let pixels = null;
 let showcase = null;
+let menuPage = 0;
 let quiz = null;
 let xrMode = null;
 let pendingRoomHandoff = false;
@@ -372,7 +376,7 @@ function foregroundTakeaway() {
     mesh.material.depthWrite = false;
   }
 }
-function menuCard({ title, lines, category, preview, icon, color, action }, index, total) {
+function menuCard({ title, lines, category, preview, icon, color, action, number }, index, total) {
   const canvas = document.createElement("canvas");
   canvas.width = 720;
   canvas.height = 360;
@@ -391,7 +395,7 @@ function menuCard({ title, lines, category, preview, icon, color, action }, inde
   drawMenuIcon(ctx, icon, color);
   ctx.fillStyle = color;
   ctx.font = "600 31px system-ui, sans-serif";
-  ctx.fillText(String(index + 1).padStart(2, "0"), 90, 321);
+  ctx.fillText(String(number ?? index + 1).padStart(2, "0"), 90, 321);
   ctx.textAlign = "left";
   ctx.font = "600 27px system-ui, sans-serif";
   ctx.fillText(category.toUpperCase(), 181, 53, 510);
@@ -464,7 +468,8 @@ function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
   const visualRoots = [
     root, floatingModel, gnssPopup?.group, rain?.group, scan?.group,
-    scan?.clipboard, showcase?.model,
+    scan?.clipboard, showcase?.group, showcase?.world, showcase?.cockpit,
+    showcase?.clipboard, showcase?.fade,
     quiz?.group, quiz?.letterField, quiz?.effects,
     ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
@@ -592,6 +597,7 @@ function point(p, color, r = 0.026, z = 0.045) {
 }
 function openMenu() {
   closeSoundMenu();
+  teleport.cancel();
   stopRainInput();
   scan?.dispose();
   scan = null;
@@ -818,6 +824,7 @@ function startPixels() {
   draw();
 }
 function startShowcase(kind) {
+  teleport.cancel();
   stopRainInput();
   rain?.dispose(); rain = null;
   scan?.dispose(); scan = null;
@@ -833,6 +840,9 @@ function startShowcase(kind) {
     change: ChangeExperience,
     interpolation: InterpolationExperience,
     suitability: SuitabilityExperience,
+    outbreak: OutbreakExperience,
+    photos: PhotoExperience,
+    road: RoadExperience,
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
   showcase = new Constructor(root, (reason) => {
@@ -1338,6 +1348,15 @@ function drawShowcaseUI() {
       suitability: ["Where Should It Go?",
         "A town needs a new clinic. GIS suitability analysis combines several spatial criteria.\nInspect three sites using a 450 m distance buffer, road proximity, and flood exposure.\nChange the priorities to see how the preferred site changes.",
         "Compare the sites"],
+      outbreak: ["One Change, Two Outbreaks",
+        "Agent-based models follow individuals and their interactions. These two fictional neighborhoods begin with the same people, movements, and infections. Change one rule on the right, then compare where infections spread. The model illustrates possible patterns; it does not forecast a real disease.",
+        "Run the paired models"],
+      photos: ["From Photos to Place",
+        "Overlapping photographs can reveal a three-dimensional surface when shared features appear from different viewpoints. Handle real March 2024 USGS photographs of Marconi Beach, find a useful pair, then watch a simplified reconstruction sequence unfold.",
+        "Explore the photographs"],
+      road: ["The Road Is Closed",
+        "An emergency route depends on connected roads and travel-time costs. Place a barricade on the town bridge, watch the fastest route change, then try a short, comfortable drive to the patient.",
+        "Open dispatch table"],
     };
     const [title, body, action] = introductions[exhibit.kind];
     lessonCard(title, body, 0.13);
@@ -1371,6 +1390,20 @@ function drawShowcaseUI() {
     takeawayActions(-0.64);
     return;
   }
+  if (["outbreak", "photos", "road"].includes(exhibit.kind) && exhibit.finished) {
+    const takeaways = {
+      outbreak: ["Small rules, spatial patterns",
+        "An agent-based model builds a larger pattern from individual movement and contacts. The paired runs share starting people and random movements. Changing one right-side contact rule can change the counts and hotspots. These fictional results illustrate how assumptions shape a model's results; they are not a disease forecast."],
+      photos: ["Overlap becomes a surface",
+        "Photogrammetry links features seen in overlapping photographs, estimates camera positions, and reconstructs 3D points. A dense point cloud can support a surface model and orthomosaic. This experience replays a preprocessed part of a real March 2024 USGS Marconi Beach survey; the headset does not calculate the reconstruction."],
+      road: ["A closure changes the network",
+        `Fastest routes depend on road connections and estimated travel times. ${exhibit.closed.length ? `Closing the north bridge changed this route from ${exhibit.original.minutes.toFixed(2)} to ${exhibit.closedRoute.minutes.toFixed(2)} simulated minutes.` : `The open north bridge gives a route of ${exhibit.original.minutes.toFixed(2)} simulated minutes; a closure would redirect traffic to the slower south bridge.`} Driving can differ from that estimate when a turn is missed or traffic conditions change. GIS routing tools recalculate from the current position.`],
+    };
+    const [title, body] = takeaways[exhibit.kind];
+    lessonCard(title, body, -0.17);
+    takeawayActions(-0.63);
+    return;
+  }
   if (exhibit.finished) {
     const takeaways = {
       cluster: ["Same deaths, new boundaries",
@@ -1385,6 +1418,66 @@ function drawShowcaseUI() {
     const [title, body] = takeaways[exhibit.kind];
     lessonCard(title, body, -0.18);
     takeawayActions(-0.62);
+    return;
+  }
+  if (exhibit.kind === "outbreak") {
+    label(exhibit.streetSide
+      ? `Street view: ${exhibit.streetSide} neighborhood · follow agents and recent contacts`
+      : "Use the left-hand clipboard to change one rule, inspect agents, or step inside.",
+    0, -0.91, 2.48, 0.15, 26, "#d8f3e6", "#0b2430");
+    buttons.push(...exhibit.controls.filter(control => control.visible));
+    return;
+  }
+  if (exhibit.kind === "photos") {
+    const messages = [
+      "Select two nearby photos with shared features, or grip and move a card.",
+      "These six camera positions cluster because the photos were taken seconds apart. Rays show shared features.",
+      "A few matched points suggest the first 3D structure. This preview samples the finished survey DSM.",
+      "More matches make a denser 3D point cloud. This preview samples the finished survey DSM.",
+      "The survey orthomosaic is draped over the aligned elevation surface.",
+      "At the bluff: aim at high ground and push/release the right stick to teleport.",
+    ];
+    label("FROM PHOTOS TO PLACE", 0, 1.00, 2.43, 0.16, 43,
+      "#e6f4f5", "#0b2430");
+    if (exhibit.phase !== 0 || exhibit.assetError) label(
+      exhibit.assetError ? `Survey asset error: ${exhibit.assetError}` :
+        exhibit.coverageNote ??
+        (!exhibit.assetReady ? "Loading survey patch…" : messages[exhibit.phase]),
+      0, -0.77, 2.47, 0.20, 29, "#e6f4f5", "#0b2430");
+    if (exhibit.phase < 5) button(["Match photos", "Show sparse cloud", "Build dense cloud",
+      "Drape surface", "Step onto bluff"][exhibit.phase], -0.61, -1.10,
+      () => { if (exhibit.advance(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera))
+        sound.cue("reveal"); }, 1.15);
+    if (exhibit.phase === 5) button("Return to model", -0.61, -1.10,
+      () => { teleport.cancel(); exhibit.setPhase(4); }, 1.15);
+    button("Takeaway", 0.68, -1.10, () => exhibit.finish(), 1.05);
+    return;
+  }
+  if (exhibit.kind === "road") {
+    if (exhibit.phase !== "driving") label("THE ROAD IS CLOSED", 0, 0.99,
+      2.43, 0.16, 43, "#e6f4f5", "#0b2430");
+    if (exhibit.phase === "table") {
+      label(exhibit.closed.length
+        ? "North bridge closed. Compare the route, then drive to the patient."
+        : "Grip the orange barricade and place it on the north bridge.",
+        0, -0.84, 2.43, 0.16, 28, "#e6f4f5", "#0b2430");
+      button(exhibit.closed.length ? "Reopen bridge" : "Close north bridge",
+        -0.87, -1.09, () => exhibit.toggleClosure(), 1.0);
+      if (exhibit.closed.length) button("Drive route", 0.16, -1.09,
+        () => exhibit.startDrive(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera),
+        0.90);
+      else label("Close bridge to drive", 0.16, -1.09, 0.90, 0.16, 28,
+        "#b6d1d9", "#0b2430");
+      button("Takeaway", 1.05, -1.09, () => exhibit.finish(), 0.72);
+    } else if (exhibit.phase === "driving") {
+      label("Grip wheel to steer · right trigger accelerate · left trigger brake",
+        0, 0.99, 2.43, 0.16, 30, "#e6f4f5", "#0b2430");
+      button("Return to table", 0, -1.12, () => exhibit.returnToTable(), 1.25);
+    } else {
+      label(`Blue: original ${exhibit.original.minutes.toFixed(2)} min · green: closed ${exhibit.closedRoute.minutes.toFixed(2)} min\nOrange: driven path ${exhibit.driveTime.toFixed(1)} s${exhibit.rerouted ? " · rerouted" : ""}`,
+        0, -0.87, 2.45, 0.24, 27, "#e6f4f5", "#0b2430");
+      button("Takeaway", 0, -1.10, () => exhibit.finish(), 1.1);
+    }
     return;
   }
   if (exhibit.kind === "suitability") {
@@ -2361,11 +2454,18 @@ function controllerGuideContext(hand) {
       treeLandscape()?.treeInteractions && treeLandscape().selected.has("vegetation")
         ? treeLandscape().treeClimbHands.size ? "Flick + release" : "Climb trunk" : null,
       onMenu, exitLabel, treeLandscape()?.isClimbingTree ? null : teleportHint];
-  if (showcase) return [showcase.kind === "projection" ? "Spin / select" :
+  if (showcase) return [showcase.kind === "road" && showcase.phase === "driving" ?
+      hand === "right" ? "Accelerate" : "Brake" :
+    showcase.kind === "outbreak" && hand === "left" ? null :
+    showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
+    showcase.kind === "road" ? showcase.phase === "driving" ? "Steer wheel" : "Carry barrier" :
+    showcase.kind === "photos" ? "Move photo" :
+    showcase.kind === "outbreak" ? "Spread hands" :
     showcase.kind === "projection" ? "Grab land" :
       ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
-    onMenu, exitLabel];
+    onMenu, exitLabel, showcase.kind === "photos" && showcase.phase === 5 && hand === "right"
+      ? "↑ Teleport" : null];
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
@@ -2374,7 +2474,8 @@ function leftHoldsClipboard(controller) {
   return controller.userData.xrInput?.handedness === "left" &&
     (layers?.started || viewshed?.started ||
       pixels?.started && pixels.phase === "pixels" ||
-      scan?.station && scan.started && !scan.finished);
+      scan?.station && scan.started && !scan.finished ||
+      showcase?.kind === "outbreak" && showcase.started && !showcase.finished);
 }
 function updateControllerGuides(cam, tracked, dt) {
   if (showFallbackControls) {
@@ -2543,8 +2644,9 @@ function drawScene() {
     }
     label("SPATIAL DISCOVERY LAB", 0, 1.03, 2.4, 0.13, 36,
       "#a6f5d9", "#0b2430");
-    label("Choose an experience", 0, 0.83, 2.5, 0.17, 52);
-    [
+    label(menuPage === 0 ? "Choose an experience" : "Experimental experiences",
+      0, 0.83, 2.5, 0.17, 52);
+    (menuPage === 0 ? [
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
         category: "GIS layers", preview: "Build a landscape by switching GIS layers on.",
         icon: "layers", color: "#a8d995", action: startLayers },
@@ -2586,9 +2688,29 @@ function drawScene() {
       { title: "GeoSlice Challenge", lines: ["GeoSlice", "Challenge"],
         category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
         icon: "slice", color: "#83e2de", action: startQuiz },
-    ].forEach((item, index, all) => menuCard(item, index, all.length));
+    ] : [
+      { title: "One Change, Two Outbreaks", lines: ["One Change,", "Two Outbreaks"],
+        category: "Agent-based models", preview: "Change one contact rule and compare paired outbreaks.",
+        icon: "outbreak", color: "#f4ae91", number: 13,
+        action: () => startShowcase("outbreak") },
+      { title: "From Photos to Place", lines: ["From Photos", "to Place"],
+        category: "Photogrammetry", preview: "Build a coast from overlapping USGS photographs.",
+        icon: "photos", color: "#a9d8e7", number: 14,
+        action: () => startShowcase("photos") },
+      { title: "The Road Is Closed", lines: ["The Road", "Is Closed"],
+        category: "Network analysis", preview: "Close a bridge and drive a recalculated route.",
+        icon: "road", color: "#f6d084", number: 15,
+        action: () => startShowcase("road") },
+    ]).forEach((item, index, all) => menuCard(item, index, all.length));
+    if (menuPage === 1)
+      label("Three short experiments · Try them and tell us what to refine",
+        0, -0.26, 2.65, 0.15, 32, "#b6d1d9", "#0b2430");
+    button("12 core demos", -0.60, -0.88, () => { menuPage = 0; draw(); },
+      1.12, menuPage === 0);
+    button("3 experimental", 0.60, -0.88, () => { menuPage = 1; draw(); },
+      1.12, menuPage === 1);
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
-      0, -0.97, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
+      0, -1.08, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
     return;
   }
@@ -2793,6 +2915,8 @@ for (let i = 0; i < 2; i++) {
       return;
     }
     if (soundMenuOpen) return;
+    if (showcase?.kind === "road" && showcase.phase === "driving" &&
+        showcase.driveInput(c.userData.xrInput?.handedness, true)) return;
     if (step === GNSS_SATELLITE && inspectGnssPart(raycaster)) return;
     if (selectGnssSatellite(raycaster)) return;
     if (viewshed) {
@@ -2822,6 +2946,7 @@ for (let i = 0; i < 2; i++) {
     }
   });
   c.addEventListener("selectend", () => {
+    if (showcase?.kind === "road") showcase.driveInput(c.userData.xrInput?.handedness, false);
     showcase?.endInteraction?.(i);
     pixels?.platformScene?.endSpin(i);
     scan?.endPreviewDrag?.(i);
@@ -2834,6 +2959,15 @@ for (let i = 0; i < 2; i++) {
     if (viewshed?.isZiplining) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (soundMenuOpen) return;
+    if (["outbreak", "photos", "road"].includes(showcase?.kind) &&
+        showcase.started && !showcase.finished && grip.visible) {
+      grip.updateWorldMatrix(true, false);
+      intersect(c);
+      if (showcase.kind === "outbreak" ? showcase.beginGrip(i, grip, raycaster) :
+          showcase.kind === "photos" ? showcase.beginGrip(raycaster, i, grip) :
+          showcase.beginGrip(i, grip, raycaster)) sound.click();
+      return;
+    }
     if (viewshed?.started && grip.visible) {
       grip.updateWorldMatrix(true, false);
       const handWorld = grip.getWorldPosition(new THREE.Vector3());
@@ -2936,6 +3070,7 @@ for (let i = 0; i < 2; i++) {
     rain?.grab.release(i);
     showcase?.grab?.release(i);
     showcase?.endContinentGrip?.(i);
+    showcase?.endGrip?.(i);
     rain?.endStroke(i);
   });
   c.addEventListener("disconnected", () => {
@@ -2947,6 +3082,7 @@ for (let i = 0; i < 2; i++) {
     c.userData.xrInput = null;
     guide.setHandedness("none");
     grab?.release(i, false);
+    showcase?.endGrip?.(i);
     scan?.grab.release(i, false);
     rain?.grab.release(i, false);
     showcase?.grab?.release(i, false);
@@ -3154,6 +3290,22 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
+    if (showcase?.kind === "photos" && showcase.phase === 5 && visibleSession &&
+        !soundMenuOpen) {
+      const right = controllers.find(({ c }) => c.userData.xrInput?.handedness === "right");
+      const pad = right?.c.userData.xrInput?.gamepad;
+      const x = pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0;
+      const y = pad?.mapping === "xr-standard" ? pad.axes[3] ?? 0 : 0;
+      const action = teleportStickAction(teleport.active && teleport.demo === showcase, x, y);
+      if (action === "begin") teleport.begin(showcase);
+      if (["begin", "aim", "commit"].includes(action) && right?.c.visible) {
+        const uiHit = intersect(right.c);
+        teleport.aim(raycaster, uiHit);
+      }
+      if (action === "commit") {
+        if (teleport.release(renderer.xr.getCamera())) sound.cue("reveal");
+      } else if (action === "cancel") teleport.cancel();
+    }
     const landscapeDemo = (pixels?.phase === "pixels" ? pixels : null) ??
       viewshed ?? layers ?? (scan?.station ? scan : null);
     if (pixels?.phase === "platforms" && visibleSession && !soundMenuOpen)
@@ -3188,7 +3340,8 @@ renderer.setAnimationLoop((time, frame) => {
       }
     }
     if (showcase && visibleSession && !soundMenuOpen)
-      showcase.update(dt, renderer.xr.getCamera());
+      showcase.update(dt, renderer.xr.getCamera(),
+        new Map(controllers.map(({ id, grip }) => [id, grip])));
     if (quiz && !quiz.session && visibleSession && !soundMenuOpen) {
       const right = controllers.find(({ c, grip }) =>
         c.userData.xrInput?.handedness === "right" && c.visible && grip.visible);
@@ -3388,7 +3541,7 @@ renderer.setAnimationLoop((time, frame) => {
         scanHit(c) || (showcase?.kind === "interpolation" ? null :
           showcase?.kind === "projection"
             ? showcase.continentGripHit(raycaster)
-            : showcase?.grabHit?.(raycaster));
+            : showcase?.grabHit?.(raycaster) ?? showcase?.pointerHit?.(raycaster));
       const interpolationGauge = hit || soundMenuOpen ||
         showcase?.kind !== "interpolation" ? null : showcase.gaugeHit(raycaster);
       const interpolationTarget = hit || soundMenuOpen ||
@@ -3407,7 +3560,7 @@ renderer.setAnimationLoop((time, frame) => {
         showcase?.draggingBy !== id &&
         pixels?.platformScene?.spinBy !== id;
       const activeTarget = pointerAvailable && !!interpolationTarget;
-      if (teleport.active && teleport.demo === landscapeDemo &&
+      if (teleport.active && (teleport.demo === landscapeDemo || teleport.demo === showcase) &&
           c.userData.xrInput?.handedness === "right") {
         beam.visible = true;
         targetBeam.visible = false;
@@ -3452,7 +3605,7 @@ renderer.setAnimationLoop((time, frame) => {
     }
   }
   if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
-    showcase.update(dt, camera);
+    showcase.update(dt, camera, new Map());
   if (devPreview && quiz && !renderer.xr.isPresenting)
     quiz.update(dt, !soundMenuOpen);
   if (devPreview && rain && !renderer.xr.isPresenting && !soundMenuOpen) {
@@ -3503,6 +3656,8 @@ renderer.setAnimationLoop((time, frame) => {
     scanning ? scan.scanCursor / scan.coverage.samples.length : 0);
   const raining = audible && !soundMenuOpen && rain?.stage === 1;
   sound.setWater(!!(raining && time < waterSoundUntil));
+  sound.setEngine(showcase?.kind === "road" && showcase.phase === "driving" &&
+    !soundMenuOpen && audible ? showcase.speed : 0);
   const flux = raining ? rain.water.flux.reduce((sum, value) => sum + Math.abs(value), 0) : 0;
   sound.setRunoff(Math.min(1, Math.sqrt(flux * 20)));
   if (raining) sound.setRainPosition(rain.cloud.getWorldPosition(audioSource));
@@ -3553,7 +3708,8 @@ if (
   } else if (new URLSearchParams(location.search).get("demo") === "pixels") {
     camera.position.y = 1.6;
     startPixels();
-  } else if (["spectral", "cluster", "projection", "change", "interpolation", "suitability"].includes(
+  } else if (["spectral", "cluster", "projection", "change", "interpolation", "suitability",
+      "outbreak", "photos", "road"].includes(
     new URLSearchParams(location.search).get("demo"))) {
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
