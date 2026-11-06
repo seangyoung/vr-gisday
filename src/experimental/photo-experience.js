@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TimedExhibit } from '../showcase/exhibit.js';
 import { box, sphere, line, panel, disposeGroup, lighting } from './visuals.js';
-import { terrainAt, terrainMeshData, usefulPhotoOverlap } from './photo-model.js';
+import { terrainAtInterpolated, terrainMeshData, usefulPhotoOverlap } from './photo-model.js';
 import { MARCONI_CAMERAS } from './marconi-cameras.js';
 
 const BASE=import.meta.env.BASE_URL+'assets/marconi/';
@@ -87,11 +87,20 @@ export class PhotoExperience extends TimedExhibit {
       worldMesh.material.map=tex;
       worldMesh.material.side=THREE.DoubleSide;
       this.world.add(worldMesh);this.worldSurface=worldMesh;
-      for(let r=12;r<data.height-12;r+=9)for(let c=12;c<data.width-12;c+=9){
+      const contact=terrainMeshData(data,2);
+      const contactGeometry=new THREE.BufferGeometry();
+      contactGeometry.setAttribute('position',
+        new THREE.Float32BufferAttribute(contact.positions,3));
+      contactGeometry.setIndex(contact.indices);
+      // Use a 161-by-161 mesh for controller rays; the visible surface keeps full detail.
+      this.collider=new THREE.Mesh(contactGeometry,
+        new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+      this.collider.matrixAutoUpdate=false;
+      for(let r=24;r<data.height-24;r+=18)for(let c=24;c<data.width-24;c+=18){
         if(this.coverageMarkers.length>=8)break;
         const h=data.heights[r][c];
         if(h==null)continue;
-        if(data.heights[r][c+4]!=null&&data.heights[r+4][c]!=null)continue;
+        if(data.heights[r][c+8]!=null&&data.heights[r+8][c]!=null)continue;
         const x=c/(data.width-1)*170-85,z=r/(data.height-1)*170-85;
         const local=sphere(this.coverageModel,0.055,0xffa0af,x*0.017,
           -0.48+h*0.017,z*0.017);
@@ -114,8 +123,8 @@ export class PhotoExperience extends TimedExhibit {
         const z=(r/(data.height-1)*170-85)*0.017;
         let hash=(Math.imul(r+1,73856093)^Math.imul(c+1,19349663))>>>0;
         hash^=hash>>>16;hash=Math.imul(hash,0x7feb352d);hash^=hash>>>15;
-        const jitterX=((hash&255)/255-0.5)*0.018;
-        const jitterZ=(((hash>>>8)&255)/255-0.5)*0.018;
+        const jitterX=((hash&255)/255-0.5)*0.008;
+        const jitterZ=(((hash>>>8)&255)/255-0.5)*0.008;
         const point=[x+jitterX,-0.53+h*0.017,z+jitterZ];
         dense.push(...point);
         const u=Math.floor(c/(data.width-1)*511),v=Math.floor(r/(data.height-1)*511);
@@ -184,8 +193,14 @@ export class PhotoExperience extends TimedExhibit {
     if(!this.started||this.finished)return null;
     if(this.phase===0)return ray.intersectObjects(this.cards,true)[0];
     if(this.phase===4)return ray.intersectObject(this.surface,false)[0];
-    if(this.phase===5)return ray.intersectObject(this.worldSurface,false)[0];
+    if(this.phase===5)return this.surfaceHit(ray);
     return null;
+  }
+  surfaceHit(ray){
+    if(!this.collider)return null;
+    this.world.updateWorldMatrix(true,false);
+    this.collider.matrixWorld.copy(this.world.matrixWorld);
+    return ray.intersectObject(this.collider,false)[0]??null;
   }
   beginGrip(ray,id,grip){
     if(this.phase!==0||this.dragBy!=null)return false;
@@ -204,15 +219,46 @@ export class PhotoExperience extends TimedExhibit {
     // Start on surveyed high ground, looking across the bluff toward the shore.
     // The crop center borders a no-data gap and gives an awkward first view.
     const startX=0,startZ=-42.5;
-    const h=terrainAt(this.terrain,startX,startZ)??16;
+    const h=terrainAtInterpolated(this.terrain,startX,startZ)??16;
     this.world.rotation.y=Math.PI/2;
     const anchor=new THREE.Vector3(startX,0,startZ).applyAxisAngle(
       new THREE.Vector3(0,1,0),this.world.rotation.y);
     this.world.position.set(p.x-anchor.x,p.y-1.6-h,p.z-anchor.z);
   }
+  turn(angle,cam){
+    if(this.phase!==5||!angle)return;
+    const eye=cam.getWorldPosition(new THREE.Vector3());
+    const offset=this.world.position.clone().sub(eye)
+      .applyAxisAngle(new THREE.Vector3(0,1,0),angle);
+    this.world.position.x=eye.x+offset.x;
+    this.world.position.z=eye.z+offset.z;
+    this.world.rotation.y+=angle;
+  }
+  walk(stickX,stickY,dt,cam){
+    if(this.phase!==5||!this.assetReady||!this.started||this.finished||dt<=0)return;
+    const magnitude=Math.hypot(stickX,stickY);
+    if(!Number.isFinite(magnitude)||magnitude<0.18)return;
+    const direction=cam.getWorldDirection(new THREE.Vector3());
+    direction.y=0;direction.normalize();
+    const distance=2.8*Math.min(1,(magnitude-0.18)/0.82)*Math.min(dt,0.1)/magnitude;
+    const dx=(-direction.z*stickX-direction.x*stickY)*distance;
+    const dz=(direction.x*stickX-direction.z*stickY)*distance;
+    const eye=cam.getWorldPosition(new THREE.Vector3());
+    const local=this.world.worldToLocal(eye.clone());
+    const delta=new THREE.Vector3(dx,0,dz)
+      .applyAxisAngle(new THREE.Vector3(0,1,0),-this.world.rotation.y);
+    const nextX=local.x+delta.x,nextZ=local.z+delta.z;
+    const from=terrainAtInterpolated(this.terrain,local.x,local.z);
+    const to=terrainAtInterpolated(this.terrain,nextX,nextZ);
+    // Keep the visitor on mapped ground and avoid abrupt bluff or survey-edge steps.
+    if(from==null||to==null||Math.abs(to-from)>0.45)return;
+    this.world.position.x-=dx;
+    this.world.position.z-=dz;
+    this.world.position.y+=from-to;
+  }
   aimTeleport(ray){
     if(this.phase!==5||!this.worldSurface)return false;
-    const hit=ray.intersectObject(this.worldSurface,false)[0];
+    const hit=this.surfaceHit(ray);
     if(!hit){this.hoverTeleport=null;return false;}
     const local=this.world.worldToLocal(hit.point.clone());
     if(local.y<8){this.hoverTeleport=null;return false;}
@@ -224,12 +270,15 @@ export class PhotoExperience extends TimedExhibit {
     const delta=p.clone().add(new THREE.Vector3(0,-1.6,0)).sub(this.hoverTeleport);
     this.world.position.add(delta);this.hoverTeleport=null;return true;
   }
-  teleportCandidate(ray){
+  teleportCandidate(ray,uiHit=null){
     if(this.phase!==5||!this.worldSurface)return null;
-    const hit=ray.intersectObject(this.worldSurface,false)[0];
-    if(!hit)return null;
+    const hit=this.surfaceHit(ray);
+    if(!hit||uiHit&&uiHit.distance<hit.distance)return null;
     const local=this.world.worldToLocal(hit.point.clone());
-    return {point:hit.point.clone(),distance:hit.distance,valid:local.y>=8};
+    const height=terrainAtInterpolated(this.terrain,local.x,local.z);
+    const point=height==null?hit.point.clone():
+      this.world.localToWorld(new THREE.Vector3(local.x,height,local.z));
+    return {point,distance:hit.distance,valid:height!=null&&height>=8};
   }
   teleportTo(candidate,cam){
     if(!candidate?.valid)return false;
@@ -247,5 +296,9 @@ export class PhotoExperience extends TimedExhibit {
     }
   }
   finish(){super.finish();this.group.visible=false;this.world.visible=false;}
-  dispose(){this.disposed=true;disposeGroup(this.world);super.dispose();}
+  dispose(){
+    this.disposed=true;
+    this.collider?.geometry.dispose();this.collider?.material.dispose();
+    disposeGroup(this.world);super.dispose();
+  }
 }

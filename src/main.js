@@ -433,6 +433,11 @@ function menuCard({ title, lines, category, preview, icon, color, action, number
   mesh.position.set(column * 0.93, 0.53 - row * 0.52,
     0.08 + 0.08 * Math.abs(column));
   mesh.rotation.y = -column * 0.17;
+  if (total === 1) {
+    mesh.scale.setScalar(1.6);
+    mesh.position.set(0, 0.27, 0.08);
+    mesh.rotation.y = 0;
+  }
   mesh.userData.action = () => { sound.click(); action(); };
   mesh.userData.label = title;
   content.add(mesh);
@@ -1435,7 +1440,7 @@ function drawShowcaseUI() {
       "A few matched points suggest the first 3D structure. This preview samples the finished survey DSM.",
       "More matches make a denser 3D point cloud. This preview samples the finished survey DSM.",
       "The survey orthomosaic is draped over the aligned elevation surface.",
-      "At the bluff: aim at high ground and push/release the right stick to teleport.",
+      "At the bluff: left stick walks. Right stick turns sideways or aims a teleport forward.",
     ];
     label("FROM PHOTOS TO PLACE", 0, 1.00, 2.43, 0.16, 43,
       "#e6f4f5", "#0b2430");
@@ -2376,6 +2381,19 @@ function draw() {
     }
     const previewLandscape = (pixels?.phase === "pixels" ? pixels : null) ??
       viewshed ?? layers;
+    if (showcase?.kind === "photos" && showcase.phase === 5) {
+      for (const [name, action] of [
+        ["Preview walk forward", () => {
+          for (let i = 0; i < 16; i++) showcase.walk(0, -1, 0.1, camera);
+        }],
+        ["Preview turn right", () => showcase.turn(Math.PI / 6, camera)],
+      ]) {
+        const b = document.createElement("button");
+        b.textContent = name;
+        b.onclick = () => { action(); draw(); };
+        panel.append(b);
+      }
+    }
     if (previewLandscape?.started && !previewLandscape.finished) {
       const b = document.createElement("button");
       b.textContent = teleport.active
@@ -2460,7 +2478,7 @@ function controllerGuideContext(hand) {
     showcase.kind === "projection" ? "Spin / select" :
     showcase.kind === "interpolation" ? "Place estimate" : "Select",
     showcase.kind === "road" ? showcase.phase === "driving" ? "Steer wheel" : "Carry barrier" :
-    showcase.kind === "photos" ? "Move photo" :
+    showcase.kind === "photos" ? showcase.phase === 0 ? "Move photo" : null :
     showcase.kind === "outbreak" ? "Spread hands" :
     showcase.kind === "projection" ? "Grab land" :
       ["interpolation", "suitability"].includes(showcase.kind) ? "Move/size" : null,
@@ -2644,7 +2662,7 @@ function drawScene() {
     }
     label("SPATIAL DISCOVERY LAB", 0, 1.03, 2.4, 0.13, 36,
       "#a6f5d9", "#0b2430");
-    label(menuPage === 0 ? "Choose an experience" : "Experimental experiences",
+    label(menuPage === 0 ? "Choose an experience" : "Experimental experience",
       0, 0.83, 2.5, 0.17, 52);
     (menuPage === 0 ? [
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
@@ -2689,25 +2707,17 @@ function drawScene() {
         category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
         icon: "slice", color: "#83e2de", action: startQuiz },
     ] : [
-      { title: "One Change, Two Outbreaks", lines: ["One Change,", "Two Outbreaks"],
-        category: "Agent-based models", preview: "Change one contact rule and compare paired outbreaks.",
-        icon: "outbreak", color: "#f4ae91", number: 13,
-        action: () => startShowcase("outbreak") },
       { title: "From Photos to Place", lines: ["From Photos", "to Place"],
         category: "Photogrammetry", preview: "Build a coast from overlapping USGS photographs.",
-        icon: "photos", color: "#a9d8e7", number: 14,
+        icon: "photos", color: "#a9d8e7", number: 13,
         action: () => startShowcase("photos") },
-      { title: "The Road Is Closed", lines: ["The Road", "Is Closed"],
-        category: "Network analysis", preview: "Close a bridge and drive a recalculated route.",
-        icon: "road", color: "#f6d084", number: 15,
-        action: () => startShowcase("road") },
     ]).forEach((item, index, all) => menuCard(item, index, all.length));
     if (menuPage === 1)
-      label("Three short experiments · Try them and tell us what to refine",
+      label("A short experiment · Try it and tell us what to refine",
         0, -0.26, 2.65, 0.15, 32, "#b6d1d9", "#0b2430");
     button("12 core demos", -0.60, -0.88, () => { menuPage = 0; draw(); },
       1.12, menuPage === 0);
-    button("3 experimental", 0.60, -0.88, () => { menuPage = 1; draw(); },
+    button("1 experimental", 0.60, -0.88, () => { menuPage = 1; draw(); },
       1.12, menuPage === 1);
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -1.08, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
@@ -3290,24 +3300,9 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    if (showcase?.kind === "photos" && showcase.phase === 5 && visibleSession &&
-        !soundMenuOpen) {
-      const right = controllers.find(({ c }) => c.userData.xrInput?.handedness === "right");
-      const pad = right?.c.userData.xrInput?.gamepad;
-      const x = pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0;
-      const y = pad?.mapping === "xr-standard" ? pad.axes[3] ?? 0 : 0;
-      const action = teleportStickAction(teleport.active && teleport.demo === showcase, x, y);
-      if (action === "begin") teleport.begin(showcase);
-      if (["begin", "aim", "commit"].includes(action) && right?.c.visible) {
-        const uiHit = intersect(right.c);
-        teleport.aim(raycaster, uiHit);
-      }
-      if (action === "commit") {
-        if (teleport.release(renderer.xr.getCamera())) sound.cue("reveal");
-      } else if (action === "cancel") teleport.cancel();
-    }
     const landscapeDemo = (pixels?.phase === "pixels" ? pixels : null) ??
-      viewshed ?? layers ?? (scan?.station ? scan : null);
+      viewshed ?? layers ?? (scan?.station ? scan : null) ??
+      (showcase?.kind === "photos" && showcase.phase === 5 ? showcase : null);
     if (pixels?.phase === "platforms" && visibleSession && !soundMenuOpen)
       pixels.update(dt);
     if (["projection", "change"].includes(showcase?.kind) &&
@@ -3356,7 +3351,8 @@ renderer.setAnimationLoop((time, frame) => {
     quiz?.update(dt, visibleSession && !soundMenuOpen);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
-      if (visible && !soundMenuOpen && !landscapeDemo.station) landscapeDemo.update(dt);
+      if (visible && !soundMenuOpen && !landscapeDemo.station &&
+          landscapeDemo !== showcase) landscapeDemo.update(dt);
       const right = visible && !soundMenuOpen
         ? controllers.find(({ c }) => c.userData.xrInput?.handedness === "right")
         : null;
@@ -3420,7 +3416,7 @@ renderer.setAnimationLoop((time, frame) => {
       if (visible && !soundMenuOpen)
         landscapeDemo.updateCanopyTransparency?.(renderer.xr.getCamera());
       if (!soundMenuOpen)
-        landscapeDemo.updateClipboard(left?.grip, renderer.xr.getCamera(), false,
+        landscapeDemo.updateClipboard?.(left?.grip, renderer.xr.getCamera(), false,
           showFallbackControls);
     }
     if (rain && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {

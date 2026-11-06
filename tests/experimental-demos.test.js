@@ -4,7 +4,8 @@ import { readFileSync,statSync } from 'node:fs';
 import { makeOutbreak,advanceOutbreak,outbreakCounts,OUTBREAK_POPULATION } from
   '../src/experimental/outbreak-model.js';
 import { fastestRoute,TOWN_EDGES,TOWN_NODES,driveStep } from '../src/experimental/road-model.js';
-import { terrainMeshData,usefulPhotoOverlap } from '../src/experimental/photo-model.js';
+import { terrainAtInterpolated,terrainMeshData,usefulPhotoOverlap } from
+  '../src/experimental/photo-model.js';
 import { MARCONI_CAMERAS } from '../src/experimental/marconi-cameras.js';
 
 test('paired outbreak runs reproduce movement and conserve population',()=>{
@@ -51,12 +52,15 @@ test('photo survey mesh preserves holes and high-overlap pairs',()=>{
   assert.equal(mesh.indices.length,0);
   assert.equal(usefulPhotoOverlap(1,2),true);
   assert.equal(usefulPhotoOverlap(0,5),false);
+  assert.equal(terrainAtInterpolated({width:2,height:2,metersPerCell:170,
+    heights:[[0,10],[20,30]]},0,0),15);
+  assert.equal(terrainAtInterpolated(data,-42.5,-42.5),null);
 });
 test('bundled Marconi survey patch and source photo subset are present and aligned',()=>{
   const data=JSON.parse(readFileSync(new URL('../public/assets/marconi/terrain.json',import.meta.url)));
-  assert.equal(data.width,161);
-  assert.equal(data.heights.length,161);
-  assert.equal(data.heights[0].length,161);
+  assert.equal(data.width,321);
+  assert.equal(data.heights.length,321);
+  assert.equal(data.heights[0].length,321);
   assert.deepEqual(data.utm19nTopLeft,[420027.5,4638270]);
   assert.ok(data.heights.flat().some(h=>h===null));
   for(const [x,y] of MARCONI_CAMERAS){
