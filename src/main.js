@@ -127,7 +127,6 @@ let layers = null;
 let viewshed = null;
 let pixels = null;
 let showcase = null;
-let menuPage = 0;
 let quiz = null;
 let xrMode = null;
 let pendingRoomHandoff = false;
@@ -433,11 +432,6 @@ function menuCard({ title, lines, category, preview, icon, color, action, number
   mesh.position.set(column * 0.93, 0.53 - row * 0.52,
     0.08 + 0.08 * Math.abs(column));
   mesh.rotation.y = -column * 0.17;
-  if (total === 1) {
-    mesh.scale.setScalar(1.6);
-    mesh.position.set(0, 0.27, 0.08);
-    mesh.rotation.y = 0;
-  }
   mesh.userData.action = () => { sound.click(); action(); };
   mesh.userData.label = title;
   content.add(mesh);
@@ -2662,9 +2656,8 @@ function drawScene() {
     }
     label("SPATIAL DISCOVERY LAB", 0, 1.03, 2.4, 0.13, 36,
       "#a6f5d9", "#0b2430");
-    label(menuPage === 0 ? "Choose an experience" : "Experimental experience",
-      0, 0.83, 2.5, 0.17, 52);
-    (menuPage === 0 ? [
+    label("Choose an experience", 0, 0.83, 2.5, 0.17, 52);
+    [
       { title: "Stand Inside the Layers", lines: ["Stand Inside", "the Layers"],
         category: "GIS layers", preview: "Build a landscape by switching GIS layers on.",
         icon: "layers", color: "#a8d995", action: startLayers },
@@ -2706,19 +2699,7 @@ function drawScene() {
       { title: "GeoSlice Challenge", lines: ["GeoSlice", "Challenge"],
         category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
         icon: "slice", color: "#83e2de", action: startQuiz },
-    ] : [
-      { title: "From Photos to Place", lines: ["From Photos", "to Place"],
-        category: "Photogrammetry", preview: "Build a coast from overlapping USGS photographs.",
-        icon: "photos", color: "#a9d8e7", number: 13,
-        action: () => startShowcase("photos") },
-    ]).forEach((item, index, all) => menuCard(item, index, all.length));
-    if (menuPage === 1)
-      label("A short experiment · Try it and tell us what to refine",
-        0, -0.26, 2.65, 0.15, 32, "#b6d1d9", "#0b2430");
-    button("12 core demos", -0.60, -0.88, () => { menuPage = 0; draw(); },
-      1.12, menuPage === 0);
-    button("1 experimental", 0.60, -0.88, () => { menuPage = 1; draw(); },
-      1.12, menuPage === 1);
+    ].forEach((item, index, all) => menuCard(item, index, all.length));
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -1.08, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
