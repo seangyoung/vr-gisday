@@ -3,6 +3,7 @@ import { TimedExhibit, canvasPanel, replacePanelTexture } from "../showcase/exhi
 import { CHANGE_SCENES } from "./scenes.js";
 
 const FULL_HEAD_TILT = 12 * Math.PI / 180;
+export const CHANGE_CASE_POINTS = 40;
 
 export function headTiltBlendFromRoll(roll) {
   const position = Math.max(0, Math.min(1,
@@ -62,6 +63,7 @@ export class ChangeExperience extends TimedExhibit {
     this.headEuler = new THREE.Euler();
     this.selectedOption = null;
     this.revealed = false;
+    this.caseResults = [];
     this.ready = false;
     this.draggingBy = null;
     this.cache = new Map();
@@ -78,6 +80,9 @@ export class ChangeExperience extends TimedExhibit {
   }
 
   get sceneInfo() { return CHANGE_SCENES[this.sceneIndex]; }
+  get completedCases() { return (this.caseResults ?? []).filter((value) => value !== undefined).length; }
+  get correctCount() { return (this.caseResults ?? []).filter((value) => value === true).length; }
+  get score() { return this.correctCount * CHANGE_CASE_POINTS; }
 
   getPair(scene) {
     if (this.cache.has(scene.id)) return Promise.resolve(this.cache.get(scene.id));
@@ -314,6 +319,8 @@ export class ChangeExperience extends TimedExhibit {
     this.draggingBy = null;
     this.selectedOption = index;
     this.revealed = true;
+    this.caseResults ??= [];
+    this.caseResults[this.sceneIndex] = index === this.sceneInfo.answer;
     this.refresh();
     this.onChange(index === this.sceneInfo.answer ? "correct" : "blocked");
   }
@@ -330,14 +337,14 @@ export class ChangeExperience extends TimedExhibit {
   }
 
   finish() {
-    if (!this.started || this.finished) return;
+    if (!this.started || this.finished || this.completedCases !== CHANGE_SCENES.length) return;
     this.draggingBy = null;
     this.group.visible = false;
     super.finish();
   }
 
   update(dt, camera) {
-    super.update(dt);
+    // Five interpretation questions advance by visitor choice, without a clock.
     if (this.finished) this.group.visible = false;
     if (!this.started || this.finished || !this.ready ||
         this.comparisonMode !== "head-tilt" || !camera) return;

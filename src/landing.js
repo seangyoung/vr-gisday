@@ -4,13 +4,13 @@ export const landingMarkup = `
     <div class="tag">GIS Day · UT Southwestern</div>
   </header>
   <main class="home-main">
-    <section class="home-intro" aria-labelledby="home-title">
-      <div class="eyebrow">Step into geospatial science</div>
-      <h1 id="home-title">See what place can tell us.</h1>
-      <p>Hands-on VR and mixed reality experiences about satellites, terrain, maps, and how we interpret change.</p>
-    </section>
     <div class="home-grid">
       <div class="home-left">
+        <section class="home-intro" aria-labelledby="home-title">
+          <div class="eyebrow">Step into geospatial science</div>
+          <h1 id="home-title">See what place can tell us.</h1>
+          <p>Hands-on VR and mixed reality experiences about satellites, terrain, maps, and how we interpret change.</p>
+        </section>
         <div class="player-entry">
           <label for="player-name">Player name</label>
           <input id="player-name" type="text" list="player-list" maxlength="30" autocomplete="nickname" placeholder="Enter or choose a name" aria-describedby="player-help" />
@@ -36,46 +36,46 @@ export const landingMarkup = `
           <a class="text-link" href="https://profiles.utsouthwestern.edu/profile/217368/sean-young.html" target="_blank" rel="noopener noreferrer">Faculty profile <span aria-hidden="true">↗</span></a>
         </section>
       </div>
-      <section class="certificate-card" aria-labelledby="certificate-title">
-        <div class="eyebrow">From curiosity to practice</div>
-        <h2 id="certificate-title">Geospatial Public Health Certificate</h2>
-        <p>Apply GIS, remote sensing, mapping, and spatial epidemiology to public health questions in UT Southwestern’s 15-credit program.</p>
-        <ul class="certificate-topics" aria-label="Program topics">
-          <li>GIS + remote sensing</li>
-          <li>Spatial epidemiology</li>
-          <li>Cartography</li>
-          <li>One Health</li>
-        </ul>
-        <a class="certificate-link" href="https://osph.utsouthwestern.edu/degree-programs/certificate-programs.html#geospatial-public-health" target="_blank" rel="noopener noreferrer">View program details <span aria-hidden="true">↗</span></a>
+      <section class="leaderboard-card" aria-labelledby="leaderboard-title">
+        <div class="leaderboard-heading">
+          <div>
+            <div class="eyebrow">Lesson questions · GIS Day challenge</div>
+            <h2 id="leaderboard-title">Leaderboard</h2>
+          </div>
+          <p>Answer lesson questions in VR. Scores here are saved in this browser.</p>
+        </div>
+        <div class="leaderboard-grid">
+          <div class="leaderboard-board">
+            <div class="leaderboard-board-heading">
+              <h3>Today’s top scores</h3>
+              <span id="leaderboard-date"></span>
+            </div>
+            <ol id="leaderboard-today" class="leaderboard-list" aria-label="Today's top scores"></ol>
+            <p id="leaderboard-today-empty" class="leaderboard-empty">No scores yet today. Be the first to play.</p>
+          </div>
+          <div class="leaderboard-board">
+            <div class="leaderboard-board-heading">
+              <h3>GIS Day best</h3>
+              <span>Nov 18, 2026</span>
+            </div>
+            <ol id="leaderboard-gisday" class="leaderboard-list" aria-label="GIS Day best scores"></ol>
+            <p id="leaderboard-gisday-empty" class="leaderboard-empty">Top GIS Day scores will appear here.</p>
+          </div>
+        </div>
+        <p class="leaderboard-footnote">The daily board resets at midnight Chicago time. GIS Day best scores remain saved in this browser.</p>
       </section>
     </div>
-    <section class="leaderboard-card" aria-labelledby="leaderboard-title">
-      <div class="leaderboard-heading">
-        <div>
-          <div class="eyebrow">Lesson questions · GIS Day challenge</div>
-          <h2 id="leaderboard-title">Leaderboard</h2>
-        </div>
-        <p>Answer one question after each demo. Scores here are saved in this browser.</p>
-      </div>
-      <div class="leaderboard-grid">
-        <div class="leaderboard-board">
-          <div class="leaderboard-board-heading">
-            <h3>Today’s top scores</h3>
-            <span id="leaderboard-date"></span>
-          </div>
-          <ol id="leaderboard-today" class="leaderboard-list" aria-label="Today's top scores"></ol>
-          <p id="leaderboard-today-empty" class="leaderboard-empty">No scores yet today. Be the first to play.</p>
-        </div>
-        <div class="leaderboard-board">
-          <div class="leaderboard-board-heading">
-            <h3>GIS Day best</h3>
-            <span>Nov 18, 2026</span>
-          </div>
-          <ol id="leaderboard-gisday" class="leaderboard-list" aria-label="GIS Day best scores"></ol>
-          <p id="leaderboard-gisday-empty" class="leaderboard-empty">Top GIS Day scores will appear here.</p>
-        </div>
-      </div>
-      <p class="leaderboard-footnote">The daily board resets at midnight Chicago time. GIS Day best scores remain saved in this browser.</p>
+    <section class="certificate-card" aria-labelledby="certificate-title">
+      <div class="eyebrow">From curiosity to practice</div>
+      <h2 id="certificate-title">Geospatial Public Health Certificate</h2>
+      <p>Apply GIS, remote sensing, mapping, and spatial epidemiology to public health questions in UT Southwestern’s 15-credit program.</p>
+      <ul class="certificate-topics" aria-label="Program topics">
+        <li>GIS + remote sensing</li>
+        <li>Spatial epidemiology</li>
+        <li>Cartography</li>
+        <li>One Health</li>
+      </ul>
+      <a class="certificate-link" href="https://osph.utsouthwestern.edu/degree-programs/certificate-programs.html#geospatial-public-health" target="_blank" rel="noopener noreferrer">View program details <span aria-hidden="true">↗</span></a>
     </section>
   </main>
   <footer>Spatial Discovery Lab · A GIS Day learning experience</footer>

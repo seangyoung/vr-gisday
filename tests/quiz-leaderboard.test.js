@@ -39,16 +39,20 @@ test("best score from each demo adds once, then daily scores reset", () => {
   board.submitDemo("rain", { score: 170 });
   assert.deepEqual(board.read().today.map(({ name, score, completed }) =>
     [name, score, completed]), [["Ada", 310, 2]]);
+  board.submitDemo("change", { score: 160 });
+  board.submitDemo("change", { score: 120 });
+  assert.deepEqual(board.read().today.map(({ score, completed }) =>
+    [score, completed]), [[470, 3]]);
   board.submitDemo("gnss", { score: 190 });
-  assert.equal(board.read().today[0].score, 360);
+  assert.equal(board.read().today[0].score, 520);
   date = new Date("2026-11-19T18:00:00Z");
   assert.deepEqual(board.read().today, []);
-  assert.equal(board.read().gisDay[0].score, 360);
+  assert.equal(board.read().gisDay[0].score, 520);
   assert.deepEqual(board.read().players, ["Ada"]);
   board.selectPlayer("Ada");
   board.submitDemo("scan", { score: 200 });
   assert.equal(board.read().today[0].score, 200);
-  assert.equal(board.read().gisDay[0].score, 360);
+  assert.equal(board.read().gisDay[0].score, 520);
 });
 
 test("scores from different players remain separate and invalid scores are rejected", () => {
@@ -60,4 +64,19 @@ test("scores from different players remain separate and invalid scores are rejec
   assert.deepEqual(board.read().today.map(({ name }) => name), ["Ada", "Ben"]);
   assert.throws(() => board.submitDemo("gnss", null), /finished lesson/);
   assert.throws(() => board.submitDemo("gnss", { score: 201 }), /finished lesson/);
+});
+
+test("old timed What Changed question scores do not mix with five-case scores", () => {
+  const storage = fakeStorage();
+  const now = new Date("2026-11-18T18:00:00Z");
+  storage.setItem("vr-gisday-lesson-scores-v2", JSON.stringify({
+    day: "2026-11-18", players: ["Ada"], selected: "Ada",
+    todayScores: { Ada: [{ demo: "change", score: 200, at: now.getTime() }] },
+    gisDayScores: { Ada: [{ demo: "change", score: 200, at: now.getTime() }] },
+  }));
+  const board = new QuizLeaderboard(storage, () => now);
+  assert.deepEqual(board.read().today, []);
+  board.submitDemo("change", { score: 160 });
+  assert.equal(board.read().today[0].score, 160);
+  assert.equal(board.read().gisDay[0].score, 160);
 });

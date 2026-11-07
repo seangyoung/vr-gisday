@@ -19,7 +19,7 @@ export function cleanPlayerName(value) {
 function validEntry(entry) {
   return entry && typeof entry.demo === "string" && /^[a-z-]+$/.test(entry.demo) &&
     Number.isInteger(entry.score) && entry.score >= 0 && entry.score <= 200 &&
-    Number.isFinite(entry.at);
+    Number.isFinite(entry.at) && (entry.demo !== "change" || entry.version === 2);
 }
 
 function normalizePlayers(players) {
@@ -104,7 +104,8 @@ export class QuizLeaderboard {
     const saved = this.read();
     const name = saved.selected;
     if (!name) throw new Error("Select a player before recording a score.");
-    const entry = { demo, score: result.score, at: this.now().getTime() };
+    const entry = { demo, score: result.score, at: this.now().getTime(),
+      ...(demo === "change" ? { version: 2 } : {}) };
     const update = (scores) => {
       const entries = scores[name] ?? [];
       const previous = entries.find((item) => item.demo === demo);

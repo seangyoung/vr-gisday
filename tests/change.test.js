@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
-import { ChangeExperience, headTiltBlendFromRoll } from "../src/change/experience.js";
+import { ChangeExperience, CHANGE_CASE_POINTS, headTiltBlendFromRoll } from "../src/change/experience.js";
 import { CHANGE_SCENES } from "../src/change/scenes.js";
 
 test("every change case has two bundled Landsat frames and a complete interpretation", () => {
@@ -56,6 +56,36 @@ test("a selected answer leaves the before-after slider draggable", () => {
   assert.equal(exhibit.dragInteraction(raycaster, "right"), true);
   assert.equal(exhibit.split, 0.75);
   assert.equal(exhibit.endInteraction("right"), true);
+});
+
+test("five first interpretations score 40 points each without a question timer", () => {
+  const exhibit = Object.create(ChangeExperience.prototype);
+  exhibit.started = true;
+  exhibit.finished = false;
+  exhibit.ready = true;
+  exhibit.revealed = false;
+  exhibit.caseResults = [];
+  exhibit.group = { visible: true };
+  exhibit.refresh = () => {};
+  exhibit.onChange = () => {};
+  assert.equal(CHANGE_CASE_POINTS * CHANGE_SCENES.length, 200);
+  exhibit.update(1000, null);
+  assert.equal(exhibit.finished, false, "time alone does not finish a case");
+  for (let index = 0; index < CHANGE_SCENES.length; index++) {
+    exhibit.sceneIndex = index;
+    exhibit.revealed = false;
+    const answer = CHANGE_SCENES[index].answer;
+    const choice = index === 0
+      ? (answer + 1) % CHANGE_SCENES[index].options.length : answer;
+    exhibit.chooseAnswer(choice);
+    exhibit.chooseAnswer(answer);
+  }
+  assert.equal(exhibit.completedCases, 5);
+  assert.equal(exhibit.correctCount, 4);
+  assert.equal(exhibit.score, 160);
+  exhibit.nextScene();
+  assert.equal(exhibit.finished, true);
+  assert.equal(exhibit.group.visible, false);
 });
 
 test("spotlight follows the image ray and remains usable after an answer", () => {

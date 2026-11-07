@@ -396,6 +396,18 @@ function takeawayActions(y, restart = start) {
     button("Exit to Menu", 0.57, y, openMenu, 1.02);
   }
 }
+function saveChangeScore(exhibit) {
+  if (!exhibit?.finished || exhibit.scoreSaved) return;
+  exhibit.scoreSaved = true;
+  if (devPreview) return;
+  try {
+    if (!quizLeaderboard) throw new Error("Local leaderboard unavailable");
+    quizLeaderboard.submitDemo("change", { score: exhibit.score });
+    refreshLandingLeaderboard();
+  } catch {
+    exhibit.scoreSaveError = "Score could not be saved on this headset.";
+  }
+}
 function foregroundTakeaway() {
   for (const mesh of uiParent.children) {
     mesh.renderOrder = 10;
@@ -907,6 +919,7 @@ function startShowcase(kind) {
   }[kind];
   if (!Constructor) throw new RangeError(`Unknown showcase: ${kind}`);
   showcase = new Constructor(root, (reason) => {
+    if (showcase?.kind === "change") saveChangeScore(showcase);
     if (reason === "selection" && showcase?.kind === "cluster") updateClusterReadout();
     else {
       if (["correct", "blocked", "reveal"].includes(reason)) sound.cue(reason);
@@ -1448,7 +1461,11 @@ function drawShowcaseUI() {
   if (exhibit.kind === "change" && exhibit.finished) {
     lessonCard("Images turn change into evidence",
       "Change detection compares images of the same ground over time.\nAutomated change detection algorithms can identify and classify many different types of changes, greatly assisting researchers' efforts to monitor and study Earth's ever-changing landscapes.", -0.18);
-    takeawayActions(-0.64);
+    label(`${exhibit.correctCount} of ${CHANGE_SCENES.length} correct · ${exhibit.score} of 200 points`,
+      0, -0.48, 2.2, 0.12, 30, "#ffdc89", "#0b2430");
+    if (exhibit.scoreSaveError) label(exhibit.scoreSaveError,
+      0, -0.59, 2.2, 0.09, 23, "#ffb194", "#0b2430");
+    takeawayActions(-0.72);
     return;
   }
   if (["outbreak", "photos", "road"].includes(exhibit.kind) && exhibit.finished) {
@@ -1617,6 +1634,8 @@ function drawShowcaseUI() {
       0.50, exhibit.comparisonMode === "head-tilt");
     label(caseInfo.question, 0.91, 0.67, 1.06, 0.16, 33,
       "#e6f4f5", "#0b2430");
+    label(`${exhibit.correctCount}/${CHANGE_SCENES.length} correct · ${exhibit.score} points`,
+      0.91, -0.86, 1.06, 0.11, 25, "#ffdc89", "#0b2430");
     if (exhibit.error) {
       label("Image could not load", 0.91, 0.16, 1.05, 0.16, 28);
       button("Retry", 0.91, -0.18, () => exhibit.loadScene(), 0.95);

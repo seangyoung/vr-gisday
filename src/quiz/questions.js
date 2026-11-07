@@ -1,6 +1,6 @@
 import { validateQuestion } from "./session.js";
 
-// The original ten GeoSlice prompts and three lesson-specific additions were
+// The original ten GeoSlice prompts and two lesson-specific additions were
 // individually approved by the curator for this gallery.
 export const QUIZ_QUESTIONS = [
   {
@@ -111,15 +111,6 @@ export const QUIZ_QUESTIONS = [
     source: "https://pubs.usgs.gov/unnumbered/70157214/report.pdf",
     approved: true,
   },
-  {
-    id: "change-alignment", category: "Change detection",
-    prompt: "Why align before and after images to the same ground locations?",
-    choices: ["So differences reflect change at each place", "To increase brightness", "To remove clouds", "To make pixels smaller"],
-    correct: 0,
-    explanation: "Aligned images compare the same place over time; misregistration can create false change.",
-    source: "https://pubs.usgs.gov/tm/2007/tm2g1/pdf/tm2g1.pdf",
-    approved: true,
-  },
 ];
 
 function shuffle(items, random) {
@@ -144,7 +135,6 @@ export const LESSON_QUESTION_IDS = Object.freeze({
   scan: "q06",
   spectral: "q07",
   pixels: "pixels-ground",
-  change: "change-alignment",
 });
 
 export function lessonQuestion(demo, random = Math.random) {
