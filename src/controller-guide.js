@@ -16,11 +16,10 @@ const anchorNames = {
   stick: "xr_standard_thumbstick_pressed_value",
 };
 const leftButtons = [
-  ["x", "X", "Restart", "y", 0.025],
-  ["y", "Y", "Reset", "x", 0.025],
+  ["x", "X", "Reset model", "y", 0.025],
+  ["y", "Y", "Sound", "x", 0.025],
 ];
 const rightButtons = [
-  ["a", "A", "Sound", "b", 0.025],
   ["b", "B", "Exit", "a", 0.025],
 ];
 const eye = new THREE.Vector3();
@@ -71,6 +70,7 @@ export class ControllerGuide {
     this.exitLabel = "Exit demo";
     this.stickAction = null;
     this.quizMode = false;
+    this.resettableModel = false;
     this.dwell = 0;
     this.hold = 0;
     this.labels = [];
@@ -89,16 +89,18 @@ export class ControllerGuide {
   }
 
   setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo",
-    stickAction = null, quizMode = false) {
+    stickAction = null, quizMode = false, resettableModel = false) {
     if (trigger === this.trigger && gripAction === this.gripAction &&
         onMenu === this.onMenu && exitLabel === this.exitLabel &&
-        stickAction === this.stickAction && quizMode === this.quizMode) return;
+        stickAction === this.stickAction && quizMode === this.quizMode &&
+        resettableModel === this.resettableModel) return;
     this.trigger = trigger;
     this.gripAction = gripAction;
     this.onMenu = onMenu;
     this.exitLabel = exitLabel;
     this.stickAction = stickAction;
     this.quizMode = quizMode;
+    this.resettableModel = resettableModel;
     this.clearLabels();
   }
 
@@ -125,11 +127,11 @@ export class ControllerGuide {
       });
       this.materialsPrepared = true;
     }
-    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}:${this.quizMode}`;
+    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}:${this.quizMode}:${this.resettableModel}`;
     if (this.labelKey === key) return this.labels.length > 0;
     this.clearLabels();
     const buttons = this.handedness === "left"
-      ? this.quizMode ? [] : leftButtons.filter(([id]) => !this.onMenu || id !== "x")
+      ? leftButtons.filter(([id]) => id !== "x" || this.resettableModel)
       : rightButtons.map((spec) => spec[0] === "b"
         ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec);
     const specs = [

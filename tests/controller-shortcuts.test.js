@@ -14,12 +14,14 @@ test("Quest face shortcuts fire once per press on the correct hand", () => {
   const shortcuts = new ControllerShortcuts();
   const idle = [source("left"), source("right")];
   assert.deepEqual(shortcuts.update(idle), []);
-  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])]),
-    ["restart", "sound"]);
-  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])]), []);
+  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])], true),
+    ["reset-model"]);
+  assert.deepEqual(shortcuts.update([source("left", [3, 4]), source("right", [4])], true), []);
   assert.deepEqual(shortcuts.update(idle), []);
   assert.deepEqual(shortcuts.update([source("left", [5]), source("right", [5])]),
-    ["reset", "exit"]);
+    ["sound", "exit"]);
+  shortcuts.update(idle);
+  assert.deepEqual(shortcuts.update([source("right", [4])]), []);
 });
 
 test("left stick click has no menu action", () => {
@@ -36,12 +38,19 @@ test("left stick click has no menu action", () => {
 test("tracking loss and non-XR gamepads cannot leave shortcuts latched", () => {
   const shortcuts = new ControllerShortcuts();
   shortcuts.update([source("left")]);
-  assert.deepEqual(shortcuts.update([source("left", [4])]), ["restart"]);
+  assert.deepEqual(shortcuts.update([source("left", [4])], true), ["reset-model"]);
   assert.deepEqual(shortcuts.update([]), []);
-  assert.deepEqual(shortcuts.update([source("left", [4])]), []);
+  assert.deepEqual(shortcuts.update([source("left", [4])], true), []);
   shortcuts.update([source("left")]);
-  assert.deepEqual(shortcuts.update([source("left", [4])]), ["restart"]);
+  assert.deepEqual(shortcuts.update([source("left", [4])], true), ["reset-model"]);
   const ordinary = source("left", [4]);
   ordinary.gamepad.mapping = "standard";
   assert.deepEqual(shortcuts.update([ordinary]), []);
+});
+
+test("X is inactive without a tabletop model and cannot swallow B", () => {
+  const shortcuts = new ControllerShortcuts();
+  shortcuts.update([source("left"), source("right")]);
+  assert.deepEqual(shortcuts.update([source("left", [4]), source("right", [5])]),
+    ["exit"]);
 });

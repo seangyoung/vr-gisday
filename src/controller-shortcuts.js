@@ -9,7 +9,7 @@ export class ControllerShortcuts {
     this.previous = { left: null, right: null };
   }
 
-  update(sources) {
+  update(sources, resettableModel = false) {
     const events = [];
     for (const hand of ["left", "right"]) {
       const source = sources.find((item) => item?.handedness === hand);
@@ -21,8 +21,10 @@ export class ControllerShortcuts {
       const pressed = [4, 5].map((index) => !!gamepad.buttons[index]?.pressed);
       const before = this.previous[hand];
       if (before) {
-        if (pressed[0] && !before[0]) events.push(hand === "left" ? "restart" : "sound");
-        if (pressed[1] && !before[1]) events.push(hand === "left" ? "reset" : "exit");
+        if (hand === "left" && resettableModel && pressed[0] && !before[0])
+          events.push("reset-model");
+        if (hand === "left" && pressed[1] && !before[1]) events.push("sound");
+        if (hand === "right" && pressed[1] && !before[1]) events.push("exit");
       }
       this.previous[hand] = pressed;
     }

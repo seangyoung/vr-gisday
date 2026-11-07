@@ -189,6 +189,13 @@ let soundBackgroundSaved = false;
 const isSpatial = () => step >= 4 && step < GNSS_SPATIAL_END;
 const isGnssObject = () => step >= GNSS_SATELLITE && step <= GNSS_MULTIPATH;
 const isMenu = () => step === -1 && !scan && !rain && !layers && !viewshed && !pixels && !showcase && !quiz;
+const canResetTabletop = () => !quiz && !soundMenuOpen && !exitConfirmOpen && (
+  !!floatingModel?.visible ||
+  !!rain && [1, 4].includes(rain.stage) && rain.group.visible ||
+  !!scan && !scan.station && scan.stage === 1 && (!scan.room || scan.frozen) ||
+  !!showcase && ["interpolation", "suitability"].includes(showcase.kind) &&
+    showcase.started && !showcase.finished
+);
 const treeLandscape = () => layers ?? (pixels?.phase === "pixels" ? pixels : null);
 const palette = [0x6ef0d1, 0xffca83, 0xc6b7ff, 0xff9ba8];
 function clearGnssPopup() {
@@ -508,7 +515,7 @@ function closeSoundMenu() {
   soundBackgroundSaved = false;
   quiz?.resumeAudio();
   for (const { guide } of controllers)
-    guide.setContext(...controllerGuideContext(guide.handedness));
+    setGuideContext(guide);
 }
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
@@ -641,7 +648,7 @@ function openExitConfirm() {
   hideVisualsForSoundMenu();
   drawExitConfirm();
   for (const { guide } of controllers)
-    guide.setContext(...controllerGuideContext(guide.handedness));
+    setGuideContext(guide);
 }
 function toggleSoundMenu() {
   if (soundMenuOpen) {
@@ -729,7 +736,8 @@ function openMenu() {
   step = -1;
   draw();
 }
-function resetView() {
+function resetTabletop() {
+  if (!canResetTabletop()) return;
   closeSoundMenu();
   teleport.cancel();
   if (devPreview) place();
@@ -750,11 +758,10 @@ function runControllerShortcut(action) {
     else openExitConfirm();
     return;
   }
-  if (quiz) return;
-  if (action === "restart" && (isMenu() || step === -3)) return;
-  sound.click();
-  if (action === "restart") start();
-  else if (action === "reset") resetView();
+  if (action === "reset-model" && canResetTabletop()) {
+    sound.click();
+    resetTabletop();
+  }
 }
 function refreshInputLayout(session) {
   const fallback = !hasQuestShortcuts(navigator.userAgent, session?.inputSources);
@@ -2380,8 +2387,8 @@ function drawFallbackToolbar() {
   if (!showFallbackControls || soundMenuOpen || quiz) return;
   const onClipboard = uiParent !== content;
   const actions = [
-    ...(!isMenu() && step !== -3 ? [["Restart", "restart"]] : []),
-    ["Reset", "reset"], ["Sound", "sound"],
+    ...(canResetTabletop() ? [["Reset Model", "reset-model"]] : []),
+    ["Sound", "sound"],
     [isMenu() ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" :
       step === -3 ? "Skip" : "Leave", "exit"],
   ];
@@ -2421,7 +2428,7 @@ function draw() {
   drawFallbackToolbar();
   sound.setMenuMusic((isMenu() || step === -3) && renderer.xr.isPresenting);
   for (const { guide } of controllers)
-    guide.setContext(...controllerGuideContext(guide.handedness));
+    setGuideContext(guide);
   if (devPreview) {
     let panel = document.querySelector("#dev-controls");
     if (!panel) {
@@ -2588,8 +2595,8 @@ function draw() {
     }
     if (!showFallbackControls) {
       for (const [name, action] of [
-        ...(!isMenu() && step !== -3 ? [["X · Restart", "restart"]] : []),
-        ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
+        ...(canResetTabletop() ? [["X · Reset model", "reset-model"]] : []),
+        ["Y · Sound menu", "sound"],
         [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Leave demo", "exit"],
       ]) {
         const b = document.createElement("button");
@@ -2644,6 +2651,12 @@ function controllerGuideContext(hand) {
   if (step === -3) return ["Select", null, onMenu, exitLabel];
   if (isSpatial()) return ["Select", "Move/size", onMenu, exitLabel];
   return [null, null, onMenu, exitLabel];
+}
+function setGuideContext(guide) {
+  const context = controllerGuideContext(guide.handedness);
+  guide.setContext(context[0] ?? null, context[1] ?? null, context[2] ?? false,
+    context[3] ?? "Exit demo", context[4] ?? null, context[5] ?? false,
+    canResetTabletop());
 }
 function leftHoldsClipboard(controller) {
   return controller.userData.xrInput?.handedness === "left" &&
@@ -2740,7 +2753,7 @@ function drawScene() {
     if (showFallbackControls) {
       label("YOUR VR CONTROLS", 0, 0.74, 2.5, 0.18, 52, "#a6f5d9");
       label("Point and press a trigger to select", 0, 0.37, 2.6, 0.18, 42);
-      label("Use Reset, Sound, or Skip below.\nLeft stick walks; right stick turns or aims a teleport.",
+      label("Use Sound or Skip below. Tabletop models also have Reset Model.\nLeft stick walks; right stick turns or aims a teleport.",
         0, 0.03, 2.55, 0.26, 33, "#e6f4f5", "#0b2430");
       button("Continue to experiences", 0, -0.50, () => {
         step = -1;
@@ -2754,10 +2767,9 @@ function drawScene() {
     controllerIllustrations = addControllerIllustrations(content, import.meta.env.BASE_URL);
     label("LEFT CONTROLLER", -0.72, 0.55, 1.2, 0.14, 34, "#80cfe6");
     label("RIGHT CONTROLLER", 0.72, 0.55, 1.2, 0.14, 34, "#ffdc83");
-    label("X · Restart", -0.72, -0.23, 1.35, 0.15, 42);
-    label("Y · Reset view", -0.72, -0.40, 1.35, 0.15, 42);
-    label("A · Sound menu", 0.72, -0.23, 1.35, 0.15, 42);
-    label("B · Back / exit", 0.72, -0.40, 1.35, 0.15, 42);
+    label("X · Reset tabletop model", -0.72, -0.23, 1.35, 0.15, 37);
+    label("Y · Sound menu", -0.72, -0.40, 1.35, 0.15, 42);
+    label("B · Back / exit", 0.72, -0.32, 1.35, 0.15, 42);
     label("Trigger · Point / select", -0.75, -0.59, 1.45, 0.14, 36);
     label("Grip · Grab / resize", 0.75, -0.59, 1.45, 0.14, 36);
     label("Landscapes · Left walk, right turn / forward teleport\nGrip + stick · Turn tabletop models 45°", 0, -0.74,
@@ -2813,7 +2825,7 @@ function drawScene() {
         0, 0.12, 2.1, 0.28, 36);
       button("Scan your room", 0, -0.25, startRoomScan, 1.75);
       label(showFallbackControls ? "Point and press the trigger to select" :
-        "A opens sound menu · Point and press the trigger",
+        "Y opens sound menu · Point and press the trigger",
         0, -0.62, 2.1, 0.13, 29, "#b6d1d9", "#0b2430");
       return;
     }
@@ -2867,7 +2879,7 @@ function drawScene() {
       label(`${selectedPlayer.selected} · ${score} points today`,
         0, -0.87, 2.4, 0.12, 28, "#cdece7", "#0b2430");
     }
-    if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
+    if (!showFallbackControls) label("Point and press trigger · Y sound · B exit VR",
       0, -1.08, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
     return;
@@ -3009,7 +3021,7 @@ for (let i = 0; i < 2; i++) {
   c.addEventListener("connected", (event) => {
     c.userData.xrInput = event.data;
     guide.setHandedness(event.data.handedness);
-    guide.setContext(...controllerGuideContext(guide.handedness));
+    setGuideContext(guide);
     if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
@@ -3454,12 +3466,13 @@ renderer.setAnimationLoop((time, frame) => {
     if (visibleSession && !showFallbackControls) {
       const actions = controllerShortcuts.update(
         controllers.map(({ c }) => c.userData.xrInput).filter(Boolean),
+        canResetTabletop(),
       );
       if (actions.length) runControllerShortcut(actions[0]);
     } else controllerShortcuts.reset();
     if (quiz)
       for (const { guide } of controllers)
-        guide.setContext(...controllerGuideContext(guide.handedness));
+        setGuideContext(guide);
     updateControllerGuides(renderer.xr.getCamera(), visibleSession, dt);
     if (
       !rain &&
@@ -3891,7 +3904,7 @@ if (
       grip.visible = true;
       grip.position.set(id === 0 ? -0.25 : 0.25, -0.18, -0.45);
       guide.setHandedness(id === 0 ? "left" : "right");
-      guide.setContext(...controllerGuideContext(guide.handedness));
+      setGuideContext(guide);
       grip.dispatchEvent({
         type: "connected",
         data: {
