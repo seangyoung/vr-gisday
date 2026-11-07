@@ -1,14 +1,12 @@
 import * as THREE from "three";
 import { QuizSession } from "./session.js";
-import { makeQuizRound } from "./questions.js";
 import { sweptBladeContact, bladeCutAtContact } from "./slice-hit.js";
-import { initialTilePose, answerBlockPose, QUIZ_SCREEN_DISTANCE } from "./layout.js";
+import { answerBlockPose, QUIZ_SCREEN_DISTANCE } from "./layout.js";
 import { splitRectangle, polygonCentroid } from "./slice-shape.js";
 
 const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
 const ROUND_INFO_Z = -0.58;
-const INITIAL_ACTION_Z = 0.26;
 const NEXT_ACTION_Z = 0.23;
 const SABER_COLORS = {
   grip: 0x283a32,
@@ -148,16 +146,18 @@ function disposeTree(root) {
 }
 
 export class QuizExperience {
-  constructor(scene, controllers, sound, onExit, leaderboard = null) {
+  constructor(scene, controllers, sound, onExit, leaderboard, demo,
+    question, playerName, onReturn) {
     this.sound = sound;
     this.onExit = onExit;
+    this.onReturn = onReturn;
     this.leaderboard = leaderboard;
+    this.demo = demo;
+    this.playerName = playerName;
     this.group = new THREE.Group();
     scene.add(this.group);
     this.screen = new THREE.Group();
     this.group.add(this.screen);
-    this.letterField = new THREE.Group();
-    scene.add(this.letterField);
     this.effects = new THREE.Group();
     scene.add(this.effects);
     this.blades = controllers.map(({ grip }) => {
@@ -165,19 +165,16 @@ export class QuizExperience {
       grip.add(blade);
       return { grip, blade, previous: null };
     });
-    this.initials = "";
-    this.session = null;
+    this.session = new QuizSession([question], playerName);
+    this.session.start();
     this.targets = [];
     this.fragments = [];
     this.lastHit = -Infinity;
     this.age = 0;
     this.timerShown = -1;
     this.leaderboardState = "";
-    this.leaderboardRows = [];
-    this.gisDayRows = [];
     this.submitted = false;
     this.feedbackRevealAt = 0;
-    this.exitAt = 0;
     this.disposed = false;
     this.render();
   }
@@ -191,15 +188,6 @@ export class QuizExperience {
     this.group.position.copy(eye).addScaledVector(forward, QUIZ_SCREEN_DISTANCE);
     this.group.position.y = eye.y - 0.03;
     this.group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), forward);
-    this.letterField.position.copy(eye);
-    this.letterField.rotation.y = Math.atan2(-forward.x, -forward.z);
-  }
-
-  snapTurnInitials(angle) {
-    if (this.session || !Number.isFinite(angle) || !angle) return false;
-    this.letterField.rotation.y += angle;
-    this.clearMotion();
-    return true;
   }
 
   addPanel(text, width, height, x, y, options) {
@@ -235,83 +223,35 @@ export class QuizExperience {
   render() {
     this.feedbackRevealAt = 0;
     while (this.screen.children.length) disposeTree(this.screen.children[0]);
-    while (this.letterField.children.length)
-      disposeTree(this.letterField.children[0]);
     this.targets = [];
     this.timerShown = -1;
-    if (!this.session) {
-      this.addPanel("GEOSLICE · THE GIS DAY CHALLENGE", 2.15, 0.25,
-        0, 0.87, { color: "#a6f5d9" });
-      this.addPanel("Turn or snap-turn with the right stick to find three initials. Slice Start to play.", 2.08, 0.22,
-        0, 0.60);
-      this.addPanel(`Your initials: ${this.initials.padEnd(3, "_").split("").join("  ")}`,
-        0.78, 0.19, 0, 0.40, { color: "#ffdc89" });
-      const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      for (let index = 0; index < letters.length; index++) {
-        const letter = letters[index];
-        const pose = initialTilePose(index, letters.length);
-        const tile = this.addTarget(letter, pose.x, pose.y,
-          0.215, 0.23, 0x2b7084, () => {
-            if (this.initials.length >= 3) return;
-            this.initials += letter;
-            this.sound.slice(true);
-            this.render();
-          }, this.letterField);
-        tile.group.position.z = pose.z;
-        tile.group.rotation.y = pose.yaw;
-      }
-      const erase = this.addTarget("Erase", -0.55, -0.58, 0.48, 0.18, 0x6b5c82, () => {
-        this.initials = this.initials.slice(0, -1);
-        this.sound.click();
-        this.render();
-      });
-      erase.group.position.z = INITIAL_ACTION_Z;
-      if (this.initials.length === 3)
-        this.addTarget("Start", 0.55, -0.58, 0.48, 0.18, 0x3c9470, () =>
-          this.begin()).group.position.z = INITIAL_ACTION_Z;
-      else this.addPanel("Slice three letters, then Start", 0.98, 0.15,
-        0.55, -0.58, { z: INITIAL_ACTION_Z, fontScale: 0.72 });
-      return;
-    }
     if (this.session.phase === "quit-paused") {
-      this.addPanel("LEAVE THE CHALLENGE?", 2.0, 0.32, 0, 0.54,
+      this.addPanel("LEAVE THIS QUESTION?", 2.0, 0.32, 0, 0.54,
         { color: "#ffdc89" });
-      this.addPanel("This round's score will be discarded.", 1.85, 0.21,
+      this.addPanel("This attempt will be discarded.", 1.85, 0.21,
         0, 0.22);
       this.addTarget("Continue", -0.45, -0.31, 0.72, 0.34, 0x2c836d,
         () => { this.session.resume(); this.render(); });
-      let exitTarget;
-      exitTarget = this.addTarget("Exit to Menu", 0.53, -0.31,
-        0.88, 0.34, 0x945862, () => this.exitAfterSlice(exitTarget));
+      this.addTarget("Return to takeaway", 0.53, -0.31,
+        0.88, 0.34, 0x945862, () => this.onReturn());
       return;
     }
     if (this.session.phase === "complete") {
-      this.addPanel("ROUND COMPLETE", 1.8, 0.28, 0, 0.75,
+      this.addPanel("LESSON QUESTION COMPLETE", 1.8, 0.28, 0, 0.75,
         { color: "#a6f5d9" });
-      this.addPanel(`${this.initials} · ${this.session.score} points · ${this.session.correctCount}/10 correct`,
+      this.addPanel(`${this.playerName} · ${this.session.score} points`,
         2.05, 0.24, 0, 0.47);
-      this.addPanel("TODAY'S TOP SCORES · THIS BROWSER", 1.93, 0.17,
-        0, 0.22, { color: "#a6f5d9", fontScale: 0.61 });
-      const board = this.leaderboardRows.length
-        ? this.leaderboardRows.slice(0, 5).map((row, index) =>
-          `${index + 1}. ${row.initials} ${row.score}`).join("   ")
-        : this.leaderboardState || "Today's board is empty";
-      this.addPanel(board, 2.20, 0.29, 0, -0.05);
-      this.addPanel(this.gisDayRows.length
-        ? `GIS DAY 2026 BEST: ${this.gisDayRows.slice(0, 3).map((row, index) =>
-          `${index + 1}. ${row.initials} ${row.score}`).join("   ")}`
-        : "Scores stay in this browser; the daily board resets at Chicago midnight.",
-        2.14, 0.21, 0, -0.39, { fontScale: 0.73 });
-      this.addTarget("Play again", -0.50, -0.75, 0.78, 0.27, 0x2c836d,
-        () => { this.session = null; this.initials = ""; this.submitted = false;
-          this.leaderboardRows = []; this.gisDayRows = []; this.render(); });
-      let exitTarget;
-      exitTarget = this.addTarget("Exit to Menu", 0.51, -0.75,
-        0.88, 0.27, 0x685e9b, () => this.exitAfterSlice(exitTarget));
+      this.addPanel(this.leaderboardState ||
+        "Your best score for each lesson adds to today's total.",
+        2.14, 0.27, 0, 0.08, { fontScale: 0.73 });
+      this.addTarget("Return to takeaway", -0.53, -0.50, 0.95, 0.3,
+        0x2c836d, () => this.onReturn());
+      this.addTarget("Exit to Menu", 0.53, -0.50, 0.86, 0.3,
+        0x685e9b, () => this.onExit());
       return;
     }
     const question = this.session.question;
-    this.addRoundPanel(`${question.category.toUpperCase()} · ${this.session.index + 1}/10 · ${this.session.score} PTS`,
+    this.addRoundPanel(`${question.category.toUpperCase()} · ${this.playerName}`,
       2.15, 0.19, 0, 0.89, { color: "#a6f5d9", fontScale: 0.56 });
     this.addRoundPanel(question.prompt, 2.23, 0.51, 0, 0.50,
       { color: "#ffffff", fontScale: 0.95 });
@@ -329,8 +269,7 @@ export class QuizExperience {
       this.addRoundPanel(`Answer: ${question.choices[question.correct]}`,
         1.9, 0.19, 0, -0.20, { color: "#ffdc89" });
       this.addRoundPanel(result.explanation, 2.17, 0.31, 0, -0.44);
-      this.addTarget(this.session.index === this.session.questions.length - 1
-        ? "See Results" : "Next Question", 0, -0.76, 0.97, 0.26, 0x2c836d,
+      this.addTarget("See score", 0, -0.76, 0.97, 0.26, 0x2c836d,
       () => {
         if (!this.session.advance()) return;
         this.sound.click();
@@ -343,19 +282,11 @@ export class QuizExperience {
       { color: "#ffdc89", fontScale: 0.9 });
     question.choices.forEach((choice, index) => {
       const pose = answerBlockPose(index, question.choices.length);
-      const target = this.addTarget(choice, pose.x, pose.y, 0.49, 0.43,
+      const target = this.addTarget(choice, pose.x, pose.y, 0.44, 0.43,
         ANSWER_COLORS[index], () => this.choose(index));
       target.group.position.z = pose.z;
       target.group.rotation.y = pose.yaw;
     });
-  }
-
-  begin() {
-    if (this.initials.length !== 3) return;
-    this.session = new QuizSession(makeQuizRound(), this.initials);
-    this.session.start();
-    this.sound.cue("reveal");
-    this.render();
   }
 
   choose(index) {
@@ -371,8 +302,7 @@ export class QuizExperience {
   }
 
   requestQuit() {
-    if (this.exitAt) return;
-    if (!this.session || this.session.complete) {
+    if (this.session.complete) {
       this.onExit();
       return;
     }
@@ -396,13 +326,6 @@ export class QuizExperience {
 
   clearMotion() {
     for (const blade of this.blades) blade.previous = null;
-  }
-
-  exitAfterSlice(target) {
-    target.group.visible = false;
-    this.targets = [];
-    this.exitAt = this.age + 1.05;
-    this.sound.slice(true);
   }
 
   split(target, cut = { point: { x: 0, y: 0 },
@@ -479,15 +402,16 @@ export class QuizExperience {
     if (this.submitted || !this.session?.complete) return;
     this.submitted = true;
     if (!this.leaderboard) {
-      this.leaderboardState = "This browser's leaderboard is unavailable";
+      this.leaderboardState = "Score shown above · leaderboard unavailable in this session";
       this.render();
       return;
     }
     try {
-      const board = this.leaderboard.submit(this.session);
-      this.leaderboardRows = board.today;
-      this.gisDayRows = board.gisDay;
-      this.leaderboardState = "This browser's daily leaderboard";
+      const board = this.leaderboard.submitDemo(this.demo, this.session.finalScore());
+      const mine = board.today.find((row) => row.name === this.playerName);
+      this.leaderboardState = mine
+        ? `Today's total: ${mine.score} points across ${mine.completed} lessons`
+        : "Score saved on this headset";
     } catch {
       this.leaderboardState = "Local storage unavailable · score shown above";
     }
@@ -510,13 +434,6 @@ export class QuizExperience {
       }
     }
     if (!active) { this.clearMotion(); return; }
-    if (this.exitAt) {
-      if (this.age >= this.exitAt) {
-        this.exitAt = 0;
-        this.onExit();
-      } else this.updateBlades(dt, false);
-      return;
-    }
     if (this.feedbackRevealAt) {
       if (this.age < this.feedbackRevealAt) {
         this.updateBlades(dt, false);
@@ -554,7 +471,6 @@ export class QuizExperience {
     this.clearMotion();
     for (const { blade } of this.blades) disposeTree(blade);
     disposeTree(this.group);
-    disposeTree(this.letterField);
     disposeTree(this.effects);
     this.targets = [];
     this.fragments = [];

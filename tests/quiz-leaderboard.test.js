@@ -1,42 +1,63 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { QuizLeaderboard } from "../src/quiz/leaderboard.js";
+import { QuizLeaderboard, cleanPlayerName } from "../src/quiz/leaderboard.js";
 
 const fakeStorage = () => {
   const values = new Map();
   return { getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value) };
 };
-const finished = (initials, score) => ({
-  finalScore: () => ({ initials, score, correct: 7, total: 10 }),
+
+test("names use normal text entry, can be selected again, and are limited to 30 characters", () => {
+  const board = new QuizLeaderboard(fakeStorage());
+  assert.throws(() => board.selectPlayer("  "), /Enter a player name/);
+  assert.equal(board.selectPlayer("  Ada   Lovelace  "), "Ada Lovelace");
+  assert.equal(board.selectPlayer("ada lovelace"), "Ada Lovelace");
+  assert.deepEqual(board.read().players, ["Ada Lovelace"]);
+  assert.equal(cleanPlayerName("x".repeat(40)).length, 30);
 });
 
-test("local leaderboard resets each Chicago day and retains GIS Day best", () => {
+test("previous GeoSlice initials remain available as player choices without mixing old scores", () => {
+  const storage = fakeStorage();
+  storage.setItem("vr-gisday-quiz-scores-v1", JSON.stringify({
+    day: "2026-11-18", today: [{ initials: "MAP", score: 1700 }],
+    gisDay: [{ initials: "GIS", score: 1800 }],
+  }));
+  const board = new QuizLeaderboard(storage, () => new Date("2026-11-18T18:00:00Z"));
+  assert.deepEqual(board.read().players, ["MAP", "GIS"]);
+  assert.deepEqual(board.read().today, []);
+  assert.equal(board.selectPlayer("gis"), "GIS");
+});
+
+test("best score from each demo adds once, then daily scores reset", () => {
   const storage = fakeStorage();
   let date = new Date("2026-11-18T18:00:00Z");
   const board = new QuizLeaderboard(storage, () => date);
-  board.submit(finished("GIS", 1400));
-  board.submit(finished("MAP", 1600));
-  assert.deepEqual(board.read().today.map((row) => row.initials), ["MAP", "GIS"]);
+  board.selectPlayer("Ada");
+  board.submitDemo("gnss", { score: 140 });
+  board.submitDemo("gnss", { score: 110 });
+  board.submitDemo("rain", { score: 170 });
+  assert.deepEqual(board.read().today.map(({ name, score, completed }) =>
+    [name, score, completed]), [["Ada", 310, 2]]);
+  board.submitDemo("gnss", { score: 190 });
+  assert.equal(board.read().today[0].score, 360);
   date = new Date("2026-11-19T18:00:00Z");
-  assert.equal(board.read().today.length, 0);
-  assert.deepEqual(board.read().gisDay.map((row) => row.initials), ["MAP", "GIS"]);
-  board.submit(finished("NEW", 1500));
-  assert.deepEqual(board.read().today.map((row) => row.initials), ["NEW"]);
-  assert.deepEqual(board.read().gisDay.map((row) => row.initials), ["MAP", "GIS"]);
+  assert.deepEqual(board.read().today, []);
+  assert.equal(board.read().gisDay[0].score, 360);
+  assert.deepEqual(board.read().players, ["Ada"]);
+  board.selectPlayer("Ada");
+  board.submitDemo("scan", { score: 200 });
+  assert.equal(board.read().today[0].score, 200);
+  assert.equal(board.read().gisDay[0].score, 360);
 });
 
-test("unfinished rounds cannot be saved", () => {
-  const board = new QuizLeaderboard(fakeStorage(), () => new Date("2026-10-22T12:00:00Z"));
-  assert.throws(() => board.submit({ finalScore: () => null }));
-});
-
-test("only the ten highest scores survive on the same headset", () => {
-  const board = new QuizLeaderboard(fakeStorage(), () => new Date("2026-11-18T18:00:00Z"));
-  for (let i = 0; i < 12; i++)
-    board.submit(finished(`G${String.fromCharCode(65 + i)}S`, i * 100));
-  assert.equal(board.read().today.length, 10);
-  assert.equal(board.read().gisDay.length, 10);
-  assert.equal(board.read().today[0].score, 1100);
-  assert.equal(board.read().today.at(-1).score, 200);
+test("scores from different players remain separate and invalid scores are rejected", () => {
+  const board = new QuizLeaderboard(fakeStorage());
+  board.selectPlayer("Ada");
+  board.submitDemo("gnss", { score: 150 });
+  board.selectPlayer("Ben");
+  board.submitDemo("gnss", { score: 130 });
+  assert.deepEqual(board.read().today.map(({ name }) => name), ["Ada", "Ben"]);
+  assert.throws(() => board.submitDemo("gnss", null), /finished lesson/);
+  assert.throws(() => board.submitDemo("gnss", { score: 201 }), /finished lesson/);
 });

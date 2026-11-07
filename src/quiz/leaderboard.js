@@ -1,5 +1,7 @@
 export const GIS_DAY_2026 = "2026-11-18";
-const KEY = "vr-gisday-quiz-scores-v1";
+const KEY = "vr-gisday-lesson-scores-v2";
+const LEGACY_KEY = "vr-gisday-quiz-scores-v1";
+const MAX_NAME = 30;
 
 export function chicagoDay(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -9,10 +11,49 @@ export function chicagoDay(date = new Date()) {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
-function topTen(rows) {
-  return rows.filter((row) => /^[A-Z]{3}$/.test(row?.initials) &&
-    Number.isInteger(row.score) && row.score >= 0 && row.score <= 2000)
-    .sort((a, b) => b.score - a.score || a.at - b.at).slice(0, 10);
+export function cleanPlayerName(value) {
+  return String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ").trim().slice(0, MAX_NAME).trim();
+}
+
+function validEntry(entry) {
+  return entry && typeof entry.demo === "string" && /^[a-z-]+$/.test(entry.demo) &&
+    Number.isInteger(entry.score) && entry.score >= 0 && entry.score <= 200 &&
+    Number.isFinite(entry.at);
+}
+
+function normalizePlayers(players) {
+  if (!Array.isArray(players)) return [];
+  const seen = new Set();
+  return players.map(cleanPlayerName).filter((name) => {
+    const key = name.toLocaleLowerCase();
+    if (!name || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeScores(scores, players) {
+  const known = new Map(players.map((name) => [name.toLocaleLowerCase(), name]));
+  if (!scores || typeof scores !== "object") return {};
+  const result = {};
+  for (const [key, entries] of Object.entries(scores)) {
+    const name = known.get(key.toLocaleLowerCase());
+    if (!name || !Array.isArray(entries)) continue;
+    result[name] = entries.filter(validEntry).slice(0, 40);
+  }
+  return result;
+}
+
+function ranks(scores) {
+  return Object.entries(scores).map(([name, entries]) => ({
+    name,
+    score: entries.reduce((sum, entry) => sum + entry.score, 0),
+    completed: entries.length,
+    at: Math.min(...entries.map((entry) => entry.at)),
+  })).filter((row) => row.completed)
+    .sort((a, b) => b.score - a.score || b.completed - a.completed || a.at - b.at)
+    .slice(0, 10);
 }
 
 export class QuizLeaderboard {
@@ -25,24 +66,55 @@ export class QuizLeaderboard {
     let saved;
     try { saved = JSON.parse(this.storage.getItem(KEY) || "null"); }
     catch { saved = null; }
+    let legacy;
+    try { legacy = JSON.parse(this.storage.getItem(LEGACY_KEY) || "null"); }
+    catch { legacy = null; }
     const day = chicagoDay(this.now());
-    return {
-      day,
-      today: saved?.day === day && Array.isArray(saved.today)
-        ? topTen(saved.today) : [],
-      gisDay: Array.isArray(saved?.gisDay) ? topTen(saved.gisDay) : [],
-    };
+    const legacyNames = [...(Array.isArray(legacy?.today) ? legacy.today : []),
+      ...(Array.isArray(legacy?.gisDay) ? legacy.gisDay : [])]
+      .map((row) => row?.initials);
+    const players = normalizePlayers([
+      ...(Array.isArray(saved?.players) ? saved.players : []), ...legacyNames,
+    ]);
+    const todayScores = saved?.day === day
+      ? normalizeScores(saved?.todayScores, players) : {};
+    const gisDayScores = normalizeScores(saved?.gisDayScores, players);
+    const selected = players.find((name) =>
+      name.toLocaleLowerCase() === cleanPlayerName(saved?.selected).toLocaleLowerCase()) ?? "";
+    return { day, players, selected, todayScores, gisDayScores,
+      today: ranks(todayScores), gisDay: ranks(gisDayScores) };
   }
 
-  submit(session) {
-    const result = session.finalScore();
-    if (!result) throw new Error("Only a finished round can be saved");
+  selectPlayer(value) {
+    const name = cleanPlayerName(value);
+    if (!name) throw new Error("Enter a player name before starting VR.");
     const saved = this.read();
-    const row = { initials: result.initials, score: result.score,
-      correct: result.correct, at: this.now().getTime() };
-    saved.today = topTen([...saved.today, row]);
-    if (saved.day === GIS_DAY_2026)
-      saved.gisDay = topTen([...saved.gisDay, row]);
+    const existing = saved.players.find((player) =>
+      player.toLocaleLowerCase() === name.toLocaleLowerCase());
+    saved.selected = existing ?? name;
+    if (!existing) saved.players.push(name);
+    this.storage.setItem(KEY, JSON.stringify(saved));
+    return saved.selected;
+  }
+
+  submitDemo(demo, result) {
+    if (!/^[a-z-]+$/.test(demo) || !result ||
+        !Number.isInteger(result.score) || result.score < 0 || result.score > 200)
+      throw new Error("A finished lesson question is required.");
+    const saved = this.read();
+    const name = saved.selected;
+    if (!name) throw new Error("Select a player before recording a score.");
+    const entry = { demo, score: result.score, at: this.now().getTime() };
+    const update = (scores) => {
+      const entries = scores[name] ?? [];
+      const previous = entries.find((item) => item.demo === demo);
+      if (!previous || entry.score > previous.score)
+        scores[name] = [...entries.filter((item) => item.demo !== demo), entry];
+    };
+    update(saved.todayScores);
+    if (saved.day === GIS_DAY_2026) update(saved.gisDayScores);
+    saved.today = ranks(saved.todayScores);
+    saved.gisDay = ranks(saved.gisDayScores);
     this.storage.setItem(KEY, JSON.stringify(saved));
     return saved;
   }

@@ -11,6 +11,13 @@ export const landingMarkup = `
     </section>
     <div class="home-grid">
       <div class="home-left">
+        <div class="player-entry">
+          <label for="player-name">Player name</label>
+          <input id="player-name" type="text" list="player-list" maxlength="30" autocomplete="nickname" placeholder="Enter or choose a name" aria-describedby="player-help" />
+          <datalist id="player-list"></datalist>
+          <select id="player-previous" aria-label="Choose a previous player"><option value="">Choose a previous player</option></select>
+          <p id="player-help">Use the Quest keyboard before entering VR. Your best score from each lesson adds to today's total on this headset.</p>
+        </div>
         <div class="launch-actions" aria-label="Explore the lab">
           <button id="vr" disabled>Checking VR…</button>
           <button id="ar" class="secondary" disabled>Checking room scan…</button>
@@ -45,10 +52,10 @@ export const landingMarkup = `
     <section class="leaderboard-card" aria-labelledby="leaderboard-title">
       <div class="leaderboard-heading">
         <div>
-          <div class="eyebrow">GeoSlice · the GIS Day challenge</div>
+          <div class="eyebrow">Lesson questions · GIS Day challenge</div>
           <h2 id="leaderboard-title">Leaderboard</h2>
         </div>
-        <p>Slice the answers in VR. Scores here are saved in this browser.</p>
+        <p>Answer one question after each demo. Scores here are saved in this browser.</p>
       </div>
       <div class="leaderboard-grid">
         <div class="leaderboard-board">

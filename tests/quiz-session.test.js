@@ -33,7 +33,7 @@ test("quick correct answers score more and each question resolves only once", ()
   assert.equal(quiz.finalScore(), null);
   assert.equal(quiz.advance(), true);
   assert.equal(quiz.advance(), false);
-  assert.deepEqual(quiz.finalScore(), { initials: "GIS", score: 183, correct: 1, total: 1 });
+  assert.deepEqual(quiz.finalScore(), { name: "GIS", score: 183, correct: 1, total: 1 });
 });
 
 test("audio and quit pauses freeze time; quitting discards progress", () => {

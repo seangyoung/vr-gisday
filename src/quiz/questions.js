@@ -1,7 +1,7 @@
 import { validateQuestion } from "./session.js";
 
-// The ten prompts and their explanations were individually reviewed for this
-// GIS Day round. Keep new drafts out of this published bank until approved.
+// The original ten GeoSlice prompts and three lesson-specific additions were
+// individually approved by the curator for this gallery.
 export const QUIZ_QUESTIONS = [
   {
     id: "q02", category: "Geography",
@@ -93,6 +93,33 @@ export const QUIZ_QUESTIONS = [
     source: "https://support.esri.com/en-us/gis-dictionary/modifiable-areal-unit-problem",
     approved: true,
   },
+  {
+    id: "layers-alignment", category: "GIS layers",
+    prompt: "What makes two GIS layers line up?",
+    choices: ["Shared locations or coordinates", "Matching colors", "The same file size", "Equal numbers of features"],
+    correct: 0,
+    explanation: "Coordinates place features at corresponding locations so layers can be overlaid.",
+    source: "https://pro.arcgis.com/en/pro-app/3.5/help/mapping/properties/coordinate-systems-and-projections.htm",
+    approved: true,
+  },
+  {
+    id: "pixels-ground", category: "Spatial resolution",
+    prompt: "At 30 m resolution, what does one image pixel represent?",
+    choices: ["An area about 30 m wide", "A 30 m camera altitude", "Exactly 30 objects", "Thirty images"],
+    correct: 0,
+    explanation: "A 30 m pixel samples roughly a 30 m by 30 m ground area.",
+    source: "https://pubs.usgs.gov/unnumbered/70157214/report.pdf",
+    approved: true,
+  },
+  {
+    id: "change-alignment", category: "Change detection",
+    prompt: "Why align before and after images to the same ground locations?",
+    choices: ["So differences reflect change at each place", "To increase brightness", "To remove clouds", "To make pixels smaller"],
+    correct: 0,
+    explanation: "Aligned images compare the same place over time; misregistration can create false change.",
+    source: "https://pubs.usgs.gov/tm/2007/tm2g1/pdf/tm2g1.pdf",
+    approved: true,
+  },
 ];
 
 function shuffle(items, random) {
@@ -104,14 +131,29 @@ function shuffle(items, random) {
   return result;
 }
 
-export function makeQuizRound(random = Math.random) {
-  const questions = QUIZ_QUESTIONS.map(validateQuestion);
-  return shuffle(questions, random).map((question) => {
-    const choices = shuffle(question.choices.map((text, index) => ({ text, index })), random);
-    return {
-      ...question,
-      choices: choices.map(({ text }) => text),
-      correct: choices.findIndex(({ index }) => index === question.correct),
-    };
+// One question follows each lesson. The two unused original trivia prompts
+// remain in the approved bank for potential future lessons.
+export const LESSON_QUESTION_IDS = Object.freeze({
+  layers: "layers-alignment",
+  gnss: "q04",
+  projection: "q10",
+  viewshed: "q15",
+  interpolation: "q09",
+  rain: "q12",
+  cluster: "q16",
+  scan: "q06",
+  spectral: "q07",
+  pixels: "pixels-ground",
+  change: "change-alignment",
+});
+
+export function lessonQuestion(demo, random = Math.random) {
+  const id = LESSON_QUESTION_IDS[demo];
+  const question = QUIZ_QUESTIONS.find((item) => item.id === id);
+  if (!question) return null;
+  const choices = shuffle(question.choices.map((text, index) => ({ text, index })), random);
+  return validateQuestion({ ...question,
+    choices: choices.map(({ text }) => text),
+    correct: choices.findIndex(({ index }) => index === question.correct),
   });
 }

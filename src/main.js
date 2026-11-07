@@ -61,6 +61,7 @@ import { PhotoExperience } from "./experimental/photo-experience.js";
 import { RoadExperience } from "./experimental/road-experience.js";
 import { QuizExperience } from "./quiz/experience.js";
 import { QuizLeaderboard } from "./quiz/leaderboard.js";
+import { lessonQuestion, LESSON_QUESTION_IDS } from "./quiz/questions.js";
 import { renderLandingLeaderboard } from "./quiz/landing-leaderboard.js";
 import { exhibitPanelHit } from "./showcase/pointer-targets.js";
 import { ControllerShortcuts } from "./controller-shortcuts.js";
@@ -79,6 +80,26 @@ const app = document.querySelector("#app");
 app.innerHTML = landingMarkup;
 const refreshLandingLeaderboard = () => renderLandingLeaderboard(app, quizLeaderboard);
 refreshLandingLeaderboard();
+const playerInput = app.querySelector("#player-name");
+const playerList = app.querySelector("#player-list");
+const playerPrevious = app.querySelector("#player-previous");
+function refreshPlayers() {
+  const board = quizLeaderboard?.read();
+  if (!board) return;
+  playerInput.value = board.selected;
+  playerList.replaceChildren(...board.players.map((name) => {
+    const option = document.createElement("option");
+    option.value = name;
+    return option;
+  }));
+  playerPrevious.replaceChildren(new Option("Choose a previous player", ""),
+    ...board.players.map((name) => new Option(name, name)));
+  playerPrevious.value = board.selected;
+}
+playerPrevious.addEventListener("change", () => {
+  if (playerPrevious.value) playerInput.value = playerPrevious.value;
+});
+refreshPlayers();
 window.addEventListener("focus", refreshLandingLeaderboard);
 window.addEventListener("storage", refreshLandingLeaderboard);
 initRecommendedVideos(app);
@@ -128,6 +149,7 @@ let viewshed = null;
 let pixels = null;
 let showcase = null;
 let quiz = null;
+let quizHiddenVisuals = [];
 let xrMode = null;
 let pendingRoomHandoff = false;
 let rightTurnReady = true;
@@ -365,8 +387,14 @@ function button(text, x, y, action, w = 0.75, selected = false) {
   return m;
 }
 function takeawayActions(y, restart = start) {
-  button("Restart", -0.57, y, restart, 1.02);
-  button("Exit to Menu", 0.57, y, openMenu, 1.02);
+  if (LESSON_QUESTION_IDS[currentQuestionDemo()]) {
+    button("Restart", -0.78, y, restart, 0.72);
+    button("Quiz question", 0, y, startLessonQuestion, 0.72);
+    button("Exit to Menu", 0.78, y, openMenu, 0.72);
+  } else {
+    button("Restart", -0.57, y, restart, 1.02);
+    button("Exit to Menu", 0.57, y, openMenu, 1.02);
+  }
 }
 function foregroundTakeaway() {
   for (const mesh of uiParent.children) {
@@ -469,7 +497,7 @@ function hideVisualsForSoundMenu() {
     root, floatingModel, gnssPopup?.group, rain?.group, scan?.group,
     scan?.clipboard, showcase?.group, showcase?.world, showcase?.cockpit,
     showcase?.clipboard, showcase?.fade,
-    quiz?.group, quiz?.letterField, quiz?.effects,
+    quiz?.group, quiz?.effects,
     ...(quiz?.blades.map(({ blade }) => blade) ?? []),
     ...(scan?.reticles?.flat() ?? []),
     ...[layers, viewshed, pixels].flatMap((demo) =>
@@ -596,6 +624,7 @@ function point(p, color, r = 0.026, z = 0.045) {
 }
 function openMenu() {
   closeSoundMenu();
+  restoreQuizVisuals();
   teleport.cancel();
   stopRainInput();
   scan?.dispose();
@@ -694,15 +723,48 @@ function start() {
   draw();
 }
 
-function startQuiz() {
+function currentQuestionDemo() {
+  if (scan) return "scan";
+  if (rain) return "rain";
+  if (layers) return "layers";
+  if (viewshed) return "viewshed";
+  if (pixels) return "pixels";
+  if (showcase) return showcase.kind;
+  if (step >= stages.length) return "gnss";
+  return null;
+}
+function restoreQuizVisuals() {
+  for (const { object, visible } of quizHiddenVisuals) object.visible = visible;
+  quizHiddenVisuals = [];
+}
+function returnFromQuestion() {
+  quiz?.dispose();
+  quiz = null;
+  restoreQuizVisuals();
+  refreshLandingLeaderboard();
+  draw();
+}
+function startLessonQuestion() {
+  const demo = currentQuestionDemo();
+  const question = lessonQuestion(demo);
+  if (!question) return;
   closeSoundMenu();
   stopRainInput();
   quiz?.dispose();
-  quiz = new QuizExperience(scene, controllers, sound, openMenu, quizLeaderboard);
+  const visuals = [root, floatingModel, gnssPopup?.group, rain?.group,
+    scan?.group, scan?.clipboard, showcase?.group, showcase?.world,
+    showcase?.cockpit, showcase?.clipboard,
+    ...[layers, viewshed, pixels].flatMap((item) =>
+      item ? [item.group, item.clipboard] : [])];
+  quizHiddenVisuals = visuals.filter(Boolean).map((object) =>
+    ({ object, visible: object.visible }));
+  for (const { object } of quizHiddenVisuals) object.visible = false;
+  const name = quizLeaderboard?.read().selected || "Guest";
+  quiz = new QuizExperience(scene, controllers, sound, openMenu,
+    devPreview ? null : quizLeaderboard, demo, question, name, returnFromQuestion);
   rightTurnReady = true;
-  step = -1;
   draw();
-  place();
+  quiz.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
 }
 function stopRainInput() {
   teleport.cancel();
@@ -1801,9 +1863,10 @@ function drawRainUI() {
   }
   if (r.stage === 4) {
     if (r.kind === "erosion" && r.replayFrames.length > 1) {
-      button("Replay", -0.78, GUIDED_ACTION_Y, () => r.startReplay(), 0.7);
-      button("Restart", 0, GUIDED_ACTION_Y, start, 0.7);
-      button("Exit to Menu", 0.78, GUIDED_ACTION_Y, openMenu, 0.7);
+      button("Replay", -0.87, GUIDED_ACTION_Y, () => r.startReplay(), 0.54);
+      button("Restart", -0.29, GUIDED_ACTION_Y, start, 0.54);
+      button("Question", 0.29, GUIDED_ACTION_Y, startLessonQuestion, 0.54);
+      button("Exit to Menu", 0.87, GUIDED_ACTION_Y, openMenu, 0.54);
     } else takeawayActions(GUIDED_ACTION_Y);
     foregroundTakeaway();
   } else if (r.stage !== 1)
@@ -2438,8 +2501,7 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
-  if (quiz) return [null, null, false, "Quit",
-    hand === "right" && !quiz.session ? "Turn letters" : null, true];
+  if (quiz) return [null, null, false, "Quit", null, true];
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
@@ -2696,10 +2758,14 @@ function drawScene() {
         category: "Change detection", preview: "Compare real satellite images across time.",
         icon: "change", color: "#f5dc91",
         action: () => startShowcase("change") },
-      { title: "GeoSlice Challenge", lines: ["GeoSlice", "Challenge"],
-        category: "Quiz", preview: "Slice answers fast in a geography and GIS quiz.",
-        icon: "slice", color: "#83e2de", action: startQuiz },
     ].forEach((item, index, all) => menuCard(item, index, all.length));
+    const selectedPlayer = quizLeaderboard?.read();
+    if (selectedPlayer?.selected) {
+      const score = selectedPlayer.today.find((row) =>
+        row.name === selectedPlayer.selected)?.score ?? 0;
+      label(`${selectedPlayer.selected} · ${score} points today`,
+        0, -0.87, 2.4, 0.12, 28, "#cdece7", "#0b2430");
+    }
     if (!showFallbackControls) label("Point and press trigger · A sound · B exit VR",
       0, -1.08, 2.8, 0.11, 26, "#b6d1d9", "#0b2430");
 
@@ -2846,7 +2912,16 @@ for (let i = 0; i < 2; i++) {
     if (renderer.xr.isPresenting) refreshInputLayout(renderer.xr.getSession());
   });
   c.addEventListener("selectstart", () => {
-    if (quiz && !soundMenuOpen) return;
+    if (quiz && !soundMenuOpen) {
+      if (showFallbackControls) {
+        const target = quizTargetFromController(c);
+        if (target) {
+          quiz.split(target);
+          target.action();
+        }
+      }
+      return;
+    }
     if (leftHoldsClipboard(c)) return;
     if (teleport.active && c.userData.xrInput?.handedness === "right") return;
     if (viewshed?.isClimbing && !soundMenuOpen) return;
@@ -3118,7 +3193,25 @@ function intersect(c) {
   raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
   return raycaster.intersectObjects(pointerButtons(), false)[0];
 }
+function quizTargetFromController(c) {
+  c.updateWorldMatrix(true, false);
+  rotation.extractRotation(c.matrixWorld);
+  raycaster.ray.origin.setFromMatrixPosition(c.matrixWorld);
+  raycaster.ray.direction.set(0, 0, -1).applyMatrix4(rotation);
+  return quiz?.targets.find((item) =>
+    raycaster.intersectObject(item.group, true).length) ?? null;
+}
 async function enter(mode, roomScan = mode === "immersive-ar") {
+  if (!devPreview && quizLeaderboard) {
+    try {
+      quizLeaderboard.selectPlayer(playerInput.value);
+      refreshPlayers();
+    } catch (error) {
+      status.textContent = error.message;
+      playerInput.focus();
+      return;
+    }
+  }
   if (mode === "immersive-vr") pendingRoomHandoff = false;
   controllerShortcuts.reset();
   if (previewGuide)
@@ -3156,6 +3249,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
     pixels = null;
     showcase?.dispose();
     showcase = null;
+    restoreQuizVisuals();
     quiz?.dispose();
     quiz = null;
     rain?.dispose();
@@ -3185,6 +3279,7 @@ async function enter(mode, roomScan = mode === "immersive-ar") {
 }
 renderer.xr.addEventListener("sessionend", () => {
   closeSoundMenu();
+  restoreQuizVisuals();
   sound.setMenuMusic(false);
   sound.setActive(false);
   controllerShortcuts.reset();
@@ -3246,7 +3341,7 @@ renderer.setAnimationLoop((time, frame) => {
   const dt = lastTime ? Math.min((time - lastTime) / 1000, 0.1) : 0;
   lastTime = time;
   updateRangeAnimations(dt);
-  if (!soundMenuOpen) gnssDisplay?.update(dt);
+  if (!soundMenuOpen && !quiz) gnssDisplay?.update(dt);
   updateUIFade(dt);
   const previousSamples = scan?.records.length ?? 0;
   if (renderer.xr.isPresenting && frame) {
@@ -3281,10 +3376,10 @@ renderer.setAnimationLoop((time, frame) => {
         draw();
       }
     }
-    const landscapeDemo = (pixels?.phase === "pixels" ? pixels : null) ??
+    const landscapeDemo = quiz ? null : (pixels?.phase === "pixels" ? pixels : null) ??
       viewshed ?? layers ?? (scan?.station ? scan : null) ??
       (showcase?.kind === "photos" && showcase.phase === 5 ? showcase : null);
-    if (pixels?.phase === "platforms" && visibleSession && !soundMenuOpen)
+    if (pixels?.phase === "platforms" && visibleSession && !soundMenuOpen && !quiz)
       pixels.update(dt);
     if (["projection", "change"].includes(showcase?.kind) &&
         showcase.draggingBy !== null) {
@@ -3315,20 +3410,9 @@ renderer.setAnimationLoop((time, frame) => {
         showcase.dragContinentGrip(raycaster, active.id);
       }
     }
-    if (showcase && visibleSession && !soundMenuOpen)
+    if (showcase && visibleSession && !soundMenuOpen && !quiz)
       showcase.update(dt, renderer.xr.getCamera(),
         new Map(controllers.map(({ id, grip }) => [id, grip])));
-    if (quiz && !quiz.session && visibleSession && !soundMenuOpen) {
-      const right = controllers.find(({ c, grip }) =>
-        c.userData.xrInput?.handedness === "right" && c.visible && grip.visible);
-      const pad = right?.c.userData.xrInput?.gamepad;
-      const rightX = pad?.mapping === "xr-standard" ? pad.axes[2] ?? 0 : 0;
-      if (Math.abs(rightX) < 0.3) rightTurnReady = true;
-      else if (rightTurnReady && Math.abs(rightX) > 0.7) {
-        quiz.snapTurnInitials(Math.sign(rightX) * Math.PI / 6);
-        rightTurnReady = false;
-      }
-    }
     quiz?.update(dt, visibleSession && !soundMenuOpen);
     if (landscapeDemo) {
       const visible = renderer.xr.getSession().visibilityState === "visible";
@@ -3400,7 +3484,7 @@ renderer.setAnimationLoop((time, frame) => {
         landscapeDemo.updateClipboard?.(left?.grip, renderer.xr.getCamera(), false,
           showFallbackControls);
     }
-    if (rain && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
+    if (rain && !quiz && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
       let falling = false;
       if (
@@ -3427,7 +3511,7 @@ renderer.setAnimationLoop((time, frame) => {
       if (falling || rain.pouring) waterSoundUntil = time + 350;
       if (rain.stage !== 0) rain.update(dt, falling);
     }
-    if (scan && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
+    if (scan && !quiz && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       if (scan.room)
         scan.updateFrame(
           frame,
@@ -3500,7 +3584,7 @@ renderer.setAnimationLoop((time, frame) => {
       b.material.color.copy(b.userData.baseColor);
     }
     for (const { c, beam, targetBeam, id } of controllers) {
-      if (quiz && !soundMenuOpen) {
+      if (quiz && !soundMenuOpen && !showFallbackControls) {
         beam.visible = false;
         targetBeam.visible = false;
         continue;
@@ -3572,7 +3656,7 @@ renderer.setAnimationLoop((time, frame) => {
     }
   }
   if (devPreview && (pixels || viewshed || layers || scan?.station) && !renderer.xr.isPresenting &&
-      !soundMenuOpen) {
+      !soundMenuOpen && !quiz) {
     if (pixels?.phase === "platforms") pixels.update(dt);
     else {
       const landscapeDemo = pixels ?? viewshed ?? layers ?? scan;
@@ -3581,7 +3665,7 @@ renderer.setAnimationLoop((time, frame) => {
       landscapeDemo.updateClipboard(null, camera, true, fallbackPreview);
     }
   }
-  if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen)
+  if (devPreview && showcase && !renderer.xr.isPresenting && !soundMenuOpen && !quiz)
     showcase.update(dt, camera, new Map());
   if (devPreview && quiz && !renderer.xr.isPresenting)
     quiz.update(dt, !soundMenuOpen);
@@ -3691,8 +3775,6 @@ if (
     startShowcase(new URLSearchParams(location.search).get("demo"));
   } else if (new URLSearchParams(location.search).get("demo") === "rain")
     startRain();
-  else if (new URLSearchParams(location.search).get("demo") === "quiz")
-    startQuiz();
   else if (new URLSearchParams(location.search).get("demo") === "scan") {
     const stationPreview = new URLSearchParams(location.search).get("mode") === "station";
     if (stationPreview) camera.position.y = 1.6;

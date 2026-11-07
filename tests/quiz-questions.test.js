@@ -1,23 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { QUIZ_QUESTIONS, makeQuizRound } from "../src/quiz/questions.js";
+import { QUIZ_QUESTIONS, LESSON_QUESTION_IDS, lessonQuestion } from "../src/quiz/questions.js";
 
-test("the first round contains exactly the ten user-selected questions", () => {
-  assert.deepEqual(QUIZ_QUESTIONS.map(({ id }) => id),
-    ["q02", "q04", "q05", "q06", "q07", "q09", "q10", "q12", "q15", "q16"]);
-  assert.ok(QUIZ_QUESTIONS.every(({ approved, source }) => approved && source));
+test("every visible lesson has one approved, topic-matched question", () => {
+  assert.deepEqual(Object.keys(LESSON_QUESTION_IDS), [
+    "layers", "gnss", "projection", "viewshed", "interpolation", "rain",
+    "cluster", "scan", "spectral", "pixels", "change",
+  ]);
+  assert.equal(new Set(Object.values(LESSON_QUESTION_IDS)).size, 11);
+  for (const demo of Object.keys(LESSON_QUESTION_IDS)) {
+    const question = lessonQuestion(demo);
+    assert.equal(question.id, LESSON_QUESTION_IDS[demo]);
+    assert.ok(question.approved && question.source);
+  }
+  assert.equal(lessonQuestion("hidden-prototype"), null);
+  assert.equal(QUIZ_QUESTIONS.length, 13);
 });
 
-test("question and answer shuffles preserve each correct answer", () => {
-  for (const random of [() => 0, () => 0.5, () => 0.999]) {
-    const round = makeQuizRound(random);
-    assert.equal(round.length, 10);
-    assert.deepEqual(new Set(round.map(({ id }) => id)),
-      new Set(QUIZ_QUESTIONS.map(({ id }) => id)));
-    for (const item of round) {
-      const original = QUIZ_QUESTIONS.find(({ id }) => id === item.id);
-      assert.equal(item.choices[item.correct], original.choices[original.correct]);
-      assert.deepEqual(new Set(item.choices), new Set(original.choices));
+test("answer order varies while preserving the correct answer", () => {
+  for (const demo of Object.keys(LESSON_QUESTION_IDS)) {
+    const original = QUIZ_QUESTIONS.find(({ id }) => id === LESSON_QUESTION_IDS[demo]);
+    for (const random of [() => 0, () => 0.5, () => 0.999]) {
+      const question = lessonQuestion(demo, random);
+      assert.equal(question.choices[question.correct], original.choices[original.correct]);
+      assert.deepEqual(new Set(question.choices), new Set(original.choices));
     }
   }
 });

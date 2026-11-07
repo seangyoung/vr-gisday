@@ -23,16 +23,16 @@ export function validateQuestion(question) {
 }
 
 export class QuizSession {
-  constructor(questions, initials, options = {}) {
-    if (!/^[A-Z]{3}$/.test(initials))
-      throw new TypeError("Initials must be three letters");
+  constructor(questions, name, options = {}) {
+    if (typeof name !== "string" || !name.trim() || name.trim().length > 30)
+      throw new TypeError("Player name must contain 1–30 characters");
     if (!Array.isArray(questions) || !questions.length)
       throw new TypeError("A quiz needs approved questions");
     this.questions = questions.map(validateQuestion);
     if (new Set(this.questions.map((question) => question.id)).size !==
         this.questions.length)
       throw new TypeError("Question IDs must be unique");
-    this.initials = initials;
+    this.name = name.trim();
     this.roundSeconds = options.roundSeconds ?? ROUND_SECONDS;
     this.promptSeconds = options.promptSeconds ?? PROMPT_SECONDS;
     if (!Number.isFinite(this.roundSeconds) || !(this.roundSeconds > 0) ||
@@ -137,7 +137,7 @@ export class QuizSession {
 
   finalScore() {
     return this.complete ? {
-      initials: this.initials,
+      name: this.name,
       score: this.score,
       correct: this.correctCount,
       total: this.questions.length,

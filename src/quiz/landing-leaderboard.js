@@ -8,10 +8,10 @@ function fillRows(list, empty, rows) {
     rank.textContent = String(index + 1).padStart(2, "0");
     const initials = document.createElement("strong");
     initials.className = "leaderboard-initials";
-    initials.textContent = row.initials;
+    initials.textContent = row.name;
     const score = document.createElement("span");
     score.className = "leaderboard-score";
-    score.textContent = `${row.score.toLocaleString()} pts`;
+    score.textContent = `${row.score.toLocaleString()} pts · ${row.completed} demos`;
     item.append(rank, initials, score);
     list.append(item);
   }
