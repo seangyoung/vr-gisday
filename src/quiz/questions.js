@@ -1,7 +1,7 @@
 import { validateQuestion } from "./session.js";
 
-// The original ten GeoSlice prompts and two lesson-specific additions were
-// individually approved by the curator for this gallery.
+// Only curator-approved questions appear in the lesson pools. What Changed?
+// scores its five image interpretations separately.
 export const QUIZ_QUESTIONS = [
   {
     id: "q02", category: "Geography",
@@ -111,6 +111,69 @@ export const QUIZ_QUESTIONS = [
     source: "https://pubs.usgs.gov/unnumbered/70157214/report.pdf",
     approved: true,
   },
+  {
+    id: "layers-topography", category: "GIS layers",
+    prompt: "Which layer reveals hills and valleys in the landscape?",
+    choices: ["Topography", "Vegetation", "Roads", "Political boundaries"],
+    correct: 0,
+    explanation: "Topography represents land elevation and the shape of hills and valleys.",
+    source: "https://www.usgs.gov/special-topics/earth-mri/topography",
+    approved: true,
+  },
+  {
+    id: "projection-tissot-shape", category: "Projections",
+    prompt: "A Tissot circle becomes an ellipse on a projected map. What does that reveal?",
+    choices: ["Local shape distortion", "Higher elevation", "A time-zone boundary", "A larger satellite pixel"],
+    correct: 0,
+    explanation: "The ellipse shows how the projection stretches local shape in one direction.",
+    source: "https://pubs.usgs.gov/bul/1532/report.pdf",
+    approved: true,
+  },
+  {
+    id: "viewshed-observer-height", category: "Visibility",
+    prompt: "A target is hidden behind a ridge. Which change might bring it into view?",
+    choices: ["Raise the observation point", "Change the map colors", "Enlarge the target marker", "Add trees to the ridge"],
+    correct: 0,
+    explanation: "A taller observer may see over a ridge that blocks an eye-level sightline.",
+    source: "https://pro.arcgis.com/en/pro-app/2.8/tool-reference/ready-to-use/viewshed.htm",
+    approved: true,
+  },
+  {
+    id: "interpolation-nearest-zone", category: "Interpolation",
+    prompt: "In the stepped nearest-gauge surface, which reading is assigned to an unmeasured location?",
+    choices: ["The closest gauge’s reading", "The average of every gauge", "The highest reading", "Zero rainfall"],
+    correct: 0,
+    explanation: "Each nearest-gauge zone uses the reading from its closest station.",
+    source: "https://pro.arcgis.com/en/pro-app/3.4/tool-reference/analysis/create-thiessen-polygons.htm",
+    approved: true,
+  },
+  {
+    id: "rain-vegetation-erosion", category: "Watersheds",
+    prompt: "Why does the painted vegetation slow erosion in the tray?",
+    choices: ["Plant cover helps protect and hold the soil", "Plants stop rain from falling", "Plants remove the downhill slope", "Plants turn sediment into rock"],
+    correct: 0,
+    explanation: "Plant cover and roots help protect and hold soil against runoff.",
+    source: "https://www.nrcs.usda.gov/sites/default/files/2025-04/Cover_Crop_Overview-FS_0.pdf",
+    approved: true,
+  },
+  {
+    id: "cluster-population-risk", category: "Aggregation",
+    prompt: "One ward has twice as many recorded deaths as another. What else would you need to compare their mortality risk?",
+    choices: ["The population at risk in each ward", "Brighter map colors", "The name of each ward", "A larger map legend"],
+    correct: 0,
+    explanation: "Counts alone cannot compare risk; deaths need a population denominator.",
+    source: "https://www.cdc.gov/nchs/hus/sources-definitions/rate.htm",
+    approved: true,
+  },
+  {
+    id: "spectral-ndvi-bands", category: "Remote sensing",
+    prompt: "Which two bands does NDVI compare?",
+    choices: ["Near-infrared and red", "Blue and green", "Ultraviolet and X-rays", "Thermal infrared and radio"],
+    correct: 0,
+    explanation: "NDVI compares near-infrared and red reflectance to highlight vegetation differences.",
+    source: "https://earthobservatory.nasa.gov/Features/MeasuringVegetation/measuring_vegetation_2.php",
+    approved: true,
+  },
 ];
 
 function shuffle(items, random) {
@@ -122,23 +185,26 @@ function shuffle(items, random) {
   return result;
 }
 
-// One question follows each lesson. The two unused original trivia prompts
-// remain in the approved bank for potential future lessons.
+// One random question follows each lesson. The two unused original trivia
+// prompts remain in the approved bank for potential future lessons.
 export const LESSON_QUESTION_IDS = Object.freeze({
-  layers: "layers-alignment",
-  gnss: "q04",
-  projection: "q10",
-  viewshed: "q15",
-  interpolation: "q09",
-  rain: "q12",
-  cluster: "q16",
-  scan: "q06",
-  spectral: "q07",
-  pixels: "pixels-ground",
+  layers: ["layers-alignment", "layers-topography"],
+  gnss: ["q04"],
+  projection: ["q10", "projection-tissot-shape"],
+  viewshed: ["q15", "viewshed-observer-height"],
+  interpolation: ["q09", "interpolation-nearest-zone"],
+  rain: ["q12", "rain-vegetation-erosion"],
+  cluster: ["q16", "cluster-population-risk"],
+  scan: ["q06"],
+  spectral: ["q07", "spectral-ndvi-bands"],
+  // The existing pixel question stays until a replacement is approved.
+  pixels: ["pixels-ground"],
 });
 
 export function lessonQuestion(demo, random = Math.random) {
-  const id = LESSON_QUESTION_IDS[demo];
+  const ids = LESSON_QUESTION_IDS[demo];
+  if (!ids?.length) return null;
+  const id = ids[Math.min(ids.length - 1, Math.floor(random() * ids.length))];
   const question = QUIZ_QUESTIONS.find((item) => item.id === id);
   if (!question) return null;
   const choices = shuffle(question.choices.map((text, index) => ({ text, index })), random);
