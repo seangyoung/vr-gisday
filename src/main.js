@@ -129,6 +129,7 @@ const root = new THREE.Group();
 scene.add(root);
 const content = new THREE.Group();
 root.add(content);
+let controllerIllustrations = null;
 const soundPanel = new THREE.Group();
 scene.add(soundPanel);
 let uiParent = content;
@@ -199,6 +200,7 @@ function clearGnssPopup() {
   gnssPopup = null;
 }
 function clear() {
+  controllerIllustrations = null;
   clearGnssPopup();
   gnssDisplay = null;
   clusterReadout = null;
@@ -2336,6 +2338,7 @@ function drawFallbackToolbar() {
 }
 function draw() {
   content.position.y = 0;
+  content.position.z = step === -3 ? -0.45 : 0;
   drawScene();
   drawFallbackToolbar();
   sound.setMenuMusic((isMenu() || step === -3) && renderer.xr.isPresenting);
@@ -2669,7 +2672,7 @@ function drawScene() {
     label("YOUR QUEST CONTROLS", 0, 0.97, 2.5, 0.17, 50, "#a6f5d9");
     label("Point at Continue and press either trigger to begin", 0, 0.76,
       2.75, 0.17, 34);
-    addControllerIllustrations(content, import.meta.env.BASE_URL);
+    controllerIllustrations = addControllerIllustrations(content, import.meta.env.BASE_URL);
     label("LEFT CONTROLLER", -0.72, 0.55, 1.2, 0.14, 34, "#80cfe6");
     label("RIGHT CONTROLLER", 0.72, 0.55, 1.2, 0.14, 34, "#ffdc83");
     label("X · Restart", -0.72, -0.23, 1.35, 0.15, 42);
@@ -3366,6 +3369,7 @@ renderer.setAnimationLoop((time, frame) => {
   if (renderer.xr.isPresenting && frame) {
     if (pendingPlacement) place();
     const session = renderer.xr.getSession();
+    if (step === -3) controllerIllustrations?.userData.updateControls(session.inputSources);
     refreshInputLayout(session);
     const visibleSession = session.visibilityState === "visible";
     if (visibleSession && !showFallbackControls) {
