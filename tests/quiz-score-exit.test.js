@@ -1,0 +1,31 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { QuizExperience } from "../src/quiz/experience.js";
+
+test("score-screen actions wait while the sliced block falls", () => {
+  const quiz = Object.create(QuizExperience.prototype);
+  const target = { group: { visible: true } };
+  let slices = 0;
+  let exits = 0;
+  quiz.sound = { slice: () => { slices++; } };
+  quiz.targets = [target];
+  quiz.fragments = [];
+  quiz.blades = [];
+  quiz.session = { phase: "complete", update() {} };
+  quiz.age = 0;
+  quiz.disposed = false;
+  quiz.scoreAction = null;
+  quiz.queueScoreAction(() => { exits++; }, target);
+  quiz.queueScoreAction(() => { exits++; }, target);
+  assert.equal(target.group.visible, false);
+  assert.equal(slices, 1);
+  assert.deepEqual(quiz.targets, []);
+  quiz.update(0.5);
+  assert.equal(exits, 0);
+  quiz.update(0.49);
+  assert.equal(exits, 0);
+  quiz.update(0.02);
+  assert.equal(exits, 1);
+  quiz.update(1);
+  assert.equal(exits, 1);
+});

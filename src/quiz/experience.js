@@ -175,6 +175,8 @@ export class QuizExperience {
     this.leaderboardState = "";
     this.submitted = false;
     this.feedbackRevealAt = 0;
+    this.scoreAction = null;
+    this.scoreActionRemaining = 0;
     this.disposed = false;
     this.render();
   }
@@ -225,17 +227,6 @@ export class QuizExperience {
     while (this.screen.children.length) disposeTree(this.screen.children[0]);
     this.targets = [];
     this.timerShown = -1;
-    if (this.session.phase === "quit-paused") {
-      this.addPanel("LEAVE THIS QUESTION?", 2.0, 0.32, 0, 0.54,
-        { color: "#ffdc89" });
-      this.addPanel("This attempt will be discarded.", 1.85, 0.21,
-        0, 0.22);
-      this.addTarget("Continue", -0.45, -0.31, 0.72, 0.34, 0x2c836d,
-        () => { this.session.resume(); this.render(); });
-      this.addTarget("Return to takeaway", 0.53, -0.31,
-        0.88, 0.34, 0x945862, () => this.onReturn());
-      return;
-    }
     if (this.session.phase === "complete") {
       this.addPanel("LESSON QUESTION COMPLETE", 1.8, 0.28, 0, 0.75,
         { color: "#a6f5d9" });
@@ -244,10 +235,12 @@ export class QuizExperience {
       this.addPanel(this.leaderboardState ||
         "Your best score for each lesson adds to today's total.",
         2.14, 0.27, 0, 0.08, { fontScale: 0.73 });
-      this.addTarget("Return to takeaway", -0.53, -0.50, 0.95, 0.3,
-        0x2c836d, () => this.onReturn());
-      this.addTarget("Exit to Menu", 0.53, -0.50, 0.86, 0.3,
-        0x685e9b, () => this.onExit());
+      const returnTarget = this.addTarget("Return to takeaway", -0.53, -0.50,
+        0.95, 0.3, 0x2c836d,
+        () => this.queueScoreAction(this.onReturn, returnTarget));
+      const exitTarget = this.addTarget("Exit to Menu", 0.53, -0.50,
+        0.86, 0.3, 0x685e9b,
+        () => this.queueScoreAction(this.onExit, exitTarget));
       return;
     }
     const question = this.session.question;
@@ -301,17 +294,13 @@ export class QuizExperience {
     this.feedbackRevealAt = this.age + 0.82;
   }
 
-  requestQuit() {
-    if (this.session.complete) {
-      this.onExit();
-      return;
-    }
-    if (this.session.phase === "quit-paused") {
-      this.session.resume();
-    } else if (this.session.phase !== "audio-paused") {
-      this.session.pause("quit");
-    }
-    this.render();
+  queueScoreAction(action, target) {
+    if (this.scoreAction || this.disposed) return;
+    this.sound.slice(true);
+    target.group.visible = false;
+    this.targets = [];
+    this.scoreAction = action;
+    this.scoreActionRemaining = 1;
   }
 
   pauseForAudio() {
@@ -434,6 +423,17 @@ export class QuizExperience {
       }
     }
     if (!active) { this.clearMotion(); return; }
+    if (this.scoreAction) {
+      this.scoreActionRemaining -= dt;
+      if (this.scoreActionRemaining <= 0) {
+        const action = this.scoreAction;
+        this.scoreAction = null;
+        action();
+        return;
+      }
+      this.updateBlades(dt, false);
+      return;
+    }
     if (this.feedbackRevealAt) {
       if (this.age < this.feedbackRevealAt) {
         this.updateBlades(dt, false);

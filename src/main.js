@@ -153,6 +153,7 @@ let quiz = null;
 let quizHiddenVisuals = [];
 let xrMode = null;
 let pendingRoomHandoff = false;
+let roomScanHandoff = false;
 let rightTurnReady = true;
 const controllerShortcuts = new ControllerShortcuts();
 const fallbackPreview = devPreview && new URLSearchParams(location.search).has("fallback");
@@ -180,6 +181,7 @@ let uiFadeAge = 1;
 let lastUIKey = "";
 let clusterReadout = null;
 let soundMenuOpen = false;
+let exitConfirmOpen = false;
 let soundButtons = [];
 let soundHiddenVisuals = [];
 let soundPreviousBackground = null;
@@ -496,6 +498,7 @@ function clearSoundPanel() {
 }
 function closeSoundMenu() {
   soundMenuOpen = false;
+  exitConfirmOpen = false;
   clearSoundPanel();
   soundPanel.visible = false;
   for (const { object, visible } of soundHiddenVisuals) object.visible = visible;
@@ -504,6 +507,8 @@ function closeSoundMenu() {
   soundPreviousBackground = null;
   soundBackgroundSaved = false;
   quiz?.resumeAudio();
+  for (const { guide } of controllers)
+    guide.setContext(...controllerGuideContext(guide.handedness));
 }
 function hideVisualsForSoundMenu() {
   showcase?.grab?.cancel();
@@ -576,10 +581,73 @@ function drawSoundMenu() {
   uiParent = previousParent;
   uiFadeAge = previousFade;
 }
+function drawExitConfirm() {
+  clearSoundPanel();
+  const background = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.04, 0.56),
+    new THREE.MeshBasicMaterial({ color: 0x0b2430, side: THREE.DoubleSide }),
+  );
+  background.position.z = -0.02;
+  soundPanel.add(background);
+  const previousParent = uiParent;
+  const previousFade = uiFadeAge;
+  uiParent = soundPanel;
+  uiFadeAge = 1;
+  label("LEAVE THIS DEMO?", 0, 0.18, 0.90, 0.10, 41, "#ffdc89");
+  label(quiz && !quiz.session.complete
+    ? "Your unfinished question will not be scored."
+    : "Return to the experience gallery?",
+  0, 0.035, 0.90, 0.13, 29, "#e6f4f5");
+  for (const [text, x, width, action] of [
+    ["Keep playing", -0.24, 0.45, closeSoundMenu],
+    ["Exit to Menu", 0.25, 0.45, openMenu],
+  ]) {
+    const mesh = label(text, x, -0.17, width, 0.11, 31,
+      "#e6f4f5", "#1b4550");
+    mesh.userData.label = text;
+    mesh.userData.action = () => { sound.click(); action(); };
+    soundButtons.push(mesh);
+  }
+  soundPanel.traverse((object) => {
+    if (!object.material) return;
+    object.material.transparent = true;
+    object.material.opacity = 1;
+    object.material.depthTest = true;
+    object.material.depthWrite = object === background;
+    object.renderOrder = object === background ? 20 : 21;
+  });
+  uiParent = previousParent;
+  uiFadeAge = previousFade;
+}
+function openExitConfirm() {
+  if (soundMenuOpen) closeSoundMenu();
+  stopRainInput();
+  quiz?.pauseForAudio();
+  grab?.cancel();
+  if (viewshed?.isClimbing && !viewshed.isZiplining) viewshed.cancelClimb();
+  if (treeLandscape()?.isClimbingTree) treeLandscape().cancelTreeClimb();
+  const cam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  const eye = cam.getWorldPosition(new THREE.Vector3());
+  const forward = cam.getWorldDirection(new THREE.Vector3());
+  forward.y = 0;
+  if (forward.lengthSq() < 0.01) forward.set(0, 0, -1);
+  forward.normalize();
+  soundPanel.position.copy(eye).addScaledVector(forward, 1.5);
+  soundPanel.position.y += 0.08;
+  soundPanel.lookAt(eye);
+  soundPanel.visible = true;
+  soundMenuOpen = true;
+  exitConfirmOpen = true;
+  hideVisualsForSoundMenu();
+  drawExitConfirm();
+  for (const { guide } of controllers)
+    guide.setContext(...controllerGuideContext(guide.handedness));
+}
 function toggleSoundMenu() {
   if (soundMenuOpen) {
+    const wasExitConfirm = exitConfirmOpen;
     closeSoundMenu();
-    return;
+    if (!wasExitConfirm) return;
   }
   stopRainInput();
   quiz?.pauseForAudio();
@@ -638,6 +706,7 @@ function point(p, color, r = 0.026, z = 0.045) {
 }
 function openMenu() {
   closeSoundMenu();
+  roomScanHandoff = false;
   restoreQuizVisuals();
   teleport.cancel();
   stopRainInput();
@@ -667,6 +736,7 @@ function resetView() {
   else pendingPlacement = true;
 }
 function runControllerShortcut(action) {
+  if (exitConfirmOpen && action !== "exit" && action !== "sound") return;
   if (action === "sound") {
     sound.click();
     toggleSoundMenu();
@@ -675,11 +745,9 @@ function runControllerShortcut(action) {
   if (action === "exit") {
     sound.click();
     if (isMenu()) renderer.xr.getSession()?.end();
-    else if (quiz) {
-      if (soundMenuOpen) closeSoundMenu();
-      quiz.requestQuit();
-    }
-    else openMenu();
+    else if (step === -3) openMenu();
+    else if (exitConfirmOpen) closeSoundMenu();
+    else openExitConfirm();
     return;
   }
   if (quiz) return;
@@ -812,6 +880,7 @@ function startRain(kind = "drainage", explore = false) {
   }
 }
 function startScan(sceneInfo, explore = false) {
+  roomScanHandoff = false;
   if (!SCAN_SCENES.includes(sceneInfo)) sceneInfo = nextScanScene();
   stopRainInput();
   rain?.dispose();
@@ -932,6 +1001,7 @@ function startShowcase(kind) {
   draw();
 }
 function startRoomScan() {
+  roomScanHandoff = false;
   stopRainInput();
   rain?.dispose();
   rain = null;
@@ -946,22 +1016,17 @@ function startRoomScan() {
   scan.place(renderer.xr.isPresenting ? renderer.xr.getCamera() : camera);
   draw();
 }
-async function switchToRoomScan() {
-  if (xrMode === "immersive-ar") {
-    startRoomScan();
-    return;
-  }
+function switchToRoomScan() {
+  roomScanHandoff = true;
+  draw();
+}
+function exitForRoomScan() {
   pendingRoomHandoff = true;
-  try {
-    const session = renderer.xr.getSession();
-    if (session) {
-      const ended = new Promise((resolve) => session.addEventListener("end", resolve, { once: true }));
-      await session.end();
-      await ended;
-    }
-    await enter("immersive-ar", true);
-  } catch (error) {
-    status.textContent = `Open the room scan with the mixed reality button: ${error.message}`;
+  const session = renderer.xr.getSession();
+  if (session) session.end();
+  else {
+    openMenu();
+    status.textContent = "Select Open room scan in MR on the main page.";
   }
 }
 function drawRoomUI() {
@@ -1070,7 +1135,8 @@ function drawScanUI() {
     return;
   }
   if (s.stage === 0) {
-    drawScanChooserUI();
+    if (roomScanHandoff) drawRoomScanHandoffUI();
+    else drawScanChooserUI();
     return;
   }
   if (s.stage === 2) {
@@ -1153,6 +1219,18 @@ function drawScanChooserUI() {
   drawScanChoiceCard("room", 0.89, "Room scan · MR", "Sample your room", switchToRoomScan);
   if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
     0, -0.91, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
+}
+function drawRoomScanHandoffUI() {
+  lessonCard("Room Scan opens in mixed reality",
+    "To scan the room around you, leave VR first. On the site's main page, choose Open room scan in MR. Quest Browser needs that fresh selection to start a mixed reality session.",
+    0.15);
+  label("Choose Cancel to return to the scan options.",
+    0, -0.43, 2.35, 0.14, 30, "#b6d1d9", "#0b2430");
+  button("Cancel", -0.57, -0.77, () => {
+    roomScanHandoff = false;
+    draw();
+  }, 1.04);
+  button("Exit to main page", 0.57, -0.77, exitForRoomScan, 1.04);
 }
 function drawLayersUI() {
   const l = layers;
@@ -2305,7 +2383,7 @@ function drawFallbackToolbar() {
     ...(!isMenu() && step !== -3 ? [["Restart", "restart"]] : []),
     ["Reset", "reset"], ["Sound", "sound"],
     [isMenu() ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" :
-      step === -3 ? "Skip" : "Exit", "exit"],
+      step === -3 ? "Skip" : "Leave", "exit"],
   ];
   let y;
   if (onClipboard) {
@@ -2512,7 +2590,7 @@ function draw() {
       for (const [name, action] of [
         ...(!isMenu() && step !== -3 ? [["X · Restart", "restart"]] : []),
         ["Y · Reset view", "reset"], ["A · Sound menu", "sound"],
-        [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Exit demo", "exit"],
+        [isMenu() ? "B · Exit XR" : step === -3 ? "B · Skip guide" : "B · Leave demo", "exit"],
       ]) {
         const b = document.createElement("button");
         b.textContent = name;
@@ -2523,10 +2601,11 @@ function draw() {
   }
 }
 function controllerGuideContext(hand) {
-  if (quiz) return [null, null, false, "Quit", null, true];
+  if (exitConfirmOpen) return [null, null, true, "Cancel", null, true];
+  if (quiz) return [null, null, false, "Leave?", null, true];
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
-    ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Exit";
+    ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Leave?";
   const teleportHint = hand === "right" ? "↑ Teleport" : null;
   if (rain?.stage === 1) {
     return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
