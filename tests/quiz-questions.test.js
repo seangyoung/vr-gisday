@@ -19,7 +19,10 @@ test("each lesson except What Changed has an approved question pool", () => {
   }
   assert.equal(lessonQuestion("hidden-prototype"), null);
   assert.equal(lessonQuestion("change"), null);
-  assert.equal(QUIZ_QUESTIONS.length, 19);
+  assert.equal(QUIZ_QUESTIONS.length, 25);
+  assert.deepEqual(LESSON_QUESTION_IDS.pixels,
+    ["pixels-mixed-road", "pixels-satellite-coverage"]);
+  assert.ok(!QUIZ_QUESTIONS.some(({ id }) => id === "pixels-ground"));
 });
 
 test("question and answer order vary while preserving the correct answer", () => {

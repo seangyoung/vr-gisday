@@ -103,15 +103,6 @@ export const QUIZ_QUESTIONS = [
     approved: true,
   },
   {
-    id: "pixels-ground", category: "Spatial resolution",
-    prompt: "At 30 m resolution, what does one image pixel represent?",
-    choices: ["An area about 30 m wide", "A 30 m camera altitude", "Exactly 30 objects", "Thirty images"],
-    correct: 0,
-    explanation: "A 30 m pixel samples roughly a 30 m by 30 m ground area.",
-    source: "https://pubs.usgs.gov/unnumbered/70157214/report.pdf",
-    approved: true,
-  },
-  {
     id: "layers-topography", category: "GIS layers",
     prompt: "Which layer reveals hills and valleys in the landscape?",
     choices: ["Topography", "Vegetation", "Roads", "Political boundaries"],
@@ -174,6 +165,69 @@ export const QUIZ_QUESTIONS = [
     source: "https://earthobservatory.nasa.gov/Features/MeasuringVegetation/measuring_vegetation_2.php",
     approved: true,
   },
+  {
+    id: "gnss-fourth-satellite", category: "Positioning",
+    prompt: "What does a fourth GNSS satellite help the receiver solve?",
+    choices: ["Position and clock error", "Signal color", "Satellite size", "Magnetic north"],
+    correct: 0,
+    explanation: "A fourth satellite signal lets the receiver solve for its clock offset along with its three-dimensional position.",
+    source: "https://www.esa.int/Applications/Satellite_navigation/How_satellite_navigation_works",
+    approved: true,
+  },
+  {
+    id: "gnss-multipath-distance", category: "Positioning",
+    prompt: "A GNSS signal bounces off a building. What can happen?",
+    choices: ["The measured distance is too large", "The distance becomes shorter", "The signal travels faster", "Clock error disappears"],
+    correct: 0,
+    explanation: "A reflected signal can follow a longer route, making the inferred distance too large and shifting the calculated location.",
+    source: "https://www.esa.int/Applications/Satellite_navigation/What_about_errors",
+    approved: true,
+  },
+  {
+    id: "projection-conformal", category: "Projections",
+    prompt: "What does a conformal projection preserve locally?",
+    choices: ["Angles and shapes", "Area", "Every distance", "Elevation"],
+    correct: 0,
+    explanation: "Conformal projections preserve local angles and the shapes of very small features.",
+    source: "https://store.usgs.gov/assets/mod/storefiles/PDF/16573.pdf",
+    approved: true,
+  },
+  {
+    id: "scan-new-viewpoint", category: "Scanning",
+    prompt: "A lidar scan misses the far side of a wall. What should the surveyor do?",
+    choices: ["Scan from another viewpoint", "Repeat from the same spot", "Change the point colors", "Increase density from the same spot"],
+    correct: 0,
+    explanation: "Another viewpoint can reveal surfaces blocked from the first scanner position.",
+    source: "https://www.usgs.gov/publications/methodological-considerations-terrestrial-laser-scanning-vegetation-monitoring",
+    approved: true,
+  },
+  {
+    id: "spectral-false-color-red", category: "Remote sensing",
+    prompt: "Why can vegetation appear red in this false-color image?",
+    choices: ["NIR is displayed as red", "Leaves emit red light", "The image shows heat", "Red marks elevation"],
+    correct: 0,
+    explanation: "The false-color display assigns near-infrared reflectance to its red channel.",
+    source: "https://earthobservatory.nasa.gov/features/FalseColor",
+    approved: true,
+  },
+  {
+    id: "pixels-mixed-road", category: "Spatial resolution",
+    prompt: "A road and trees share one coarse pixel. Why might the road be hard to identify?",
+    choices: ["Their signals are mixed in that pixel", "The road has moved", "Trees cannot reflect light", "The pixel records only the tallest object"],
+    correct: 0,
+    explanation: "A coarse pixel combines signals from the surfaces inside its ground footprint.",
+    source: "https://pubs.usgs.gov/unnumbered/70157214/report.pdf",
+    approved: true,
+  },
+  {
+    id: "pixels-satellite-coverage", category: "Spatial resolution",
+    prompt: "A survey needs repeated images of a very large region. Which platform is generally best suited?",
+    choices: ["Satellite", "Drone", "Ground camera", "Tripod scanner"],
+    correct: 0,
+    explanation: "Earth-observing satellites such as Landsat repeatedly capture wide swaths across large regions.",
+    source: "https://www.usgs.gov/faqs/what-are-acquisition-schedules-landsat-satellites",
+    approved: true,
+  },
 ];
 
 function shuffle(items, random) {
@@ -189,16 +243,15 @@ function shuffle(items, random) {
 // prompts remain in the approved bank for potential future lessons.
 export const LESSON_QUESTION_IDS = Object.freeze({
   layers: ["layers-alignment", "layers-topography"],
-  gnss: ["q04"],
-  projection: ["q10", "projection-tissot-shape"],
+  gnss: ["q04", "gnss-fourth-satellite", "gnss-multipath-distance"],
+  projection: ["q10", "projection-tissot-shape", "projection-conformal"],
   viewshed: ["q15", "viewshed-observer-height"],
   interpolation: ["q09", "interpolation-nearest-zone"],
   rain: ["q12", "rain-vegetation-erosion"],
   cluster: ["q16", "cluster-population-risk"],
-  scan: ["q06"],
-  spectral: ["q07", "spectral-ndvi-bands"],
-  // The existing pixel question stays until a replacement is approved.
-  pixels: ["pixels-ground"],
+  scan: ["q06", "scan-new-viewpoint"],
+  spectral: ["q07", "spectral-ndvi-bands", "spectral-false-color-red"],
+  pixels: ["pixels-mixed-road", "pixels-satellite-coverage"],
 });
 
 export function lessonQuestion(demo, random = Math.random) {
