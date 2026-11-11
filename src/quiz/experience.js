@@ -8,6 +8,7 @@ const ANSWER_COLORS = [0x236f89, 0x685ea1, 0x9b682f, 0x298270];
 const BLADE_SAMPLES = [-0.32, -0.52, -0.72, -0.84];
 const ROUND_INFO_Z = -0.58;
 const NEXT_ACTION_Z = 0.23;
+const BLADE_TIP_Z = -0.84;
 const SABER_COLORS = {
   grip: 0x283a32,
   metal: 0x929d8d,
@@ -169,6 +170,7 @@ export class QuizExperience {
     this.session.start();
     this.targets = [];
     this.fragments = [];
+    this.pendingBlast = null;
     this.lastHit = -Infinity;
     this.age = 0;
     this.timerShown = -1;
@@ -237,10 +239,10 @@ export class QuizExperience {
         2.14, 0.27, 0, 0.08, { fontScale: 0.73 });
       const returnTarget = this.addTarget("Return to takeaway", -0.53, -0.50,
         0.95, 0.3, 0x2c836d,
-        () => this.queueScoreAction(this.onReturn, returnTarget));
+        (method) => this.queueScoreAction(this.onReturn, returnTarget, method));
       const exitTarget = this.addTarget("Exit to Menu", 0.53, -0.50,
         0.86, 0.3, 0x685e9b,
-        () => this.queueScoreAction(this.onExit, exitTarget));
+        (method) => this.queueScoreAction(this.onExit, exitTarget, method));
       return;
     }
     const question = this.session.question;
@@ -263,9 +265,10 @@ export class QuizExperience {
         1.9, 0.19, 0, -0.20, { color: "#ffdc89" });
       this.addRoundPanel(result.explanation, 2.17, 0.31, 0, -0.44);
       this.addTarget("See score", 0, -0.76, 0.97, 0.26, 0x2c836d,
-      () => {
+      (method = "slice") => {
         if (!this.session.advance()) return;
-        this.sound.click();
+        if (method === "blast") this.sound.blastImpact(true);
+        else this.sound.slice(true);
         if (this.session.complete) this.submitScore();
         else this.render();
       }).group.position.z = NEXT_ACTION_Z;
@@ -273,20 +276,23 @@ export class QuizExperience {
     }
     this.timerPanel = this.addRoundPanel("18 seconds", 0.95, 0.15, 0, 0.13,
       { color: "#ffdc89", fontScale: 0.9 });
+    this.addRoundPanel("Slice a block or aim your blade and press trigger",
+      2.16, 0.16, 0, -0.13, { color: "#a6f5d9", fontScale: 0.7 });
     question.choices.forEach((choice, index) => {
       const pose = answerBlockPose(index, question.choices.length);
       const target = this.addTarget(choice, pose.x, pose.y, 0.44, 0.43,
-        ANSWER_COLORS[index], () => this.choose(index));
+        ANSWER_COLORS[index], (method) => this.choose(index, method));
       target.group.position.z = pose.z;
       target.group.rotation.y = pose.yaw;
     });
   }
 
-  choose(index) {
+  choose(index, method = "slice") {
     if (this.session?.phase !== "question") return;
     const result = this.session.answer(index);
     if (!result) return;
-    this.sound.slice(result.correct);
+    if (method === "blast") this.sound.blastImpact(result.correct);
+    else this.sound.slice(result.correct);
     // Hold the board briefly so the cut can open before feedback covers it.
     for (const target of this.targets) target.group.visible = false;
     this.targets = [];
@@ -294,9 +300,10 @@ export class QuizExperience {
     this.feedbackRevealAt = this.age + 0.82;
   }
 
-  queueScoreAction(action, target) {
+  queueScoreAction(action, target, method = "slice") {
     if (this.scoreAction || this.disposed) return;
-    this.sound.slice(true);
+    if (method === "blast") this.sound.blastImpact(true);
+    else this.sound.slice(true);
     target.group.visible = false;
     this.targets = [];
     this.scoreAction = action;
@@ -345,6 +352,92 @@ export class QuizExperience {
     this.fragments.push({ group: fragmentGroup, pieces, normal, age: 0 });
   }
 
+  shatter(target) {
+    target.group.updateWorldMatrix(true, false);
+    const fragmentGroup = new THREE.Group();
+    target.group.getWorldPosition(fragmentGroup.position);
+    target.group.getWorldQuaternion(fragmentGroup.quaternion);
+    const pieces = [];
+    for (let row = 0; row < 2; row++) for (let column = 0; column < 2; column++) {
+      const x0 = -target.width / 2 + column * target.width / 2;
+      const y0 = -target.height / 2 + row * target.height / 2;
+      const polygon = [
+        { x: x0, y: y0 }, { x: x0 + target.width / 2, y: y0 },
+        { x: x0 + target.width / 2, y: y0 + target.height / 2 },
+        { x: x0, y: y0 + target.height / 2 },
+      ];
+      const center = polygonCentroid(polygon);
+      const texture = new THREE.CanvasTexture(target.face.userData.canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const mesh = new THREE.Mesh(
+        cutPieceGeometry(polygon, center, target.width, target.height), [
+          new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+          new THREE.MeshBasicMaterial({ color: target.color, side: THREE.DoubleSide }),
+        ]);
+      mesh.position.set(center.x, center.y, 0);
+      fragmentGroup.add(mesh);
+      pieces.push({ mesh, start: center, velocity: new THREE.Vector3(
+        (column ? 1 : -1) * 0.75, (row ? 1 : -1) * 0.62, 0.42),
+        side: column ? 1 : -1 });
+    }
+    this.effects.add(fragmentGroup);
+    this.fragments.push({ group: fragmentGroup, pieces, age: 0, blast: true });
+  }
+
+  fireFromGrip(grip) {
+    if (this.disposed || this.pendingBlast || !grip?.visible ||
+        !["question", "feedback", "complete"].includes(this.session?.phase) ||
+        !this.targets.length) return false;
+    grip.updateWorldMatrix(true, false);
+    const from = grip.localToWorld(new THREE.Vector3(0, 0, BLADE_TIP_Z));
+    const direction = new THREE.Vector3(0, 0, -1)
+      .transformDirection(grip.matrixWorld);
+    const ray = new THREE.Raycaster(from, direction, 0.035, 3.2);
+    let target = null;
+    let nearest = null;
+    for (const item of this.targets) {
+      if (!item.group.visible) continue;
+      item.group.updateWorldMatrix(true, true);
+      const hit = ray.intersectObject(item.group, true)[0];
+      if (hit && (!nearest || hit.distance < nearest.distance)) {
+        nearest = hit;
+        target = item;
+      }
+    }
+    const to = nearest?.point ?? from.clone().addScaledVector(direction, 2.6);
+    const bolt = new THREE.Group();
+    const tip = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8),
+      new THREE.MeshBasicMaterial({ color: 0xc5ecb8 }));
+    const trail = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.015, 1, 8),
+      new THREE.MeshBasicMaterial({ color: 0x94dca4, transparent: true,
+        opacity: 0.83, depthWrite: false }));
+    trail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+    bolt.add(tip, trail);
+    this.effects.add(bolt);
+    this.pendingBlast = { from, to, target, bolt, tip, trail,
+      age: 0, duration: Math.max(0.1, from.distanceTo(to) / 17) };
+    this.sound.laserFire();
+    return true;
+  }
+
+  updateBlast(dt) {
+    const shot = this.pendingBlast;
+    if (!shot) return;
+    shot.age += dt;
+    const fraction = Math.min(1, shot.age / shot.duration);
+    const point = shot.from.clone().lerp(shot.to, fraction);
+    shot.tip.position.copy(point);
+    shot.trail.position.copy(shot.from).lerp(point, 0.5);
+    shot.trail.scale.y = point.distanceTo(shot.from);
+    if (fraction < 1) return;
+    this.pendingBlast = null;
+    disposeTree(shot.bolt);
+    if (!shot.target || !this.targets.includes(shot.target)) return;
+    this.lastHit = this.age;
+    this.shatter(shot.target);
+    shot.target.action("blast");
+  }
+
   updateBlades(dt, allowHit) {
     for (const hand of this.blades) {
       hand.blade.visible = hand.grip.visible;
@@ -352,7 +445,7 @@ export class QuizExperience {
       hand.grip.updateWorldMatrix(true, false);
       const current = BLADE_SAMPLES.map((z) =>
         hand.grip.localToWorld(new THREE.Vector3(0, 0, z)));
-      if (allowHit && hand.previous && dt > 0) {
+      if (allowHit && !this.pendingBlast && hand.previous && dt > 0) {
         const tip = current.at(-1);
         const oldTip = hand.previous.at(-1);
         const speed = tip.distanceTo(oldTip) / dt;
@@ -411,11 +504,18 @@ export class QuizExperience {
     this.age += dt;
     for (const fragment of [...this.fragments]) {
       fragment.age += dt;
-      for (const { mesh, side, start } of fragment.pieces) {
-        mesh.position.x = start.x + side * fragment.normal.x * fragment.age * 0.34;
-        mesh.position.y = start.y + side * fragment.normal.y * fragment.age * 0.34 -
-          fragment.age * fragment.age * 0.55;
-        mesh.rotation.z = side * fragment.age * 1.35;
+      for (const { mesh, side, start, velocity } of fragment.pieces) {
+        if (fragment.blast) {
+          mesh.position.copy(velocity).multiplyScalar(fragment.age)
+            .add(new THREE.Vector3(start.x, start.y - fragment.age ** 2 * 0.55, 0));
+          mesh.rotation.set(side * fragment.age * 1.7,
+            fragment.age * 2.1, side * fragment.age * 1.35);
+        } else {
+          mesh.position.x = start.x + side * fragment.normal.x * fragment.age * 0.34;
+          mesh.position.y = start.y + side * fragment.normal.y * fragment.age * 0.34 -
+            fragment.age * fragment.age * 0.55;
+          mesh.rotation.z = side * fragment.age * 1.35;
+        }
       }
       if (fragment.age > 1.18) {
         disposeTree(fragment.group);
@@ -423,6 +523,8 @@ export class QuizExperience {
       }
     }
     if (!active) { this.clearMotion(); return; }
+    const answerInFlight = Boolean(this.pendingBlast?.target);
+    this.updateBlast(dt);
     if (this.scoreAction) {
       this.scoreActionRemaining -= dt;
       if (this.scoreActionRemaining <= 0) {
@@ -443,7 +545,7 @@ export class QuizExperience {
     }
     const oldPhase = this.session?.phase;
     const oldIndex = this.session?.index;
-    this.session?.update(dt);
+    if (!answerInFlight) this.session?.update(dt);
     if (this.session && (this.session.phase !== oldPhase || this.session.index !== oldIndex)) {
       if (this.session.phase === "question") this.sound.cue("reveal");
       this.render();
@@ -468,6 +570,7 @@ export class QuizExperience {
 
   dispose() {
     this.disposed = true;
+    this.pendingBlast = null;
     this.clearMotion();
     for (const { blade } of this.blades) disposeTree(blade);
     disposeTree(this.group);

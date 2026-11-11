@@ -2609,7 +2609,7 @@ function draw() {
 }
 function controllerGuideContext(hand) {
   if (exitConfirmOpen) return [null, null, true, "Cancel", null, true];
-  if (quiz) return [null, null, false, "Leave?", null, true];
+  if (quiz) return ["Aim / fire", null, false, "Leave?", null, true];
   const onMenu = isMenu() || step === -3;
   const exitLabel = step === -3 ? "Skip guide" : onMenu
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Leave?";
@@ -3032,7 +3032,7 @@ for (let i = 0; i < 2; i++) {
           quiz.split(target);
           target.action();
         }
-      }
+      } else quiz.fireFromGrip(grip);
       return;
     }
     if (leftHoldsClipboard(c)) return;

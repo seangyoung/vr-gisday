@@ -609,6 +609,34 @@ export class LabSound {
     this.tone(correct ? 870 : 310, 0.16, 0.12);
     if (correct) this.tone(1305, 0.12, 0.06);
   }
+  laserFire() {
+    this.unlock();
+    if (!this.context || this.context.state !== "running" || this.muted ||
+        !this.active || !this.effectsEnabled || this.volume === 0) return;
+    const ctx = this.context;
+    const now = ctx.currentTime;
+    const oscillator = ctx.createOscillator();
+    const envelope = ctx.createGain();
+    oscillator.type = "sawtooth";
+    oscillator.frequency.setValueAtTime(1150, now);
+    oscillator.frequency.exponentialRampToValueAtTime(310, now + 0.13);
+    envelope.gain.setValueAtTime(0.001, now);
+    envelope.gain.linearRampToValueAtTime(0.055, now + 0.009);
+    envelope.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    oscillator.connect(envelope);
+    envelope.connect(this.effectsBus);
+    oscillator.onended = () => {
+      oscillator.disconnect(); envelope.disconnect();
+    };
+    oscillator.start(now);
+    oscillator.stop(now + 0.15);
+  }
+  blastImpact(correct) {
+    this.unlock();
+    this.noiseBurst(0.23, 1700, 220, 0.22);
+    this.tone(correct ? 870 : 310, 0.16, 0.12);
+    if (correct) this.tone(1305, 0.12, 0.06);
+  }
   scan(distance = 1) {
     if (!this.context) return;
     const now = this.context.currentTime;
