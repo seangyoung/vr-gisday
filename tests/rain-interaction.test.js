@@ -172,16 +172,18 @@ test("both tabletop rain models can be snap-turned without changing the terrain"
   }
 });
 
-test("erosion tray paints vegetation with the right trigger while rain stays available", () => {
+test("A-button planting paints vegetation while the right trigger remains sculpt", () => {
   const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
   r.explore();
   const originalBed = r.heights.slice();
   const water = r.water;
-  r.setBrushTool("vegetation");
   const start = new THREE.Vector3(-0.3, r.heights[r.cellAt(-0.3, -0.4)], -0.4);
   const hand = new THREE.Vector3(-0.3, 1, -0.4);
-  assert.equal(r.beginTrigger("right", 0, start, hand), "plant");
+  assert.equal(r.beginPlant(0, start, hand), true);
+  assert.equal(r.stroke.tool, "vegetation");
+  assert.equal(r.stroke.input, "button");
   assert.equal(r.beginTrigger("left", 1, start, hand), "rain");
+  assert.equal(r.beginTrigger("right", 0, start, hand), null);
   const end = new THREE.Vector3(0.3, r.heights[r.cellAt(0.3, -0.4)], -0.4);
   r.moveStroke(0, hand, end);
   assert.ok(r.vegetation[r.cellAt(-0.3, -0.4)] > 0);
@@ -192,14 +194,33 @@ test("erosion tray paints vegetation with the right trigger while rain stays ava
   assert.equal(r.water, water);
   r.moveStroke(0, hand, null);
   assert.equal(r.brush.visible, false);
-  r.endStroke(0);
-  r.setBrushTool("earth");
+  r.endStroke(0, "trigger");
+  assert.equal(r.stroke.tool, "vegetation", "trigger release cannot end an A-button stroke");
+  r.endStroke(0, "button");
+  assert.equal(r.beginTrigger("right", 0, start, hand), "sculpt");
+  assert.equal(r.stroke.tool, "earth");
+  r.endStroke(0, "trigger");
   assert.ok(r.vegetation[r.cellAt(0, -0.4)] > 0);
   assert.equal(r.water, water);
   r.restore();
-  assert.equal(r.brushTool, "earth");
   assert.ok(r.vegetation.every((value) => value === 0));
   assert.equal(r.water.vegetation, r.vegetation);
+  r.dispose();
+});
+
+test("fallback Plant patch paints the last aimed soil without changing the trigger", () => {
+  const r = new RainExperience(new THREE.Scene(), () => {}, "erosion");
+  r.explore();
+  const point = new THREE.Vector3(0.1, r.heights[r.cellAt(0.1, -0.2)], -0.2);
+  assert.equal(r.plantPatch(), false);
+  r.rememberPlantAim(point);
+  assert.equal(r.plantPatch(), true);
+  assert.ok(r.vegetation[r.cellAt(0.1, -0.2)] > 0);
+  assert.equal(r.beginTrigger("right", 0, point, new THREE.Vector3(0, 1, 0)),
+    "sculpt");
+  r.endStroke(0, "trigger");
+  r.restore();
+  assert.equal(r.plantPatch(), false);
   r.dispose();
 });
 

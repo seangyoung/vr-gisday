@@ -1882,9 +1882,8 @@ function drawRainUI() {
     button("Return to Takeaway", 0, GUIDED_ACTION_Y, () => r.endReplay(), 1.3);
     return;
   }
-  const copy = [
-    null,
-    [
+  const copy = {
+    1: [
       r.kind === "erosion"
         ? "Shape the land. Watch water reshape it."
         : "Shape the land. Follow the water.",
@@ -1892,21 +1891,11 @@ function drawRainUI() {
         ? "Rain cuts channels in loose soil. Paint green cover to protect a patch,\nthen compare its erosion with bare ground beside it."
         : "Runoff follows slope toward an outlet; ridges form divides.\nRain the slopes, sculpt the land, and watch paths change.",
     ],
-    [
-      "Predict the path",
-      "Rain will fall at the gold ring near the ridge.\nWhich outlet will this water reach?\nPoint at an outlet choice below and press trigger.",
-    ],
-    [
-      r.answer === r.destination
-        ? "Your prediction follows the slope."
-        : "The slope sends this rain the other way.",
-      `This rain reaches outlet ${r.destination}. Follow its glowing path.\nEach colored area drains to one outlet: a watershed.\nThe white ridge line is the divide between them.`,
-    ],
-    [
+    4: [
       "One landscape. Two watersheds.",
       "A watershed is land that drains to one outlet.\nDrops on opposite sides of a ridge reach different outlets.\nThe ridge is a drainage divide between the watersheds.",
     ],
-  ];
+  };
   if (r.stage === 4 && r.edited)
     copy[4] = [
       "Change the land. Change the flow.",
@@ -1921,9 +1910,9 @@ function drawRainUI() {
   const [title, body] = copy[r.stage];
   if (r.stage === 1)
     label(
-      `Left trigger: rain · Right trigger: ${r.kind === "erosion" && r.brushTool === "vegetation" ? "paint plants" : "sculpt"}\nGrip: move/size · Grip + stick: turn 45°\n${r.kind === "erosion"
-        ? r.replayTime >= 0 ? "Replay shows saved bed shapes." : "Green cover protects soil; bare patches erode faster."
-        : r.overlay
+      r.kind === "erosion"
+        ? `Left trigger: rain · Right trigger: sculpt\n${showFallbackControls ? "Plant patch button" : "Hold A: paint plants"} · Grip: move/size\nGrip + stick: turn 45° · Plants slow erosion`
+        : `Left trigger: rain · Right trigger: sculpt\nGrip: move/size · Grip + stick: turn 45°\n${r.overlay
           ? `${basinLabels.A} and ${basinLabels.B} mark the two drainage basins.`
           : "Runoff follows slope; ridges divide basins."}`,
       0, GUIDED_INFO_Y, 2.3, 0.22, 29, "#e6f4f5", "#0b2430",
@@ -1931,39 +1920,30 @@ function drawRainUI() {
   else lessonCard(title, body, r.stage === 4 ? -0.70 : GUIDED_CARD_Y);
   if (r.stage === 1) {
     if (r.kind === "erosion") {
-      button("Reset", -0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.restore(); }, 0.42);
-      button(r.originalBed.visible ? "Hide bed" : "Compare", -0.44, GUIDED_ACTION_Y,
-        () => { r.originalBed.visible = !r.originalBed.visible; draw(); }, 0.42);
-      button(r.replayTime >= 0 ? "Live" : "Replay", 0, GUIDED_ACTION_Y,
-        () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }, 0.42);
-      button("Plants", 0.44, GUIDED_ACTION_Y,
-        () => r.setBrushTool(r.brushTool === "vegetation" ? "earth" : "vegetation"),
-        0.42, r.brushTool === "vegetation");
-      button("Takeaway", 0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.42);
+      const spacing = showFallbackControls ? 0.44 : 0.55;
+      const width = showFallbackControls ? 0.42 : 0.50;
+      const actions = [
+        ["Reset", () => { stopRainInput(); r.restore(); }],
+        [r.originalBed.visible ? "Hide bed" : "Compare",
+          () => { r.originalBed.visible = !r.originalBed.visible; draw(); }],
+        [r.replayTime >= 0 ? "Live" : "Replay",
+          () => { stopRainInput(); if (r.replayTime >= 0) r.endReplay(); else r.startReplay(); }],
+        ...(showFallbackControls ? [["Plant patch", () => {
+          if (r.plantPatch()) sound.click();
+        }]] : []),
+        ["Takeaway", () => { stopRainInput(); r.finish(); }],
+      ];
+      actions.forEach(([text, action], index) =>
+        button(text, (index - (actions.length - 1) / 2) * spacing,
+          GUIDED_ACTION_Y, action, width));
     } else {
       button("Reset terrain", -0.7, GUIDED_ACTION_Y,
         () => { stopRainInput(); r.restore(); }, 0.65);
       button(r.overlay ? "Hide basins" : "Show basins", 0, GUIDED_ACTION_Y,
         () => r.toggleOverlay(), 0.65);
-      button(r.edited ? "Takeaways" : "Prediction", 0.7, GUIDED_ACTION_Y,
-        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.65);
+      button("Takeaway", 0.7, GUIDED_ACTION_Y,
+        () => { stopRainInput(); r.finish(); }, 0.65);
     }
-  }
-  if (r.stage === 2) {
-    button("Left outlet", -0.54, GUIDED_ACTION_Y, () => r.choose("A"), 1.02);
-    button("Right outlet", 0.58, GUIDED_ACTION_Y, () => r.choose("B"), 1.02);
-  }
-  if (r.stage === 3) {
-    button(
-      "Rain here again",
-      -0.54,
-      GUIDED_ACTION_Y,
-      () => {
-        r.playback = 4;
-      },
-      1.02,
-    );
-    button("Takeaways", 0.58, GUIDED_ACTION_Y, () => r.finish(), 1.02);
   }
   if (r.stage === 4) {
     if (r.kind === "erosion" && r.replayFrames.length > 1) {
@@ -2613,8 +2593,9 @@ function controllerGuideContext(hand) {
     ? xrMode === "immersive-ar" ? "Exit MR" : "Exit VR" : "Leave?";
   const teleportHint = hand === "right" ? "↑ Teleport" : null;
   if (rain?.stage === 1) {
-    return [hand === "left" ? "Rain" : rain.brushTool === "vegetation" ? "Plant" : "Sculpt",
-      "Move/size", onMenu, exitLabel];
+    return [hand === "left" ? "Rain" : "Sculpt",
+      "Move/size", onMenu, exitLabel, null, false,
+      rain.kind === "erosion" ? "Plants" : null];
   }
   if (scan?.station && scan.stage === 1)
     return [hand === "left" ? null : "Scan", "Carry tripod", onMenu, exitLabel, teleportHint];
@@ -2654,7 +2635,7 @@ function setGuideContext(guide) {
   const context = controllerGuideContext(guide.handedness);
   guide.setContext(context[0] ?? null, context[1] ?? null, context[2] ?? false,
     context[3] ?? "Exit demo", context[4] ?? null, context[5] ?? false,
-    canResetTabletop());
+    canResetTabletop(), context[6] ?? null);
 }
 function leftHoldsClipboard(controller) {
   return controller.userData.xrInput?.handedness === "left" &&
@@ -3127,7 +3108,7 @@ for (let i = 0; i < 2; i++) {
     showcase?.endInteraction?.(i);
     pixels?.platformScene?.endSpin(i);
     scan?.endPreviewDrag?.(i);
-    rain?.endStroke(i);
+    rain?.endStroke(i, "trigger");
     c.userData.raining = false;
     c.userData.scanning = false;
   });
@@ -3599,6 +3580,23 @@ renderer.setAnimationLoop((time, frame) => {
     }
     if (rain && !quiz && !soundMenuOpen && renderer.xr.getSession().visibilityState === "visible") {
       const active = controllers[rainPointer];
+      const right = controllers.find(({ c }) =>
+        c.userData.xrInput?.handedness === "right");
+      const planting = rain.kind === "erosion" && rain.stage === 1 &&
+        right?.c.visible && right.grip.visible &&
+        right.c.userData.xrInput?.gamepad?.buttons[4]?.pressed &&
+        !rain.grab.hands.size && rain.replayTime < 0;
+      if (rain.stroke?.input === "button" && !planting)
+        rain.endStroke(rain.stroke.id, "button");
+      if (rain.kind === "erosion" && rain.stage === 1 && right?.c.visible) {
+        const ui = intersect(right.c);
+        const land = rainHit(right.c);
+        if (modelBeforeUi(land, ui)) {
+          rain.rememberPlantAim(land.point);
+          if (planting && !rain.stroke && rain.beginPlant(right.id, land.point,
+            right.grip.getWorldPosition(new THREE.Vector3()))) sound.click();
+        }
+      }
       let falling = false;
       if (
         active?.c.visible &&
@@ -3965,6 +3963,7 @@ if (
       const land = raycaster.intersectObject(rain.terrain, false)[0];
       if (land) {
         rain.aim(land.point);
+        rain.rememberPlantAim(land.point);
         previewRaining = true;
       }
     }
@@ -4023,7 +4022,10 @@ if (devPreview) {
     }
     rain.group.updateWorldMatrix(true, true);
     const hit = raycaster.intersectObject(rain.terrain, false)[0];
-    if (hit) rain.aim(hit.point);
+    if (hit) {
+      rain.aim(hit.point);
+      rain.rememberPlantAim(hit.point);
+    }
     // A held press keeps watering its last valid source beyond the terrain edge.
   });
   renderer.domElement.addEventListener("pointerleave", () => {

@@ -11,8 +11,6 @@ import {
   cellPoint,
   cellAt,
   routeFrom,
-  outletFor,
-  CHALLENGE,
   OUTLET_A,
   OUTLET_B,
 } from "./terrain.js";
@@ -36,7 +34,7 @@ export class RainExperience {
     this.heights =
       this.kind === "erosion" ? createTray(this.size) : createHeights();
     this.vegetation = this.kind === "erosion" ? new Float32Array(this.heights.length) : null;
-    this.brushTool = "earth";
+    this.plantAim = null;
     this.water =
       this.kind === "erosion"
         ? new ErosionWater(this.heights, this.vegetation)
@@ -48,7 +46,6 @@ export class RainExperience {
     this.elapsed = 0;
     this.overlay = false;
     this.outletMeshes = [];
-    this.answer = null;
     this.counts = { A: 0, B: 0, sink: 0 };
     this.source = this.cellAt(-0.45, -0.3);
     this.drops = [];
@@ -61,7 +58,6 @@ export class RainExperience {
     this.replayCaptureTime = 0;
     this.replayTime = -1;
     this.replayFrameIndex = -1;
-    this.playback = 0;
     this.group = new THREE.Group();
     this.grab = new ModelGrab(this.group, 0.22, 0.75);
     this.grabBounds = new THREE.Box3(
@@ -242,13 +238,6 @@ export class RainExperience {
       this.cloud.add(m);
     }
     this.group.add(this.cloud);
-    this.marker = new THREE.Mesh(
-      new THREE.TorusGeometry(0.055, 0.014, 8, 28),
-      new THREE.MeshBasicMaterial({ color: 0xffe28a }),
-    );
-    this.marker.rotation.x = -Math.PI / 2;
-    this.marker.visible = false;
-    this.group.add(this.marker);
     this.particles = new THREE.InstancedMesh(
       new THREE.SphereGeometry(0.014, 7, 5),
       new THREE.MeshBasicMaterial({ color: 0xd8faff }),
@@ -535,11 +524,35 @@ export class RainExperience {
     }
     if (handedness === "right" && worldHand) {
       this.beginStroke(id, worldHit, worldHand);
-      return this.stroke?.id === id ? this.brushTool === "vegetation" ? "plant" : "sculpt" : null;
+      return this.stroke?.id === id && this.stroke.input === "trigger" ? "sculpt" : null;
     }
     return null;
   }
-  beginStroke(id, worldHit, worldHand) {
+  beginPlant(id, worldHit, worldHand) {
+    if (this.kind !== "erosion" || this.stage !== 1 ||
+        this.grab.hands.size || this.replayTime >= 0 || !worldHand) return false;
+    this.beginStroke(id, worldHit, worldHand, "vegetation", "button");
+    return this.stroke?.id === id && this.stroke.input === "button";
+  }
+  rememberPlantAim(worldHit) {
+    if (this.kind !== "erosion" || !worldHit) return;
+    const point = this.group.worldToLocal(worldHit.clone());
+    if (Math.abs(point.x) <= 1 && Math.abs(point.z) <= 1)
+      this.plantAim = { x: point.x, z: point.z };
+  }
+  plantPatch() {
+    if (this.kind !== "erosion" || this.stage !== 1 ||
+        this.grab.hands.size || this.replayTime >= 0 || !this.plantAim) return false;
+    const changed = paintVegetation(this.vegetation,
+      this.plantAim.x, this.plantAim.z, 0.28);
+    if (changed) {
+      this.edited = true;
+      this.paint();
+      this.onChange();
+    }
+    return changed;
+  }
+  beginStroke(id, worldHit, worldHand, tool = "earth", input = "trigger") {
     if (this.stage !== 1 || this.grab.hands.size || this.stroke) return;
     const hit = this.group.worldToLocal(worldHit.clone());
     const hand = this.group.worldToLocal(worldHand.clone());
@@ -549,9 +562,16 @@ export class RainExperience {
       handZ: worldHand.z,
       lastHeight: hand.y,
       center: hit,
-      tool: this.brushTool,
+      tool,
+      input,
       lastPaint: null,
     };
+    this.brush.material.color.setHex(tool === "vegetation" ? 0x73e076 : 0xffcd85);
+    this.brush.scale.set(
+      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
+      0.22,
+      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
+    );
     if (this.kind === "erosion" && this.stroke.tool === "vegetation")
       this.movePlantBrush(hit.x, hit.z);
   }
@@ -574,18 +594,6 @@ export class RainExperience {
     const delta = THREE.MathUtils.clamp(height - this.stroke.lastHeight, -0.08, 0.08);
     this.stroke.lastHeight = height;
     this.applyBrush(this.stroke.center.x, this.stroke.center.z, delta);
-  }
-  setBrushTool(tool) {
-    if (this.kind !== "erosion" || !["earth", "vegetation"].includes(tool)) return;
-    this.endStroke();
-    this.brushTool = tool;
-    this.brush.material.color.setHex(tool === "vegetation" ? 0x73e076 : 0xffcd85);
-    this.brush.scale.set(
-      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
-      0.22,
-      tool === "vegetation" ? VEGETATION_BRUSH_RADIUS / 0.24 : 1,
-    );
-    this.onChange();
   }
   movePlantBrush(x, z) {
     if (x < -1 || x > 1 || z < -1 || z > 1) {
@@ -655,8 +663,9 @@ export class RainExperience {
       tree.position.y = this.heights[tree.userData.cell] + 0.08;
     this.paint();
   }
-  endStroke(id) {
+  endStroke(id, input) {
     if (id !== undefined && this.stroke?.id !== id) return;
+    if (input && this.stroke?.input !== input) return;
     this.stroke = null;
     this.brush.visible = false;
     if (this.strokeDirty) {
@@ -683,7 +692,7 @@ export class RainExperience {
     this.overflowAnnounced = false;
     this.grab.cancel();
     this.stroke = null;
-    this.brushTool = "earth";
+    this.plantAim = null;
     this.brush.material.color.setHex(0xffcd85);
     this.brush.scale.set(1, 0.22, 1);
     this.heights =
@@ -841,31 +850,6 @@ export class RainExperience {
     this.onEvent("reveal");
     this.onChange();
   }
-  challenge() {
-    this.restore(false);
-    this.stage = 2;
-    this.drops = [];
-    this.clearTrails();
-    this.overlay = false;
-    this.divide.visible = false;
-    this.paint();
-    this.setSource(CHALLENGE);
-    const p = cellPoint(CHALLENGE, this.heights);
-    this.marker.position.set(p.x, p.y + 0.025, p.z);
-    this.marker.visible = true;
-    this.onChange();
-  }
-  choose(answer) {
-    if (this.stage !== 2) return;
-    this.answer = answer;
-    this.stage = 3;
-    this.overlay = true;
-    this.divide.visible = true;
-    this.paint();
-    this.playback = 4;
-    this.onEvent(answer === this.destination ? "correct" : "blocked");
-    this.onChange();
-  }
   finish() {
     this.endReplay();
     if (this.kind === "erosion") this.captureReplayFrame();
@@ -877,11 +861,7 @@ export class RainExperience {
     this.cloud.visible = true;
     this.stage = 4;
     this.group.visible = false;
-    this.playback = 0;
     this.onChange();
-  }
-  get destination() {
-    return outletFor(CHALLENGE);
   }
   get terrainChange() {
     if (this.kind !== "erosion") return null;
@@ -1028,12 +1008,8 @@ export class RainExperience {
         return;
       }
     }
-    const active =
-      (this.stage === 1 &&
-        !this.grab.hands.size &&
-        (raining || this.pouring)) ||
-      (this.stage === 3 && this.playback > 0);
-    this.playback = Math.max(0, this.playback - dt);
+    const active = this.stage === 1 && !this.grab.hands.size &&
+      (raining || this.pouring);
     if (active) {
       this.emission += dt;
       while (this.emission >= 0.1) {
@@ -1076,7 +1052,6 @@ export class RainExperience {
     }
     this.particles.count = count;
     this.particles.instanceMatrix.needsUpdate = true;
-    this.marker.scale.setScalar(1 + 0.12 * Math.sin(this.time * 3));
   }
   dispose() {
     this.grab.cancel();

@@ -71,6 +71,7 @@ export class ControllerGuide {
     this.stickAction = null;
     this.quizMode = false;
     this.resettableModel = false;
+    this.aAction = null;
     this.dwell = 0;
     this.hold = 0;
     this.labels = [];
@@ -89,11 +90,11 @@ export class ControllerGuide {
   }
 
   setContext(trigger, gripAction = null, onMenu = false, exitLabel = "Exit demo",
-    stickAction = null, quizMode = false, resettableModel = false) {
+    stickAction = null, quizMode = false, resettableModel = false, aAction = null) {
     if (trigger === this.trigger && gripAction === this.gripAction &&
         onMenu === this.onMenu && exitLabel === this.exitLabel &&
         stickAction === this.stickAction && quizMode === this.quizMode &&
-        resettableModel === this.resettableModel) return;
+        resettableModel === this.resettableModel && aAction === this.aAction) return;
     this.trigger = trigger;
     this.gripAction = gripAction;
     this.onMenu = onMenu;
@@ -101,6 +102,7 @@ export class ControllerGuide {
     this.stickAction = stickAction;
     this.quizMode = quizMode;
     this.resettableModel = resettableModel;
+    this.aAction = aAction;
     this.clearLabels();
   }
 
@@ -127,13 +129,16 @@ export class ControllerGuide {
       });
       this.materialsPrepared = true;
     }
-    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}:${this.quizMode}:${this.resettableModel}`;
+    const key = `${this.handedness}:${this.trigger}:${this.gripAction ?? ""}:${this.onMenu}:${this.exitLabel}:${this.stickAction ?? ""}:${this.quizMode}:${this.resettableModel}:${this.aAction ?? ""}`;
     if (this.labelKey === key) return this.labels.length > 0;
     this.clearLabels();
     const buttons = this.handedness === "left"
       ? leftButtons.filter(([id]) => id !== "x" || this.resettableModel)
-      : rightButtons.map((spec) => spec[0] === "b"
-        ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec);
+      : [
+          ...(this.aAction ? [["a", "A", this.aAction, "b", 0.025]] : []),
+          ...rightButtons.map((spec) => spec[0] === "b"
+            ? [spec[0], spec[1], this.exitLabel, spec[3], spec[4]] : spec),
+        ];
     const specs = [
       ...buttons,
       ...(this.trigger ? [["trigger", "TRIG", this.trigger, "grip", 0.032]] : []),
