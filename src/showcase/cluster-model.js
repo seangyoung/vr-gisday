@@ -19,8 +19,8 @@ export const SNOW_WINDOW = Object.freeze({
 // broader connected wards. Keeping the assignments fixed avoids runtime
 // zoning calculations on the headset.
 export const CLUSTER_MODES = Object.freeze({
-  points: { name: "Mapped buildings", note: [
-    "Each circle records deaths at a building.",
+  points: { name: "Mapped addresses", note: [
+    "Each circle records deaths at an address.",
     "Compare these same deaths in Plans A–D.",
   ] },
   wardA: { name: "Plan A · six compact wards", count: 6, note: [

@@ -1769,7 +1769,7 @@ function drawShowcaseUI() {
     label("Where Did the Cluster Go?", 0, 0.98, 2.45, 0.17, 46, "#e6f4f5", "#0b2430");
     clusterReadout = label(exhibit.selectedText, 0, -0.64, 2.35, 0.12,
       27, "#b6d1d9", "#0b2430");
-    button("Buildings", -0.96, -0.84, () => exhibit.setMode("points"),
+    button("Addresses", -0.96, -0.84, () => exhibit.setMode("points"),
       0.45, exhibit.mode === "points");
     button("Plan A", -0.48, -0.84, () => exhibit.setMode("wardA"),
       0.43, exhibit.mode === "wardA");

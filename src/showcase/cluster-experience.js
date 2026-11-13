@@ -145,7 +145,7 @@ function drawMap(canvas, mode) {
   ctx.font = "22px system-ui";
   ctx.fillStyle = "#c4dce0";
   ctx.fillText("1854 Soho, London", 602, 102);
-  ctx.fillText(`${SNOW_BUILDINGS.length} mapped buildings`, 602, 144);
+  ctx.fillText(`${SNOW_BUILDINGS.length} mapped addresses`, 602, 144);
   ctx.fillText(`${SNOW_TOTAL} recorded deaths`, 602, 177);
   ctx.fillStyle = "#ffe17c";
   ctx.fillText("● Broad Street pump", 602, 228);
@@ -153,7 +153,7 @@ function drawMap(canvas, mode) {
   ctx.fillText("● Other mapped pumps", 602, 262);
   if (mode === "points") {
     ctx.fillStyle = "#f0a987";
-    ctx.fillText("● Size = deaths at building", 602, 307);
+    ctx.fillText("● Size = deaths at address", 602, 307);
     ctx.fillStyle = "#c4dce0";
     ctx.fillText("Pale gaps = streets", 602, 355);
     ctx.fillText("Dark shapes = blocks", 602, 390);
@@ -226,7 +226,7 @@ export class ClusterExperience extends TimedExhibit {
     this.kind = "cluster";
     this.mode = "points";
     this.selection = null;
-    this.selectedText = "Point at a building to see its recorded death count.";
+    this.selectedText = "Point at an address to see its recorded death count.";
     this.mapCanvas = document.createElement("canvas");
     this.mapCanvas.width = 930;
     this.mapCanvas.height = 600;
@@ -256,7 +256,7 @@ export class ClusterExperience extends TimedExhibit {
     const highest = mode === "points" ? null : aggregationFor(mode)
       .reduce((best, zone) => zone.deaths > best.deaths ? zone : best);
     this.selectedText = mode === "points"
-      ? "Select a building circle to see its recorded deaths."
+      ? "Select an address circle to see its recorded deaths."
       : `Highest ward: ${highest.deaths} deaths. Select a block to outline its ward.`;
     drawMap(this.mapCanvas, mode);
     this.map.material.map.needsUpdate = true;
@@ -284,8 +284,8 @@ export class ClusterExperience extends TimedExhibit {
       this.selection = near.distance <= 14
         ? { type: "building", point: near.point } : null;
       this.selectedText = this.selection
-        ? `${near.point.deaths} recorded death${near.point.deaths === 1 ? "" : "s"} at this mapped building.`
-        : "Select a building circle to inspect its count.";
+        ? `${near.point.deaths} recorded death${near.point.deaths === 1 ? "" : "s"} at this mapped address.`
+        : "Select an address circle to inspect its count.";
     } else {
       const block = blockAt(x, y);
       const zone = block ? aggregationFor(this.mode)[wardFor(block, this.mode)] : null;
