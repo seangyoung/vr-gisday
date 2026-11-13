@@ -1048,7 +1048,7 @@ function drawRoomUI() {
       : s.stage === 2
         ? "Your surroundings, sampled."
         : s.frozen
-          ? "Frozen room cloud"
+          ? "Room scan model"
           : "Sweep across real surfaces";
   const body =
     s.stage === 0
@@ -1056,8 +1056,8 @@ function drawRoomUI() {
       : s.stage === 2
         ? "Your browser estimated these surfaces in your room.\nGaps show where another viewpoint could add samples.\nLidar builds point clouds from timed laser returns."
         : s.frozen
-          ? "Move the frozen point cloud to inspect gaps.\nResume returns points to their real-world positions.\nKeep passthrough visible as you explore."
-          : "Aim at real surfaces and sweep.\nUp to three green dots mark actual surface returns.\nFreeze to inspect the point cloud you collected.";
+          ? "Move the point cloud to inspect gaps.\nResume Scan returns points to their real-world positions.\nKeep passthrough visible as you explore."
+          : "Aim at real surfaces and sweep.\nUp to three green dots mark actual surface returns.\nView Model to inspect the point cloud you collected.";
   if (intro) {
     label(title, 0, 1.02, 2.4, 0.18, 48, "#e6f4f5", "#0b2430");
     label(body, 0, 0.78, 2.4, 0.3, 33, "#e6f4f5", "#0b2430");
@@ -1074,13 +1074,19 @@ function drawRoomUI() {
   } else label(`${s.message}\n${s.records.length} WebXR points · ${colorGuide}`,
     0, GUIDED_INFO_Y, 2.3, 0.17, 25, "#d8eae8", "#0b2430");
   if (s.stage === 0) {
-    if (s.status !== "unavailable")
-      button("Start room scan", 0, -0.77, () => s.explore(), 1.65);
+    const canStart = s.status !== "unavailable";
+    if (canStart)
+      button("Start room scan", -0.62, -0.77, () => s.explore(), 1.10);
+    button("Exit Mixed Reality", canStart ? 0.62 : 0, -0.77, () => {
+      const session = renderer.xr.getSession();
+      if (session) session.end();
+      else openMenu();
+    }, canStart ? 1.10 : 1.65);
     if (!showFallbackControls) label("Raise either controller into view for button shortcuts",
       0, -0.98, 2.3, 0.11, 27, "#b6d1d9", "#0b2430");
   } else {
     button(
-      s.frozen ? "Resume" : "Freeze",
+      s.frozen ? "Resume Scan" : "View Model",
       -0.84,
       GUIDED_ACTION_Y,
       () => {

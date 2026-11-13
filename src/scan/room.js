@@ -225,7 +225,7 @@ export class RoomScan {
           entry.sources.slice(1).some(Boolean));
         this.message =
           this.records.length >= this.capacity
-            ? "Point limit reached. Freeze or clear the scan."
+            ? "Point limit reached. View Model or clear the scan."
             : wide
               ? "Real surface detected. Hold trigger and sweep the short ray fan."
               : "Real surface detected. Hold trigger and sweep slowly.";
