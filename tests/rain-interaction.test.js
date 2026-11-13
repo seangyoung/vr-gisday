@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { BASIN_PALETTES, RainExperience } from "../src/rain/experience.js";
+import { BASIN_PALETTE, RainExperience } from "../src/rain/experience.js";
 import { createHeights, cellAt } from "../src/rain/terrain.js";
 // Only text sprites need a canvas; geometry and controller motion use real Three.js.
 globalThis.document = {
@@ -118,21 +118,21 @@ test("erosion tray has a visible base and corners with translucent soil sides", 
   r.dispose();
 });
 
-test("basin palette changes recolor terrain, outlets, and existing runoff paths", () => {
+test("basin overlay, outlets, and runoff paths share the fixed palette", () => {
   const r = new RainExperience(new THREE.Scene(), () => {});
   r.explore();
   r.toggleOverlay();
   const source = r.basins.findIndex((name) => name === "A");
   r.emit(source);
-  const before = r.terrain.geometry.attributes.color.array.slice(source * 3, source * 3 + 3);
-  r.nextPalette();
-  assert.equal(r.palette.name, BASIN_PALETTES[1].name);
-  assert.notDeepEqual([...r.terrain.geometry.attributes.color.array.slice(source * 3, source * 3 + 3)], [...before]);
+  assert.equal(r.palette, BASIN_PALETTE);
   assert.equal(r.outletMeshes.find((item) => item.name === "A").mesh.material.color.getHex(),
-    r.palette.colors.A);
-  assert.equal(r.trails[0].material.color.getHex(), r.palette.colors.A);
-  for (let i = 1; i < BASIN_PALETTES.length; i++) r.nextPalette();
-  assert.equal(r.palette.name, BASIN_PALETTES[0].name);
+    BASIN_PALETTE.colors.A);
+  assert.equal(r.trails[0].material.color.getHex(), BASIN_PALETTE.colors.A);
+  const tinted = new THREE.Color(BASIN_PALETTE.colors.A).multiplyScalar(0.82);
+  const vertex = r.terrain.geometry.attributes.color.array.slice(source * 3, source * 3 + 3);
+  assert.ok(Math.abs(vertex[0] - tinted.r) < 0.0001);
+  assert.ok(Math.abs(vertex[1] - tinted.g) < 0.0001);
+  assert.ok(Math.abs(vertex[2] - tinted.b) < 0.0001);
   r.dispose();
 });
 

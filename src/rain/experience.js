@@ -16,16 +16,10 @@ import {
   OUTLET_A,
   OUTLET_B,
 } from "./terrain.js";
-export const BASIN_PALETTES = [
-  { name: "Coast", colors: { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff },
-    labels: { A: "blue", B: "gold", sink: "purple" } },
-  { name: "Coral", colors: { A: 0x5ac6e8, B: 0xff9e8c, sink: 0xdfb7f2 },
-    labels: { A: "blue", B: "coral", sink: "lavender" } },
-  { name: "Meadow", colors: { A: 0x53d9a3, B: 0xe9a3e8, sink: 0xffce72 },
-    labels: { A: "green", B: "pink", sink: "amber" } },
-  { name: "Contrast", colors: { A: 0x6298ff, B: 0xffd461, sink: 0xe684bf },
-    labels: { A: "blue", B: "yellow", sink: "magenta" } },
-];
+export const BASIN_PALETTE = {
+  colors: { A: 0x60e3f0, B: 0xffce83, sink: 0xd5a2ff },
+  labels: { A: "blue", B: "gold", sink: "purple" },
+};
 export class RainExperience {
   constructor(scene, onChange, kind = "drainage", onEvent = () => {}) {
     this.kind = kind;
@@ -53,7 +47,6 @@ export class RainExperience {
     this.trees = [];
     this.elapsed = 0;
     this.overlay = false;
-    this.paletteIndex = 0;
     this.outletMeshes = [];
     this.answer = null;
     this.counts = { A: 0, B: 0, sink: 0 };
@@ -761,20 +754,10 @@ export class RainExperience {
     return obj;
   }
   get palette() {
-    return BASIN_PALETTES[this.paletteIndex];
+    return BASIN_PALETTE;
   }
   basinColor(name) {
     return this.palette.colors[name] ?? this.palette.colors.sink;
-  }
-  nextPalette() {
-    if (this.kind !== "drainage") return;
-    this.paletteIndex = (this.paletteIndex + 1) % BASIN_PALETTES.length;
-    for (const { name, mesh } of this.outletMeshes)
-      mesh.material.color.setHex(this.basinColor(name));
-    for (const trail of this.trails)
-      trail.material.color.setHex(this.basinColor(trail.userData.basin));
-    this.paint();
-    this.onChange();
   }
   paint(displayHeights = this.heights, displayVegetation = this.vegetation) {
     const attr = this.terrain.geometry.getAttribute("color");

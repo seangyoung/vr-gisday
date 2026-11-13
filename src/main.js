@@ -1941,14 +1941,12 @@ function drawRainUI() {
         0.42, r.brushTool === "vegetation");
       button("Takeaway", 0.88, GUIDED_ACTION_Y, () => { stopRainInput(); r.finish(); }, 0.42);
     } else {
-      button("Reset terrain", -0.88, GUIDED_ACTION_Y,
-        () => { stopRainInput(); r.restore(); }, 0.51);
-      button(r.overlay ? "Hide basins" : "Show basins", -0.29, GUIDED_ACTION_Y,
-        () => r.toggleOverlay(), 0.51);
-      button(`Colors: ${r.palette.name}`, 0.29, GUIDED_ACTION_Y,
-        () => r.nextPalette(), 0.51);
-      button(r.edited ? "Takeaways" : "Prediction", 0.88, GUIDED_ACTION_Y,
-        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.51);
+      button("Reset terrain", -0.7, GUIDED_ACTION_Y,
+        () => { stopRainInput(); r.restore(); }, 0.65);
+      button(r.overlay ? "Hide basins" : "Show basins", 0, GUIDED_ACTION_Y,
+        () => r.toggleOverlay(), 0.65);
+      button(r.edited ? "Takeaways" : "Prediction", 0.7, GUIDED_ACTION_Y,
+        () => { stopRainInput(); if (r.edited) r.finish(); else r.challenge(); }, 0.65);
     }
   }
   if (r.stage === 2) {
