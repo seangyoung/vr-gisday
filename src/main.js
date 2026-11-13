@@ -2624,18 +2624,18 @@ function controllerGuideContext(hand) {
     return ["Scan", scan.room && !scan.frozen ? null : "Move/size", onMenu, exitLabel];
   if (viewshed?.started && !viewshed.finished)
     return [hand === "left" || viewshed.isClimbing ? null : "Place tower",
-      viewshed.isZiplining ? null :
-      viewshed.isAtTop ? "Grip pole" :
-      viewshed.climbHands.size ? "Flick + release" : "Grip pole / rim", onMenu,
+      viewshed.isZiplining || viewshed.observer.height !== 12 ? null : "Climb", onMenu,
       exitLabel, viewshed.isClimbing || viewshed.isAtTop ? null : teleportHint];
   if (pixels?.started && !pixels.finished && pixels.phase === "platforms")
     return ["Select / spin", null, onMenu, exitLabel];
   if ((layers?.started && !layers.finished) ||
-      (pixels?.started && !pixels.finished && pixels.phase === "pixels"))
+      (pixels?.started && !pixels.finished && pixels.phase === "pixels")) {
+    const landscape = treeLandscape();
     return [hand === "left" ? null : "Select",
-      treeLandscape()?.treeInteractions && treeLandscape().selected.has("vegetation")
-        ? treeLandscape().treeClimbHands.size ? "Flick + release" : "Climb trunk" : null,
-      onMenu, exitLabel, treeLandscape()?.isClimbingTree ? null : teleportHint];
+      landscape?.treeInteractions && landscape.selected.has("vegetation")
+        ? "Climb" : null,
+      onMenu, exitLabel, landscape?.isClimbingTree ? null : teleportHint];
+  }
   if (showcase) return [showcase.kind === "road" && showcase.phase === "driving" ?
       hand === "right" ? "Accelerate" : "Brake" :
     showcase.kind === "outbreak" && hand === "left" ? null :
