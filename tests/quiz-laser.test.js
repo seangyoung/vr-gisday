@@ -11,7 +11,7 @@ function fixture() {
   group.position.z = -1.5;
   const hits = [];
   const sounds = [];
-  const target = { group, action: (method) => {
+  const target = { group, body: group, action: (method) => {
     hits.push(method);
     quiz.targets = [];
   } };
@@ -46,6 +46,38 @@ test("aiming away fires visibly but does not answer", () => {
   assert.equal(quiz.pendingBlast.target, null);
   quiz.updateBlast(0.2);
   assert.deepEqual(hits, []);
+});
+
+test("a nearby decorative outline cannot pull the bolt off the saber's axis", () => {
+  const { quiz, grip, hits } = fixture();
+  const target = quiz.targets[0];
+  target.body.position.x = 0.6;
+  const outline = new THREE.LineSegments(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, -0.2, -1.5),
+      new THREE.Vector3(0, 0.2, -1.5),
+    ]), new THREE.LineBasicMaterial());
+  target.body.add(outline);
+  assert.equal(quiz.fireFromGrip(grip), true);
+  assert.equal(quiz.pendingBlast.target, null);
+  assert.ok(Math.abs(quiz.pendingBlast.to.x - quiz.pendingBlast.from.x) < 1e-8);
+  assert.ok(Math.abs(quiz.pendingBlast.to.y - quiz.pendingBlast.from.y) < 1e-8);
+  quiz.updateBlast(0.2);
+  assert.deepEqual(hits, []);
+});
+
+test("a rotated saber sends the bolt straight along its visible blade", () => {
+  const { quiz, grip } = fixture();
+  grip.rotation.y = -0.35;
+  grip.updateWorldMatrix(true, false);
+  const from = grip.localToWorld(new THREE.Vector3(0, 0, -0.84));
+  const forward = new THREE.Vector3(0, 0, -1)
+    .transformDirection(grip.matrixWorld);
+  quiz.targets[0].body.position.copy(from).addScaledVector(forward, 0.9);
+  assert.equal(quiz.fireFromGrip(grip), true);
+  assert.equal(quiz.pendingBlast.target, quiz.targets[0]);
+  const flight = quiz.pendingBlast.to.clone().sub(quiz.pendingBlast.from).normalize();
+  assert.ok(flight.angleTo(forward) < 1e-8);
 });
 
 test("trigger cannot answer while the quiz is prompting or paused", () => {

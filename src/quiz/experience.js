@@ -217,7 +217,7 @@ export class QuizExperience {
         fontScale: text.length === 1 ? 1.6 : 1 });
     group.add(body, edge, face);
     parent.add(group);
-    const target = { group, face, text, width, height, color, action,
+    const target = { group, body, face, text, width, height, color, action,
       box: { min: { x: -width / 2, y: -height / 2, z: -0.08 },
         max: { x: width / 2, y: height / 2, z: 0.08 } } };
     this.targets.push(target);
@@ -398,13 +398,16 @@ export class QuizExperience {
     for (const item of this.targets) {
       if (!item.group.visible) continue;
       item.group.updateWorldMatrix(true, true);
-      const hit = ray.intersectObject(item.group, true)[0];
+      // The decorative edge is a LineSegments object. Its generous default
+      // raycast tolerance can report a hit well away from the actual block.
+      const hit = ray.intersectObject(item.body, false)[0];
       if (hit && (!nearest || hit.distance < nearest.distance)) {
         nearest = hit;
         target = item;
       }
     }
-    const to = nearest?.point ?? from.clone().addScaledVector(direction, 2.6);
+    const to = from.clone().addScaledVector(direction,
+      nearest?.distance ?? 2.6);
     const bolt = new THREE.Group();
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.025, 10, 8),
       new THREE.MeshBasicMaterial({ color: 0xc5ecb8 }));
