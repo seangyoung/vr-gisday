@@ -12,11 +12,11 @@ export const landingMarkup = `
           <p>Hands-on VR and mixed reality experiences about satellites, terrain, maps, and how we interpret change.</p>
         </section>
         <div class="player-entry">
-          <label for="player-name">Player name</label>
-          <input id="player-name" type="text" list="player-list" maxlength="30" autocomplete="nickname" placeholder="Enter or choose a name" aria-describedby="player-help" />
-          <datalist id="player-list"></datalist>
-          <select id="player-previous" aria-label="Choose a previous player"><option value="">Choose a previous player</option></select>
-          <p id="player-help">Use the Quest keyboard before entering VR. Your best score from each lesson adds to today's total on this headset.</p>
+          <label for="player-name">Player name for the leaderboard</label>
+          <input id="player-name" type="text" maxlength="30" autocomplete="off" placeholder="Enter your name" aria-describedby="player-help" />
+          <button id="player-picker" class="player-picker" type="button" aria-controls="player-choices" aria-expanded="false" hidden>Choose a saved player</button>
+          <div id="player-choices" class="player-choices" role="group" aria-label="Saved players" hidden></div>
+          <p id="player-help">Enter a name or choose one saved on this headset. Your best score from each lesson adds to today's total.</p>
         </div>
         <div class="launch-actions" aria-label="Explore the lab">
           <button id="vr" disabled>Checking VR…</button>

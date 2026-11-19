@@ -205,8 +205,7 @@ p {
   background: #102f39;
 }
 .player-entry label { display: block; font-weight: 650; margin-bottom: 7px; }
-.player-entry input,
-.player-entry select {
+.player-entry input {
   box-sizing: border-box;
   width: 100%;
   min-height: 48px;
@@ -217,8 +216,43 @@ p {
   color: #102b37;
   font: inherit;
 }
-.player-entry select { margin-top: 9px; }
-.player-entry input:focus-visible { outline: 3px solid #ffdc83; outline-offset: 3px; }
+.player-entry input:focus-visible,
+.player-entry button:focus-visible { outline: 3px solid #ffdc83; outline-offset: 3px; }
+.player-picker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid #649b9c;
+  border-radius: 9px;
+  background: #173e48;
+  color: #d5f4ed;
+  font: inherit;
+  cursor: pointer;
+}
+.player-picker[hidden],
+.player-choices[hidden] { display: none; }
+.player-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 152px;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+.player-choice {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid #4d8c8c;
+  border-radius: 9px;
+  background: #245159;
+  color: #ecfbf5;
+  font: inherit;
+  cursor: pointer;
+}
+.player-choice:hover { background: #326b6a; }
 .player-entry p { margin: 8px 0 0; font-size: 13px; color: #bad4d5; }
 .leaderboard-board-heading {
   display: flex;

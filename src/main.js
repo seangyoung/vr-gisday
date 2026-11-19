@@ -81,23 +81,39 @@ app.innerHTML = landingMarkup;
 const refreshLandingLeaderboard = () => renderLandingLeaderboard(app, quizLeaderboard);
 refreshLandingLeaderboard();
 const playerInput = app.querySelector("#player-name");
-const playerList = app.querySelector("#player-list");
-const playerPrevious = app.querySelector("#player-previous");
+const playerPicker = app.querySelector("#player-picker");
+const playerChoices = app.querySelector("#player-choices");
+function showPlayerChoices(open) {
+  playerChoices.hidden = !open;
+  playerPicker.setAttribute("aria-expanded", String(open));
+}
 function refreshPlayers() {
   const board = quizLeaderboard?.read();
   if (!board) return;
   playerInput.value = board.selected;
-  playerList.replaceChildren(...board.players.map((name) => {
-    const option = document.createElement("option");
-    option.value = name;
-    return option;
+  playerChoices.replaceChildren(...board.players.map((name) => {
+    const choice = document.createElement("button");
+    choice.type = "button";
+    choice.className = "player-choice";
+    choice.textContent = name;
+    choice.addEventListener("click", () => {
+      playerInput.value = name;
+      showPlayerChoices(false);
+    });
+    return choice;
   }));
-  playerPrevious.replaceChildren(new Option("Choose a previous player", ""),
-    ...board.players.map((name) => new Option(name, name)));
-  playerPrevious.value = board.selected;
+  playerPicker.hidden = board.players.length === 0;
+  showPlayerChoices(false);
 }
-playerPrevious.addEventListener("change", () => {
-  if (playerPrevious.value) playerInput.value = playerPrevious.value;
+playerPicker.addEventListener("click", () => {
+  showPlayerChoices(playerChoices.hidden);
+});
+playerInput.addEventListener("input", () => showPlayerChoices(false));
+playerChoices.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    showPlayerChoices(false);
+    playerPicker.focus();
+  }
 });
 refreshPlayers();
 window.addEventListener("focus", refreshLandingLeaderboard);
